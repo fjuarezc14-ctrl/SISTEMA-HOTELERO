@@ -2,7 +2,7 @@
  * Cliente HTTP centralizado para comunicación con la API Backend
  */
 
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api/v1';
+const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4020/api/v1';
 
 export async function apiRequest(endpoint, options = {}) {
   const token = localStorage.getItem('valetec_hotel_token');
