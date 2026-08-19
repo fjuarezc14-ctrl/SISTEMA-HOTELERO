@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import bcrypt from 'bcryptjs';
 
 dotenv.config();
 
@@ -78,6 +79,16 @@ export async function initDatabase() {
         await client.query(seedsSql);
         console.log('✅ Datos iniciales (Seeds) verificados / cargados con éxito.');
       }
+
+      // Asegurar hash de contraseñas de admin y recepcion
+      const salt = await bcrypt.genSalt(10);
+      const defaultHash = await bcrypt.hash('admin123', salt);
+      await client.query(
+        "UPDATE users SET password_hash = $1 WHERE username IN ('admin', 'recepcion')",
+        [defaultHash]
+      );
+      console.log('✅ Usuarios iniciales verificados con contraseña default (admin123).');
+
     } finally {
       client.release();
     }

@@ -17,29 +17,29 @@ VALUES (
 ON CONFLICT DO NOTHING;
 
 -- 2. Usuario Administrador por Defecto (username: admin / password: admin123)
--- Hash bcrypt para 'admin123': $2b$10$wH6qKzH3yGf9qYfGZ5.1yeC67m4M2Jz6b5e/iT0fV6d4z7g4Cj7G2
+-- Hash bcrypt para 'admin123': $2a$10$YpW5xTVlTkEqUO6FfKD/IuJYxII.J6JIif456eO61KWFOnRK.yP7m
 INSERT INTO users (id, username, password_hash, full_name, role, is_active)
 VALUES (
     'a0000000-0000-0000-0000-000000000001',
     'admin',
-    '$2b$10$wH6qKzH3yGf9qYfGZ5.1yeC67m4M2Jz6b5e/iT0fV6d4z7g4Cj7G2',
+    '$2a$10$YpW5xTVlTkEqUO6FfKD/IuJYxII.J6JIif456eO61KWFOnRK.yP7m',
     'Administrador General',
     'super_admin',
     true
 )
-ON CONFLICT (username) DO NOTHING;
+ON CONFLICT (username) DO UPDATE SET password_hash = EXCLUDED.password_hash;
 
 -- Usuario Recepcionista de prueba (username: recepcion / password: admin123)
 INSERT INTO users (id, username, password_hash, full_name, role, is_active)
 VALUES (
     'a0000000-0000-0000-0000-000000000002',
     'recepcion',
-    '$2b$10$wH6qKzH3yGf9qYfGZ5.1yeC67m4M2Jz6b5e/iT0fV6d4z7g4Cj7G2',
+    '$2a$10$YpW5xTVlTkEqUO6FfKD/IuJYxII.J6JIif456eO61KWFOnRK.yP7m',
     'Recepcionista Turno Día',
     'receptionist',
     true
 )
-ON CONFLICT (username) DO NOTHING;
+ON CONFLICT (username) DO UPDATE SET password_hash = EXCLUDED.password_hash;
 
 -- 3. Tipos de Habitación con Tarifas por Defecto en Soles (PEN)
 INSERT INTO room_types (id, name, description, hours_quantity_default, price_hours_default, price_overnight_default, price_full_day_default, price_extra_hour_default)
