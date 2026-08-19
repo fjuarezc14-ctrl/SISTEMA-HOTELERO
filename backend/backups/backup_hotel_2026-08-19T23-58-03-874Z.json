@@ -1,0 +1,403 @@
+{
+  "timestamp": "2026-08-19T23:58:03.789Z",
+  "database": "hotel_peru_db",
+  "data": {
+    "hotel_info": [
+      {
+        "id": "6aaf8fb1-636a-4795-8d93-523bc4dcd2a4",
+        "business_name": "VT HOTEL PERÚ S.A.C.",
+        "trade_name": "Hotel Marte Perú",
+        "ruc": "20123456789",
+        "address": "Av. Principal 123, Miraflores, Lima, Perú",
+        "phone": "01-2345678",
+        "email": "contacto@hotelperu.com",
+        "currency_symbol": "S/",
+        "currency_code": "PEN",
+        "updated_at": "2026-08-19T17:00:51.236Z"
+      },
+      {
+        "id": "e9cc9a1e-f66b-4929-8c6a-814ddade6eb1",
+        "business_name": "VT HOTEL PERÚ S.A.C.",
+        "trade_name": "Hotel Marte Perú",
+        "ruc": "20123456789",
+        "address": "Av. Principal 123, Miraflores, Lima, Perú",
+        "phone": "01-2345678",
+        "email": "contacto@hotelperu.com",
+        "currency_symbol": "S/",
+        "currency_code": "PEN",
+        "updated_at": "2026-08-19T17:15:43.545Z"
+      },
+      {
+        "id": "1af6961f-828e-4dc9-871d-feb849afe42c",
+        "business_name": "VT HOTEL PERÚ S.A.C.",
+        "trade_name": "Hotel Marte Perú",
+        "ruc": "20123456789",
+        "address": "Av. Principal 123, Miraflores, Lima, Perú",
+        "phone": "01-2345678",
+        "email": "contacto@hotelperu.com",
+        "currency_symbol": "S/",
+        "currency_code": "PEN",
+        "updated_at": "2026-08-19T17:39:50.390Z"
+      },
+      {
+        "id": "ba27c41e-5d53-4a1f-9469-7fcc869344f6",
+        "business_name": "VT HOTEL PERÚ S.A.C.",
+        "trade_name": "Hotel Marte Perú",
+        "ruc": "20123456789",
+        "address": "Av. Principal 123, Miraflores, Lima, Perú",
+        "phone": "01-2345678",
+        "email": "contacto@hotelperu.com",
+        "currency_symbol": "S/",
+        "currency_code": "PEN",
+        "updated_at": "2026-08-19T23:33:06.195Z"
+      },
+      {
+        "id": "a163689e-8b2a-4089-8187-653ffddd704c",
+        "business_name": "VT HOTEL PERÚ S.A.C.",
+        "trade_name": "Hotel Marte Perú",
+        "ruc": "20123456789",
+        "address": "Av. Principal 123, Miraflores, Lima, Perú",
+        "phone": "01-2345678",
+        "email": "contacto@hotelperu.com",
+        "currency_symbol": "S/",
+        "currency_code": "PEN",
+        "updated_at": "2026-08-19T23:34:50.960Z"
+      },
+      {
+        "id": "e07f51ea-216b-42ec-9369-be95529ab2b8",
+        "business_name": "VT HOTEL PERÚ S.A.C.",
+        "trade_name": "Hotel Marte Perú",
+        "ruc": "20123456789",
+        "address": "Av. Principal 123, Miraflores, Lima, Perú",
+        "phone": "01-2345678",
+        "email": "contacto@hotelperu.com",
+        "currency_symbol": "S/",
+        "currency_code": "PEN",
+        "updated_at": "2026-08-19T23:56:08.205Z"
+      }
+    ],
+    "users": [
+      {
+        "id": "a0000000-0000-0000-0000-000000000001",
+        "username": "admin",
+        "password_hash": "$2a$10$YpW5xTVlTkEqUO6FfKD/IuJYxII.J6JIif456eO61KWFOnRK.yP7m",
+        "full_name": "Administrador General",
+        "role": "super_admin",
+        "is_active": true,
+        "created_at": "2026-08-19T17:00:51.240Z",
+        "updated_at": "2026-08-19T17:00:51.240Z"
+      },
+      {
+        "id": "a0000000-0000-0000-0000-000000000002",
+        "username": "recepcion",
+        "password_hash": "$2a$10$YpW5xTVlTkEqUO6FfKD/IuJYxII.J6JIif456eO61KWFOnRK.yP7m",
+        "full_name": "Recepcionista Turno Día",
+        "role": "receptionist",
+        "is_active": true,
+        "created_at": "2026-08-19T17:00:51.243Z",
+        "updated_at": "2026-08-19T17:00:51.243Z"
+      }
+    ],
+    "customers": [],
+    "room_types": [
+      {
+        "id": "b0000000-0000-0000-0000-000000000001",
+        "name": "Simple Estándar",
+        "description": "Habitación individual con cama de 1.5 plazas, baño privado y TV cable.",
+        "hours_quantity_default": 3,
+        "price_hours_default": "25.00",
+        "price_overnight_default": "50.00",
+        "price_full_day_default": "70.00",
+        "price_extra_hour_default": "10.00",
+        "created_at": "2026-08-19T17:00:51.246Z",
+        "updated_at": "2026-08-19T17:00:51.246Z"
+      },
+      {
+        "id": "b0000000-0000-0000-0000-000000000002",
+        "name": "Matrimonial",
+        "description": "Cama Queen de 2 plazas, baño privado, agua caliente, Smart TV y WiFi.",
+        "hours_quantity_default": 3,
+        "price_hours_default": "30.00",
+        "price_overnight_default": "60.00",
+        "price_full_day_default": "90.00",
+        "price_extra_hour_default": "10.00",
+        "created_at": "2026-08-19T17:00:51.246Z",
+        "updated_at": "2026-08-19T17:00:51.246Z"
+      },
+      {
+        "id": "b0000000-0000-0000-0000-000000000003",
+        "name": "Doble",
+        "description": "Dos camas individuales, baño privado y ambiente espacioso.",
+        "hours_quantity_default": 3,
+        "price_hours_default": "40.00",
+        "price_overnight_default": "80.00",
+        "price_full_day_default": "110.00",
+        "price_extra_hour_default": "15.00",
+        "created_at": "2026-08-19T17:00:51.246Z",
+        "updated_at": "2026-08-19T17:00:51.246Z"
+      },
+      {
+        "id": "b0000000-0000-0000-0000-000000000004",
+        "name": "Suite Jacuzzi",
+        "description": "Habitación VIP con tina de hidromasajes/jacuzzi, cama King, frigobar y luces LED.",
+        "hours_quantity_default": 3,
+        "price_hours_default": "70.00",
+        "price_overnight_default": "130.00",
+        "price_full_day_default": "180.00",
+        "price_extra_hour_default": "20.00",
+        "created_at": "2026-08-19T17:00:51.246Z",
+        "updated_at": "2026-08-19T17:00:51.246Z"
+      }
+    ],
+    "rooms": [
+      {
+        "id": "b20122c7-5242-420d-acbc-746f3f8e13b0",
+        "room_number": "101",
+        "room_type_id": "b0000000-0000-0000-0000-000000000002",
+        "floor": 1,
+        "status": "available",
+        "observations": null,
+        "created_at": "2026-08-19T17:00:51.249Z",
+        "updated_at": "2026-08-19T17:00:51.249Z"
+      },
+      {
+        "id": "c6a2cfd1-9efa-4dac-bd79-0dc1c134711a",
+        "room_number": "102",
+        "room_type_id": "b0000000-0000-0000-0000-000000000002",
+        "floor": 1,
+        "status": "available",
+        "observations": null,
+        "created_at": "2026-08-19T17:00:51.249Z",
+        "updated_at": "2026-08-19T17:00:51.249Z"
+      },
+      {
+        "id": "24ed76bd-6e87-497d-8c1e-3e99f554abe6",
+        "room_number": "103",
+        "room_type_id": "b0000000-0000-0000-0000-000000000001",
+        "floor": 1,
+        "status": "available",
+        "observations": null,
+        "created_at": "2026-08-19T17:00:51.249Z",
+        "updated_at": "2026-08-19T17:00:51.249Z"
+      },
+      {
+        "id": "2763fb0a-1c46-492d-b83c-8c7b93074874",
+        "room_number": "104",
+        "room_type_id": "b0000000-0000-0000-0000-000000000003",
+        "floor": 1,
+        "status": "available",
+        "observations": null,
+        "created_at": "2026-08-19T17:00:51.249Z",
+        "updated_at": "2026-08-19T17:00:51.249Z"
+      },
+      {
+        "id": "81aab541-2f05-42e9-a796-9a7ffc3addf6",
+        "room_number": "201",
+        "room_type_id": "b0000000-0000-0000-0000-000000000002",
+        "floor": 2,
+        "status": "available",
+        "observations": null,
+        "created_at": "2026-08-19T17:00:51.259Z",
+        "updated_at": "2026-08-19T17:00:51.259Z"
+      },
+      {
+        "id": "2252547e-9711-4c34-9f3b-e3dc36236bc4",
+        "room_number": "202",
+        "room_type_id": "b0000000-0000-0000-0000-000000000002",
+        "floor": 2,
+        "status": "available",
+        "observations": null,
+        "created_at": "2026-08-19T17:00:51.259Z",
+        "updated_at": "2026-08-19T17:00:51.259Z"
+      },
+      {
+        "id": "244bccaa-8d07-44c4-a632-b10a63e8a147",
+        "room_number": "203",
+        "room_type_id": "b0000000-0000-0000-0000-000000000001",
+        "floor": 2,
+        "status": "available",
+        "observations": null,
+        "created_at": "2026-08-19T17:00:51.259Z",
+        "updated_at": "2026-08-19T17:00:51.259Z"
+      },
+      {
+        "id": "3efab0bd-d46f-445d-857b-09459c2cce82",
+        "room_number": "204",
+        "room_type_id": "b0000000-0000-0000-0000-000000000004",
+        "floor": 2,
+        "status": "available",
+        "observations": null,
+        "created_at": "2026-08-19T17:00:51.259Z",
+        "updated_at": "2026-08-19T17:00:51.259Z"
+      },
+      {
+        "id": "3fe757b1-268a-431b-96a9-9edb9ae7ad88",
+        "room_number": "301",
+        "room_type_id": "b0000000-0000-0000-0000-000000000002",
+        "floor": 3,
+        "status": "available",
+        "observations": null,
+        "created_at": "2026-08-19T17:00:51.267Z",
+        "updated_at": "2026-08-19T17:00:51.267Z"
+      },
+      {
+        "id": "9e3ff562-4d25-4604-a0ba-9203828f60ab",
+        "room_number": "302",
+        "room_type_id": "b0000000-0000-0000-0000-000000000004",
+        "floor": 3,
+        "status": "available",
+        "observations": null,
+        "created_at": "2026-08-19T17:00:51.267Z",
+        "updated_at": "2026-08-19T17:00:51.267Z"
+      },
+      {
+        "id": "34ae4949-1019-479a-9395-806a7c18c9a6",
+        "room_number": "303",
+        "room_type_id": "b0000000-0000-0000-0000-000000000003",
+        "floor": 3,
+        "status": "available",
+        "observations": null,
+        "created_at": "2026-08-19T17:00:51.267Z",
+        "updated_at": "2026-08-19T17:00:51.267Z"
+      }
+    ],
+    "work_shifts": [
+      {
+        "id": "602990b4-d184-4aa6-8d3d-113b0a299fef",
+        "user_id": "a0000000-0000-0000-0000-000000000001",
+        "opened_at": "2026-08-19T20:18:18.644Z",
+        "closed_at": null,
+        "initial_cash_pen": "0.00",
+        "expected_cash_pen": "0.00",
+        "actual_cash_pen": null,
+        "difference_cash_pen": "0.00",
+        "total_yape_plin_pen": "0.00",
+        "total_card_pen": "0.00",
+        "total_revenue_pen": "0.00",
+        "status": "open",
+        "shift_notes": "",
+        "created_at": "2026-08-19T20:18:18.644Z"
+      }
+    ],
+    "stays": [],
+    "cash_transactions": [],
+    "products": [
+      {
+        "id": "4a1a382f-b476-4966-a2cf-b79bc3ef8052",
+        "name": "Agua Mineral San Mateo 600ml",
+        "sale_price_pen": "3.00",
+        "stock": 50,
+        "is_active": true,
+        "created_at": "2026-08-19T17:00:51.272Z",
+        "updated_at": "2026-08-19T17:00:51.272Z"
+      },
+      {
+        "id": "394da9fa-0e4e-4f97-9a2f-f8ee82009f31",
+        "name": "Gaseosa Coca Cola 500ml",
+        "sale_price_pen": "4.00",
+        "stock": 40,
+        "is_active": true,
+        "created_at": "2026-08-19T17:00:51.272Z",
+        "updated_at": "2026-08-19T17:00:51.272Z"
+      },
+      {
+        "id": "1725cb5e-f340-4d88-8d0b-0defab8c3bcc",
+        "name": "Gaseosa Inca Kola 500ml",
+        "sale_price_pen": "4.00",
+        "stock": 40,
+        "is_active": true,
+        "created_at": "2026-08-19T17:00:51.272Z",
+        "updated_at": "2026-08-19T17:00:51.272Z"
+      },
+      {
+        "id": "ea9837a1-93e0-4ca0-adaf-80dd24f93e48",
+        "name": "Cerveza Cusqueña 330ml",
+        "sale_price_pen": "8.00",
+        "stock": 30,
+        "is_active": true,
+        "created_at": "2026-08-19T17:00:51.272Z",
+        "updated_at": "2026-08-19T17:00:51.272Z"
+      },
+      {
+        "id": "3925bfbf-c4c0-4fee-b02d-fa92716529e9",
+        "name": "Cerveza Pilsen Callao 330ml",
+        "sale_price_pen": "7.00",
+        "stock": 35,
+        "is_active": true,
+        "created_at": "2026-08-19T17:00:51.272Z",
+        "updated_at": "2026-08-19T17:00:51.272Z"
+      },
+      {
+        "id": "bd16c0da-f6f4-4f19-91ec-10267d203a0e",
+        "name": "Snack Papas Lays 45g",
+        "sale_price_pen": "3.50",
+        "stock": 30,
+        "is_active": true,
+        "created_at": "2026-08-19T17:00:51.272Z",
+        "updated_at": "2026-08-19T17:00:51.272Z"
+      },
+      {
+        "id": "ac385508-6b7d-4339-ab97-f7a0452fe966",
+        "name": "Preservativos Durex (Caja x3)",
+        "sale_price_pen": "15.00",
+        "stock": 25,
+        "is_active": true,
+        "created_at": "2026-08-19T17:00:51.272Z",
+        "updated_at": "2026-08-19T17:00:51.272Z"
+      },
+      {
+        "id": "a4b89f6b-1bb3-446e-92bb-fa9cec6af387",
+        "name": "Kit Dental (Cepillo + Crema)",
+        "sale_price_pen": "5.00",
+        "stock": 20,
+        "is_active": true,
+        "created_at": "2026-08-19T17:00:51.272Z",
+        "updated_at": "2026-08-19T17:00:51.272Z"
+      }
+    ],
+    "room_consumptions": [],
+    "maintenance_tickets": [],
+    "audit_logs": [
+      {
+        "id": "4c667442-4688-42ce-8cfd-caed73038e5a",
+        "user_id": "a0000000-0000-0000-0000-000000000001",
+        "user_name": "Administrador General",
+        "role": "super_admin",
+        "action": "LOGIN",
+        "details": "Inicio de sesión exitoso de admin",
+        "ip_address": "::ffff:172.20.0.1",
+        "created_at": "2026-08-19T17:17:15.824Z"
+      },
+      {
+        "id": "109e007d-6341-41f6-bde0-e623ccf35087",
+        "user_id": "a0000000-0000-0000-0000-000000000001",
+        "user_name": "Administrador General",
+        "role": "super_admin",
+        "action": "LOGIN",
+        "details": "Inicio de sesión exitoso de admin",
+        "ip_address": "::ffff:172.20.0.1",
+        "created_at": "2026-08-19T17:17:23.449Z"
+      },
+      {
+        "id": "65750d47-e444-48fe-a869-8749b63148cb",
+        "user_id": "a0000000-0000-0000-0000-000000000001",
+        "user_name": "Administrador General",
+        "role": "super_admin",
+        "action": "LOGIN",
+        "details": "Inicio de sesión exitoso de admin",
+        "ip_address": "::ffff:172.20.0.1",
+        "created_at": "2026-08-19T17:18:07.771Z"
+      },
+      {
+        "id": "7f19569b-ef83-4e5d-9da6-925af04cb2c4",
+        "user_id": "a0000000-0000-0000-0000-000000000001",
+        "user_name": "Administrador General",
+        "role": "super_admin",
+        "action": "LOGIN",
+        "details": "Inicio de sesión exitoso de admin",
+        "ip_address": "::ffff:172.20.0.1",
+        "created_at": "2026-08-19T23:34:57.122Z"
+      }
+    ]
+  }
+}

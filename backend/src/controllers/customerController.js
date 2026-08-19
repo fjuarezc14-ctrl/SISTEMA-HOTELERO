@@ -21,6 +21,16 @@ export const customerController = {
     }
   },
 
+  async lookup(req, res, next) {
+    try {
+      const { documentNumber } = req.params;
+      const result = await customerService.lookupDocument(documentNumber);
+      res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  },
+
   async createOrUpdate(req, res, next) {
     try {
       const customer = await customerService.registerOrUpdateCustomer(req.body);

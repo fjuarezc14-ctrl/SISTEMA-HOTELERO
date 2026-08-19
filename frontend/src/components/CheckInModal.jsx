@@ -45,23 +45,25 @@ export function CheckInModal({ isOpen, onClose, room, onSuccess }) {
     }
   }, [room, stayType]);
 
-  // Buscar cliente existente por documento (DNI/RUC/CE)
+  // Buscar cliente existente o consultar padrón RENIEC / SUNAT
   const handleSearchCustomer = async () => {
     if (!documentNumber.trim()) return;
     try {
       setSearchingDoc(true);
       setError('');
-      const res = await api.get(`/customers/doc/${documentNumber.trim()}`);
-      if (res.data) {
+      const res = await api.get(`/customers/lookup/${documentNumber.trim()}`);
+      if (res.data && res.data.found) {
         setFullName(res.data.full_name || '');
-        setPhone(res.data.phone || '');
-        setDocumentType(res.data.document_type || 'DNI');
+        if (res.data.phone) setPhone(res.data.phone);
+        if (res.data.document_type) setDocumentType(res.data.document_type);
         if (res.data.is_blacklisted) {
-          setError(`⚠️ ALERTA: Este cliente está VETADO. Motivo: ${res.data.blacklist_reason || 'No especificado'}`);
+          setError(`⚠️ ALERTA DE VETO: Este cliente está en LISTA NEGRA. Motivo: ${res.data.blacklist_reason || 'No especificado'}`);
         }
+      } else {
+        setError('Documento no registrado en base local. Ingresa el nombre del huésped.');
       }
     } catch (err) {
-      // Si no existe, no es error bloqueante
+      console.error('Error buscando documento:', err.message);
     } finally {
       setSearchingDoc(false);
     }

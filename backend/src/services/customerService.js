@@ -21,6 +21,54 @@ export const customerService = {
     return await customerRepository.findByDocument(docNumber.trim());
   },
 
+  async lookupDocument(docNumber) {
+    if (!docNumber) return null;
+    const cleanDoc = docNumber.trim();
+    
+    // Primero verificar si ya existe en la base de datos local
+    const existing = await customerRepository.findByDocument(cleanDoc);
+    if (existing) {
+      return {
+        found: true,
+        source: 'local_database',
+        document_type: existing.document_type,
+        document_number: existing.document_number,
+        full_name: existing.full_name,
+        phone: existing.phone,
+        is_blacklisted: existing.is_blacklisted,
+        blacklist_reason: existing.blacklist_reason
+      };
+    }
+
+    // Búsqueda inteligente / simulación RENIEC (8 dígitos) o SUNAT (11 dígitos)
+    if (cleanDoc.length === 8 && /^\d+$/.test(cleanDoc)) {
+      return {
+        found: true,
+        source: 'RENIEC',
+        document_type: 'DNI',
+        document_number: cleanDoc,
+        full_name: `Huésped DNI ${cleanDoc}`,
+        phone: ''
+      };
+    }
+
+    if (cleanDoc.length === 11 && /^\d+$/.test(cleanDoc)) {
+      return {
+        found: true,
+        source: 'SUNAT',
+        document_type: 'RUC',
+        document_number: cleanDoc,
+        full_name: `Empresa / Razón Social RUC ${cleanDoc}`,
+        phone: ''
+      };
+    }
+
+    return {
+      found: false,
+      message: 'Documento no encontrado en padrón.'
+    };
+  },
+
   async registerOrUpdateCustomer({ document_type = 'DNI', document_number, full_name, phone = '', email = '', is_blacklisted = false, blacklist_reason = '' }) {
     if (!document_number || !full_name) {
       const error = new Error('El número de documento y el nombre completo son obligatorios.');

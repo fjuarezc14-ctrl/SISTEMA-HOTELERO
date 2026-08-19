@@ -1,11 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, Wallet, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Clock, Wallet, AlertCircle, CheckCircle2, Maximize2 } from 'lucide-react';
 import { useShift } from '../context/ShiftContext';
 import { formatPEN } from '../utils/formatters';
 
 export function Navbar({ onOpenShiftModal, onCloseShiftModal }) {
   const { activeShift, hasActiveShift } = useShift();
   const [time, setTime] = useState('');
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch((err) => console.error(err));
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      }
+    }
+  };
 
   useEffect(() => {
     const update = () => {
@@ -73,7 +83,13 @@ export function Navbar({ onOpenShiftModal, onCloseShiftModal }) {
               + Abrir Turno
             </button>
           </div>
-        )}
+        <button
+          onClick={toggleFullscreen}
+          title="Pantalla Completa (Modo Kiosco)"
+          className="p-2 text-slate-400 hover:text-emerald-400 hover:bg-slate-800 rounded-lg transition-colors"
+        >
+          <Maximize2 className="w-4 h-4" />
+        </button>
       </div>
     </header>
   );

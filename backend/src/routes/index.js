@@ -8,6 +8,7 @@ import cashRoutes from './cashRoutes.js';
 import productRoutes from './productRoutes.js';
 import settingsRoutes from './settingsRoutes.js';
 import userRoutes from './userRoutes.js';
+import maintenanceRoutes from './maintenanceRoutes.js';
 
 const apiRouter = Router();
 
@@ -20,5 +21,6 @@ apiRouter.use('/cash', cashRoutes);
 apiRouter.use('/products', productRoutes);
 apiRouter.use('/settings', settingsRoutes);
 apiRouter.use('/users', userRoutes);
+apiRouter.use('/maintenance', maintenanceRoutes);
 
 export default apiRouter;

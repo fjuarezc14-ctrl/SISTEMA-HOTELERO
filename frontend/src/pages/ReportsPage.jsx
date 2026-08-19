@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api/apiClient';
 import { formatPEN, formatDatePeru, PAYMENT_METHOD_LABELS } from '../utils/formatters';
-import { BarChart3, Wallet, QrCode, CreditCard, Calendar, TrendingUp } from 'lucide-react';
+import { BarChart3, Wallet, QrCode, CreditCard, Calendar, TrendingUp, Download } from 'lucide-react';
 
 export function ReportsPage() {
   const [transactions, setTransactions] = useState([]);
@@ -21,6 +21,29 @@ export function ReportsPage() {
     };
     fetchReport();
   }, []);
+
+  const exportToCSV = () => {
+    if (transactions.length === 0) return;
+    const headers = ['Fecha', 'Tipo', 'Concepto', 'Categoria', 'Medio de Pago', 'Registrado Por', 'Monto PEN'];
+    const rows = transactions.map((t) => [
+      `"${formatDatePeru(t.created_at)}"`,
+      `"${t.transaction_type}"`,
+      `"${t.concept.replace(/"/g, '""')}"`,
+      `"${t.category}"`,
+      `"${PAYMENT_METHOD_LABELS[t.payment_method] || t.payment_method}"`,
+      `"${t.user_full_name}"`,
+      t.amount_pen
+    ]);
+
+    const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `reporte_caja_hotel_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   // Totales acumulados por los 3 métodos de pago oficiales en Perú
   const totalIncome = transactions
@@ -48,14 +71,24 @@ export function ReportsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h2 className="text-xl font-bold text-white flex items-center gap-2">
-          <BarChart3 className="w-5 h-5 text-emerald-400" />
-          <span>Reportes Financieros y Métodos de Pago (Perú)</span>
-        </h2>
-        <p className="text-xs text-slate-400">
-          Consolidado general de ingresos por Yape/Plin, Efectivo y Tarjeta en Soles (S/).
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-bold text-white flex items-center gap-2">
+            <BarChart3 className="w-5 h-5 text-emerald-400" />
+            <span>Reportes Financieros y Métodos de Pago (Perú)</span>
+          </h2>
+          <p className="text-xs text-slate-400">
+            Consolidado general de ingresos por Yape/Plin, Efectivo y Tarjeta en Soles (S/).
+          </p>
+        </div>
+
+        <button
+          onClick={exportToCSV}
+          className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold rounded-xl shadow-lg shadow-emerald-500/20 transition-all flex items-center gap-2"
+        >
+          <Download className="w-4 h-4" />
+          <span>Exportar a Excel (CSV)</span>
+        </button>
       </div>
 
       {/* Financial Overview Cards */}

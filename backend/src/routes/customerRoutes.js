@@ -8,6 +8,7 @@ router.use(authenticateToken);
 
 router.get('/', customerController.getAll);
 router.get('/doc/:documentNumber', customerController.getByDocument);
+router.get('/lookup/:documentNumber', customerController.lookup);
 router.post('/', customerController.createOrUpdate);
 router.patch('/:id/blacklist', customerController.updateBlacklist);
 

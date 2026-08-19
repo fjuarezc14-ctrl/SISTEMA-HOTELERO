@@ -151,6 +151,27 @@ export const stayService = {
       throw error;
     }
 
+    // Cálculo automático de Horas Extra por sobrestadía
+    const now = new Date();
+    const expectedEnd = new Date(stay.expected_end_time);
+    if (now > expectedEnd) {
+      const diffMs = now.getTime() - expectedEnd.getTime();
+      const diffMinutes = Math.floor(diffMs / 60000);
+      // Tolerancia de 10 minutos de gracia
+      if (diffMinutes > 10) {
+        const extraHours = Math.ceil(diffMinutes / 60);
+        const room = await roomRepository.findRoomById(stay.room_id);
+        const pricePerExtraHour = Number(room?.price_extra_hour_default || 10.00);
+        const extraCost = extraHours * pricePerExtraHour;
+
+        const newTotalStayPrice = Number(stay.total_stay_price_pen) + extraCost;
+        await stayRepository.updateStayPrices(stay.id, {
+          total_stay_price_pen: newTotalStayPrice
+        });
+        stay.total_stay_price_pen = newTotalStayPrice;
+      }
+    }
+
     // Registrar pago final si existe saldo pendiente y se abona
     if (final_payment && Number(final_payment.amount) > 0) {
       let activeShift = await shiftRepository.findActiveShiftByUserId(user_id);

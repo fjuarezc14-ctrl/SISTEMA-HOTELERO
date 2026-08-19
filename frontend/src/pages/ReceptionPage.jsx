@@ -266,6 +266,26 @@ export function ReceptionPage() {
                     </button>
                   )}
 
+                  {room.status === 'cleaning' && (
+                    <button
+                      onClick={() => handleQuickStatusChange(room.id, 'available')}
+                      className="w-full py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold rounded-xl shadow-md shadow-amber-500/20 transition-all flex items-center justify-center gap-1.5"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Marcar Limpia (Disponible)</span>
+                    </button>
+                  )}
+
+                  {room.status === 'maintenance' && (
+                    <button
+                      onClick={() => handleQuickStatusChange(room.id, 'available')}
+                      className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl transition-all flex items-center justify-center gap-1.5"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Habilitar Habitación</span>
+                    </button>
+                  )}
+
                   {room.status === 'occupied' && (
                     <>
                       <button
@@ -289,28 +309,8 @@ export function ReceptionPage() {
                         <LogOut className="w-3.5 h-3.5" />
                         <span>Check-out</span>
                       </button>
-                    </>
                   )}
-
-                  {room.status === 'cleaning' && (
-                    <button
-                      onClick={() => handleQuickStatusChange(room.id, 'available')}
-                      className="w-full py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold rounded-xl shadow-md shadow-amber-500/20 transition-all flex items-center justify-center gap-1.5"
-                    >
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      <span>Completar Limpieza</span>
-                    </button>
-                  )}
-
-                  {room.status === 'maintenance' && (
-                    <button
-                      onClick={() => handleQuickStatusChange(room.id, 'available')}
-                      className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5"
-                    >
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                      <span>Habilitar Habitación</span>
-                    </button>
-                  )}
+                </div>
                 </div>
               </div>
             );
