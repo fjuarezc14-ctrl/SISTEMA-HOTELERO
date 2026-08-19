@@ -3,13 +3,14 @@ import { roomRepository } from '../repositories/roomRepository.js';
 import { customerRepository } from '../repositories/customerRepository.js';
 import { cashRepository } from '../repositories/cashRepository.js';
 import { shiftRepository } from '../repositories/shiftRepository.js';
+import { productRepository } from '../repositories/productRepository.js';
 import { calculateExpectedEndTime } from '../utils/timeHelper.js';
 
 export const stayService = {
   async getActiveStayByRoom(roomId) {
     const stay = await stayRepository.findActiveByRoomId(roomId);
     if (!stay) return null;
-    const consumptions = await stayRepository.findConsumptionsByStayId ? await stayRepository.findConsumptionsByStayId(stay.id) : [];
+    const consumptions = await productRepository.findConsumptionsByStayId(stay.id);
     const payments = await cashRepository.findByStayId(stay.id);
     return {
       ...stay,

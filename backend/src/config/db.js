@@ -80,14 +80,19 @@ export async function initDatabase() {
         console.log('✅ Datos iniciales (Seeds) verificados / cargados con éxito.');
       }
 
-      // Asegurar hash de contraseñas de admin y recepcion
-      const salt = await bcrypt.genSalt(10);
-      const defaultHash = await bcrypt.hash('admin123', salt);
-      await client.query(
-        "UPDATE users SET password_hash = $1 WHERE username IN ('admin', 'recepcion')",
-        [defaultHash]
-      );
-      console.log('✅ Usuarios iniciales verificados con contraseña default (admin123).');
+      // Garantizar usuario administrador inicial únicamente si la tabla está vacía
+      const userCheck = await client.query("SELECT COUNT(*) FROM users");
+      if (parseInt(userCheck.rows[0].count, 10) === 0) {
+        const salt = await bcrypt.genSalt(10);
+        const defaultHash = await bcrypt.hash('admin123', salt);
+        await client.query(
+          "INSERT INTO users (username, password_hash, full_name, role) VALUES ('admin', $1, 'Administrador General', 'super_admin')",
+          [defaultHash]
+        );
+        console.log('✅ Usuario inicial admin creado con clave default (admin123).');
+      } else {
+        console.log('✅ Usuarios del sistema verificados y preservados.');
+      }
 
     } finally {
       client.release();

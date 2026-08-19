@@ -14,7 +14,8 @@ const PORT = process.env.PORT || 4000;
 
 // Middlewares de seguridad y parsing
 app.use(helmet());
-app.use(cors({ origin: '*' }));
+const allowedOrigins = process.env.FRONTEND_URL ? [process.env.FRONTEND_URL, 'http://localhost:5185'] : '*';
+app.use(cors({ origin: allowedOrigins }));
 app.use(express.json({ limit: '20mb' }));
 app.use(express.urlencoded({ limit: '20mb', extended: true }));
 

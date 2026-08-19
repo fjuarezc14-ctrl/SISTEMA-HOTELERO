@@ -15,7 +15,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 
-export function ShiftsPage({ onOpenShiftModal, onCloseShiftModal }) {
+export function ShiftsPage({ onOpenShiftModal = () => {}, onCloseShiftModal = () => {} }) {
   const { activeShift, hasActiveShift } = useShift();
   const [history, setHistory] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
