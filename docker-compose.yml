@@ -1,0 +1,70 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: hotel_peru_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER:-hotel_admin}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-hotel_secret_2026}
+      POSTGRES_DB: ${DB_NAME:-hotel_peru_db}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/database/schema.sql:/docker-entrypoint-initdb.d/1_schema.sql
+      - ./backend/database/seeds.sql:/docker-entrypoint-initdb.d/2_seeds.sql
+    networks:
+      - hotel_network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: hotel_peru_backend
+    restart: always
+    ports:
+      - "${PORT:-4000}:4000"
+    environment:
+      - NODE_ENV=development
+      - PORT=4000
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=${DB_USER:-hotel_admin}
+      - DB_PASSWORD=${DB_PASSWORD:-hotel_secret_2026}
+      - DB_NAME=${DB_NAME:-hotel_peru_db}
+      - JWT_SECRET=${JWT_SECRET:-valetec_hotel_peru_jwt_secret_2026}
+    depends_on:
+      - postgres
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    networks:
+      - hotel_network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: hotel_peru_frontend
+    restart: always
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:4000/api/v1
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - hotel_network
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  hotel_network:
+    driver: bridge

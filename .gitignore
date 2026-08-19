@@ -1,0 +1,33 @@
+# Dependencias
+node_modules/
+.pnp
+.pnp.js
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Entornos y variables secretas
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Compilados de producción
+dist/
+build/
+
+# Base de datos local
+*.sqlite
+*.sqlite3
+*.db
+
+# IDE y Sistema Operativo
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
