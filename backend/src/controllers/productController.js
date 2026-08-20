@@ -68,5 +68,39 @@ export const productController = {
     } catch (error) {
       next(error);
     }
+  },
+
+  async registerPurchase(req, res, next) {
+    try {
+      const purchase = await productService.registerPurchase({
+        ...req.body,
+        user_id: req.user.id
+      });
+      res.status(201).json({
+        success: true,
+        message: 'Compra registrada y stock actualizado en almacén.',
+        data: purchase
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async getPurchases(req, res, next) {
+    try {
+      const purchases = await productService.getPurchases();
+      res.json({ success: true, data: purchases });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async getKardex(req, res, next) {
+    try {
+      const kardex = await productService.getKardexSummary();
+      res.json({ success: true, data: kardex });
+    } catch (error) {
+      next(error);
+    }
   }
 };

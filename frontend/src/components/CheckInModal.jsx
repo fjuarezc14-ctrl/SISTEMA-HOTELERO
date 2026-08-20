@@ -287,6 +287,24 @@ export function CheckInModal({ isOpen, onClose, room, onSuccess }) {
           </div>
 
           <div className="pt-2 border-t border-slate-800 space-y-3">
+            <div>
+              <label className="block text-[11px] font-medium text-slate-400 mb-1.5">Comprobante a Emitir (SUNAT Perú)</label>
+              <div className="grid grid-cols-3 gap-2">
+                <label className="p-2 rounded-lg bg-slate-900 border border-slate-800 flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
+                  <input type="radio" name="receipt" defaultChecked className="text-emerald-500" />
+                  <span>Nota Control</span>
+                </label>
+                <label className="p-2 rounded-lg bg-slate-900 border border-slate-800 flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
+                  <input type="radio" name="receipt" className="text-emerald-500" />
+                  <span>Boleta B001 (DNI)</span>
+                </label>
+                <label className="p-2 rounded-lg bg-slate-900 border border-slate-800 flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
+                  <input type="radio" name="receipt" className="text-emerald-500" />
+                  <span>Factura F001 (RUC)</span>
+                </label>
+              </div>
+            </div>
+
             <div className="flex items-center justify-between">
               <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
                 <input

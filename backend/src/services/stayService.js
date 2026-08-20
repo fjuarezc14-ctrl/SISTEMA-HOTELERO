@@ -4,6 +4,7 @@ import { customerRepository } from '../repositories/customerRepository.js';
 import { cashRepository } from '../repositories/cashRepository.js';
 import { shiftRepository } from '../repositories/shiftRepository.js';
 import { productRepository } from '../repositories/productRepository.js';
+import { companionRepository } from '../repositories/companionRepository.js';
 import { calculateExpectedEndTime } from '../utils/timeHelper.js';
 
 export const stayService = {
@@ -12,10 +13,12 @@ export const stayService = {
     if (!stay) return null;
     const consumptions = await productRepository.findConsumptionsByStayId(stay.id);
     const payments = await cashRepository.findByStayId(stay.id);
+    const companions = await companionRepository.findByStayId(stay.id);
     return {
       ...stay,
       consumptions,
-      payments
+      payments,
+      companions
     };
   },
 
@@ -25,6 +28,7 @@ export const stayService = {
     stay_type = 'hours',
     hours_count = 3,
     companion_name = '',
+    companions = [],
     custom_price = null,
     initial_payment = null, // { amount, payment_method, reference_number }
     user_id
@@ -130,6 +134,25 @@ export const stayService = {
       await stayRepository.updateStayPrices(stay.id, {
         total_paid_pen: Number(initial_payment.amount)
       });
+    }
+
+    // 8. Guardar acompañantes (Ficha Registral MINCETUR / PNP)
+    if (Array.isArray(companions) && companions.length > 0) {
+      for (const comp of companions) {
+        if (comp.full_name && comp.document_number) {
+          await companionRepository.addCompanion({
+            stay_id: stay.id,
+            document_type: comp.document_type || 'DNI',
+            document_number: comp.document_number.trim(),
+            full_name: comp.full_name.trim(),
+            age: comp.age ? Number(comp.age) : null,
+            nationality: comp.nationality || 'Peruana',
+            origin_city: comp.origin_city || 'Lima',
+            destination_city: comp.destination_city || 'Lima',
+            travel_reason: comp.travel_reason || 'Turismo / Vacaciones'
+          });
+        }
+      }
     }
 
     return stay;

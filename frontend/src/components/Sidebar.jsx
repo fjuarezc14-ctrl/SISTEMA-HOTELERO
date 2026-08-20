@@ -9,7 +9,8 @@ import {
   UserCog,
   BarChart3,
   LogOut,
-  Hotel
+  Hotel,
+  Calendar
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -19,6 +20,7 @@ export function Sidebar({ currentTab, setCurrentTab }) {
 
   const navItems = [
     { id: 'reception', label: 'Recepción', icon: BedDouble },
+    { id: 'reservations', label: 'Reservaciones', icon: Calendar },
     { id: 'shifts', label: 'Turnos de Caja', icon: Clock },
     { id: 'cash', label: 'Caja & Movimientos', icon: Wallet },
     { id: 'customers', label: 'Clientes / DNI', icon: Users },

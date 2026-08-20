@@ -5,6 +5,7 @@ import { Sidebar } from './components/Sidebar';
 import { Navbar } from './components/Navbar';
 import { LoginPage } from './pages/LoginPage';
 import { ReceptionPage } from './pages/ReceptionPage';
+import { ReservationsPage } from './pages/ReservationsPage';
 import { ShiftsPage } from './pages/ShiftsPage';
 import { CashPage } from './pages/CashPage';
 import { CustomersPage } from './pages/CustomersPage';
@@ -29,6 +30,8 @@ function MainLayout() {
     switch (currentTab) {
       case 'reception':
         return <ReceptionPage />;
+      case 'reservations':
+        return <ReservationsPage />;
       case 'shifts':
         return (
           <ShiftsPage

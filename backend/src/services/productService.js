@@ -2,6 +2,7 @@ import { productRepository } from '../repositories/productRepository.js';
 import { stayRepository } from '../repositories/stayRepository.js';
 import { cashRepository } from '../repositories/cashRepository.js';
 import { shiftRepository } from '../repositories/shiftRepository.js';
+import { kardexRepository } from '../repositories/kardexRepository.js';
 
 export const productService = {
   async getAllProducts(onlyActive = true) {
@@ -103,5 +104,42 @@ export const productService = {
       amount_pen: totalAmount,
       payment_method
     });
+  },
+
+  // Registrar compra de mercadería (Aumento de stock en Almacén)
+  async registerPurchase({ product_id, quantity = 1, unit_cost_pen, supplier_name, user_id }) {
+    const product = await productRepository.findById(product_id);
+    if (!product) {
+      const error = new Error('Producto no encontrado.');
+      error.statusCode = 404;
+      error.isOperational = true;
+      throw error;
+    }
+
+    const qty = Number(quantity);
+    const unitCost = Number(unit_cost_pen);
+    const totalCost = qty * unitCost;
+
+    // Incrementar stock en productos
+    const currentStock = Number(product.stock || 0);
+    await productRepository.update(product.id, { stock: currentStock + qty });
+
+    // Registrar compra en kardex
+    return await kardexRepository.addPurchase({
+      product_id: product.id,
+      user_id,
+      quantity: qty,
+      unit_cost_pen: unitCost,
+      total_cost_pen: totalCost,
+      supplier_name: supplier_name ? supplier_name.trim() : 'Proveedor General'
+    });
+  },
+
+  async getPurchases() {
+    return await kardexRepository.findAllPurchases();
+  },
+
+  async getKardexSummary() {
+    return await kardexRepository.getKardexSummary();
   }
 };

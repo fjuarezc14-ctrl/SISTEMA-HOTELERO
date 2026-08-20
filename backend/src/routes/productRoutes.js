@@ -12,5 +12,8 @@ router.post('/', authorizeRoles(ROLES.SUPER_ADMIN, ROLES.ADMIN), productControll
 router.put('/:id', authorizeRoles(ROLES.SUPER_ADMIN, ROLES.ADMIN), productController.update);
 router.post('/charge-room', productController.chargeToRoom);
 router.post('/direct-sale', productController.directSale);
+router.post('/purchase', authorizeRoles(ROLES.SUPER_ADMIN, ROLES.ADMIN), productController.registerPurchase);
+router.get('/purchases', authorizeRoles(ROLES.SUPER_ADMIN, ROLES.ADMIN), productController.getPurchases);
+router.get('/kardex', authorizeRoles(ROLES.SUPER_ADMIN, ROLES.ADMIN), productController.getKardex);
 
 export default router;

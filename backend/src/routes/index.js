@@ -9,6 +9,8 @@ import productRoutes from './productRoutes.js';
 import settingsRoutes from './settingsRoutes.js';
 import userRoutes from './userRoutes.js';
 import maintenanceRoutes from './maintenanceRoutes.js';
+import reservationRoutes from './reservationRoutes.js';
+import receiptRoutes from './receiptRoutes.js';
 
 const apiRouter = Router();
 
@@ -22,5 +24,7 @@ apiRouter.use('/products', productRoutes);
 apiRouter.use('/settings', settingsRoutes);
 apiRouter.use('/users', userRoutes);
 apiRouter.use('/maintenance', maintenanceRoutes);
+apiRouter.use('/reservations', reservationRoutes);
+apiRouter.use('/receipts', receiptRoutes);
 
 export default apiRouter;

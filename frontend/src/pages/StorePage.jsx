@@ -27,6 +27,14 @@ export function StorePage() {
   const [submittingProduct, setSubmittingProduct] = useState(false);
   const [productError, setProductError] = useState('');
 
+  // Modal Registrar Compra de Stock (Kardex)
+  const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
+  const [purchaseProdId, setPurchaseProdId] = useState('');
+  const [purchaseQty, setPurchaseQty] = useState(10);
+  const [purchaseUnitCost, setPurchaseUnitCost] = useState('1.50');
+  const [supplierName, setSupplierName] = useState('Distribuidora San José');
+  const [submittingPurchase, setSubmittingPurchase] = useState(false);
+
   const fetchProducts = async () => {
     try {
       setLoading(true);
@@ -42,6 +50,27 @@ export function StorePage() {
   useEffect(() => {
     fetchProducts();
   }, []);
+
+  const handleRegisterPurchase = async (e) => {
+    e.preventDefault();
+    if (!purchaseProdId || purchaseQty <= 0 || !purchaseUnitCost) return;
+    try {
+      setSubmittingPurchase(true);
+      await api.post('/products/purchase', {
+        product_id: purchaseProdId,
+        quantity: Number(purchaseQty),
+        unit_cost_pen: parseFloat(purchaseUnitCost),
+        supplier_name: supplierName
+      });
+      alert('Compra registrada correctamente. Stock actualizado en Almacén.');
+      setIsPurchaseModalOpen(false);
+      fetchProducts();
+    } catch (err) {
+      alert(err.message || 'Error registrando compra.');
+    } finally {
+      setSubmittingPurchase(false);
+    }
+  };
 
   const handleDirectSale = async (e) => {
     e.preventDefault();
@@ -138,13 +167,22 @@ export function StorePage() {
           </p>
         </div>
 
-        <button
-          onClick={handleOpenCreateProduct}
-          className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold rounded-xl shadow-lg shadow-emerald-500/20 transition-all flex items-center gap-2"
-        >
-          <Plus className="w-4 h-4" />
-          <span>+ Nuevo Producto</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setIsPurchaseModalOpen(true)}
+            className="px-4 py-2 bg-indigo-500 hover:bg-indigo-400 text-white text-xs font-bold rounded-xl shadow-lg shadow-indigo-500/20 transition-all flex items-center gap-2"
+          >
+            <Plus className="w-4 h-4" />
+            <span>+ Ingreso Almacén / Kardex</span>
+          </button>
+          <button
+            onClick={handleOpenCreateProduct}
+            className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold rounded-xl shadow-lg shadow-emerald-500/20 transition-all flex items-center gap-2"
+          >
+            <Plus className="w-4 h-4" />
+            <span>+ Nuevo Producto</span>
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -397,6 +435,85 @@ export function StorePage() {
               className="px-5 py-2 text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-xl shadow-lg shadow-emerald-500/20 transition-all"
             >
               {submittingProduct ? 'Guardando...' : 'Guardar Producto'}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Modal Registrar Compra Almacén / Kardex */}
+      <Modal isOpen={isPurchaseModalOpen} onClose={() => setIsPurchaseModalOpen(false)} title="Ingreso a Almacén / Registro de Compra (Kardex)">
+        <form onSubmit={handleRegisterPurchase} className="space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-1">Producto</label>
+            <select
+              required
+              value={purchaseProdId}
+              onChange={(e) => setPurchaseProdId(e.target.value)}
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-indigo-500"
+            >
+              <option value="">Seleccionar Producto</option>
+              {products.map(p => (
+                <option key={p.id} value={p.id}>{p.name} (Stock actual: {p.stock})</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">Cantidad Comprada</label>
+              <input
+                type="number"
+                min="1"
+                required
+                value={purchaseQty}
+                onChange={(e) => setPurchaseQty(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs font-bold text-white focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">Costo Unitario (S/)</label>
+              <input
+                type="number"
+                step="0.10"
+                min="0.10"
+                required
+                value={purchaseUnitCost}
+                onChange={(e) => setPurchaseUnitCost(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs font-bold text-white focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-1">Proveedor / Distribuidor</label>
+            <input
+              type="text"
+              value={supplierName}
+              onChange={(e) => setSupplierName(e.target.value)}
+              placeholder="Ej: Distribuidora San José..."
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-indigo-500"
+            />
+          </div>
+
+          <div className="p-3 bg-indigo-500/10 border border-indigo-500/30 rounded-xl text-xs text-indigo-300 flex justify-between font-bold">
+            <span>Costo Total Compra:</span>
+            <span>S/ {(Number(purchaseQty) * parseFloat(purchaseUnitCost || 0)).toFixed(2)}</span>
+          </div>
+
+          <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+            <button
+              type="button"
+              onClick={() => setIsPurchaseModalOpen(false)}
+              className="px-4 py-2 text-xs text-slate-400 hover:text-white"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={submittingPurchase}
+              className="px-5 py-2 text-xs font-bold bg-indigo-500 hover:bg-indigo-400 text-white rounded-xl shadow-lg shadow-indigo-500/20"
+            >
+              {submittingPurchase ? 'Registrando...' : 'Registrar en Almacén'}
             </button>
           </div>
         </form>

@@ -174,6 +174,49 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- 13. Reservaciones Futuras
+CREATE TABLE IF NOT EXISTS reservations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    room_id UUID NOT NULL REFERENCES rooms(id) ON DELETE RESTRICT,
+    customer_id UUID NOT NULL REFERENCES customers(id) ON DELETE RESTRICT,
+    work_shift_id UUID REFERENCES work_shifts(id) ON DELETE SET NULL,
+    start_date TIMESTAMPTZ NOT NULL,
+    end_date TIMESTAMPTZ NOT NULL,
+    deposit_amount_pen NUMERIC(10, 2) NOT NULL DEFAULT 0.00,
+    payment_method VARCHAR(20) NOT NULL DEFAULT 'YAPE_PLIN',
+    status VARCHAR(20) NOT NULL DEFAULT 'confirmed', -- confirmed, checked_in, cancelled
+    notes TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 14. Acompañantes y Ficha Registral MINCETUR / PNP
+CREATE TABLE IF NOT EXISTS stay_companions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    stay_id UUID NOT NULL REFERENCES stays(id) ON DELETE CASCADE,
+    document_type VARCHAR(20) NOT NULL DEFAULT 'DNI',
+    document_number VARCHAR(20) NOT NULL,
+    full_name VARCHAR(150) NOT NULL,
+    age INT,
+    nationality VARCHAR(50) DEFAULT 'Peruana',
+    origin_city VARCHAR(100) DEFAULT 'Lima',
+    destination_city VARCHAR(100) DEFAULT 'Lima',
+    travel_reason VARCHAR(100) DEFAULT 'Turismo / Vacaciones',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 15. Compras de Productos (Kardex de Inventario)
+CREATE TABLE IF NOT EXISTS product_purchases (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    product_id UUID NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    quantity INT NOT NULL DEFAULT 1,
+    unit_cost_pen NUMERIC(10, 2) NOT NULL,
+    total_cost_pen NUMERIC(10, 2) NOT NULL,
+    supplier_name VARCHAR(150) DEFAULT 'Proveedor General',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- Índices para optimización de consultas
 CREATE INDEX IF NOT EXISTS idx_rooms_status ON rooms(status);
 CREATE INDEX IF NOT EXISTS idx_stays_status ON stays(status);
@@ -181,3 +224,6 @@ CREATE INDEX IF NOT EXISTS idx_stays_room_id ON stays(room_id);
 CREATE INDEX IF NOT EXISTS idx_work_shifts_status ON work_shifts(status);
 CREATE INDEX IF NOT EXISTS idx_cash_transactions_shift ON cash_transactions(work_shift_id);
 CREATE INDEX IF NOT EXISTS idx_customers_document ON customers(document_number);
+CREATE INDEX IF NOT EXISTS idx_reservations_status ON reservations(status);
+CREATE INDEX IF NOT EXISTS idx_reservations_dates ON reservations(start_date, end_date);
+
