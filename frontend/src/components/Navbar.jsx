@@ -83,6 +83,8 @@ export function Navbar({ onOpenShiftModal, onCloseShiftModal }) {
               + Abrir Turno
             </button>
           </div>
+        )}
+
         <button
           onClick={toggleFullscreen}
           title="Pantalla Completa (Modo Kiosco)"
