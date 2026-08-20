@@ -5,8 +5,8 @@
 -- 1. Información Inicial del Hotel
 INSERT INTO hotel_info (business_name, trade_name, ruc, address, phone, email, currency_symbol, currency_code)
 VALUES (
-    'VT HOTEL PERÚ S.A.C.',
-    'Hotel Marte Perú',
+    'HOTEL ZAFIRO S.A.C.',
+    'Hotel Zafiro',
     '20123456789',
     'Av. Principal 123, Miraflores, Lima, Perú',
     '01-2345678',

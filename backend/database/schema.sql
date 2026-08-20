@@ -9,8 +9,8 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 -- 1. Información de la Empresa / Hotel
 CREATE TABLE IF NOT EXISTS hotel_info (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    business_name VARCHAR(150) NOT NULL DEFAULT 'VT HOTEL PERÚ S.A.C.',
-    trade_name VARCHAR(150) NOT NULL DEFAULT 'Hotel Marte Perú',
+    business_name VARCHAR(150) NOT NULL DEFAULT 'HOTEL ZAFIRO S.A.C.',
+    trade_name VARCHAR(150) NOT NULL DEFAULT 'Hotel Zafiro',
     ruc VARCHAR(11) NOT NULL DEFAULT '20123456789',
     address TEXT NOT NULL DEFAULT 'Av. Principal 123, Lima, Perú',
     phone VARCHAR(30) NOT NULL DEFAULT '01-2345678',

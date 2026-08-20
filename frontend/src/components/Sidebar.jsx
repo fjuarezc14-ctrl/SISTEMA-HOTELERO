@@ -40,7 +40,7 @@ export function Sidebar({ currentTab, setCurrentTab }) {
           <Hotel className="w-6 h-6" />
         </div>
         <div>
-          <h1 className="font-bold text-white text-base leading-tight">Hotel Marte Perú</h1>
+          <h1 className="font-bold text-white text-base leading-tight">Hotel Zafiro</h1>
           <p className="text-xs text-emerald-400 font-medium tracking-wide">VT VALETEC • S/ (PEN)</p>
         </div>
       </div>

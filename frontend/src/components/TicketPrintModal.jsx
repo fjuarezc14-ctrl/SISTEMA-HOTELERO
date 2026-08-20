@@ -16,8 +16,8 @@ export function TicketPrintModal({ isOpen, onClose, ticketData }) {
         {/* Printable Ticket Area */}
         <div id="thermal-ticket-area" className="p-4 bg-white text-black font-mono text-xs rounded-xl space-y-2 border border-slate-300 shadow-inner">
           <div className="text-center border-b border-dashed border-black pb-2 space-y-0.5">
-            <p className="font-bold text-sm uppercase">Hotel Marte Perú</p>
-            <p className="text-[10px]">VT HOTEL PERÚ S.A.C. - RUC: 20123456789</p>
+            <p className="font-bold text-sm uppercase">Hotel Zafiro</p>
+            <p className="text-[10px]">HOTEL ZAFIRO S.A.C. - RUC: 20123456789</p>
             <p className="text-[10px]">Av. Principal 123, Miraflores, Lima</p>
             <p className="text-[10px]">Tel: 01-2345678</p>
           </div>
