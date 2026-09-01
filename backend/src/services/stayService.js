@@ -7,14 +7,17 @@ import { productRepository } from '../repositories/productRepository.js';
 import { companionRepository } from '../repositories/companionRepository.js';
 import { incidentRepository } from '../repositories/incidentRepository.js';
 import { calculateExpectedEndTime } from '../utils/timeHelper.js';
+import { query } from '../config/db.js';
 
 export const stayService = {
   async getActiveStayByRoom(roomId) {
     const stay = await stayRepository.findActiveByRoomId(roomId);
     if (!stay) return null;
-    const consumptions = await productRepository.findConsumptionsByStayId(stay.id);
-    const payments = await cashRepository.findByStayId(stay.id);
-    const companions = await companionRepository.findByStayId(stay.id);
+    const [consumptions, payments, companions] = await Promise.all([
+      productRepository.findConsumptionsByStayId(stay.id),
+      cashRepository.findByStayId(stay.id),
+      companionRepository.findByStayId(stay.id)
+    ]);
     return {
       ...stay,
       consumptions,
@@ -213,9 +216,11 @@ export const stayService = {
     if (now > expectedEnd) {
       const diffMs = now.getTime() - expectedEnd.getTime();
       const diffMinutes = Math.floor(diffMs / 60000);
-      // Tolerancia de 10 minutos de gracia
-      if (diffMinutes > 10) {
-        const extraHours = Math.ceil(diffMinutes / 60);
+      // Leer tolerancia de gracia desde configuración del hotel
+      const hotelInfoRes = await query('SELECT grace_period_minutes FROM hotel_info LIMIT 1');
+      const graceMinutes = hotelInfoRes.rows[0]?.grace_period_minutes ?? 10;
+      if (diffMinutes > graceMinutes) {
+        const extraHours = Math.ceil((diffMinutes - graceMinutes) / 60);
         const room = await roomRepository.findRoomById(stay.room_id);
         const pricePerExtraHour = Number(room?.price_extra_hour_default || 10.00);
         const extraCost = extraHours * pricePerExtraHour;

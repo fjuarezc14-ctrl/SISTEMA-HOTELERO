@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useShift } from '../context/ShiftContext';
 import { api } from '../api/apiClient';
 import { formatPEN, formatDatePeru } from '../utils/formatters';
+import { TicketPrintModal } from '../components/TicketPrintModal';
 import {
   Clock,
   Wallet,
@@ -9,16 +10,26 @@ import {
   CreditCard,
   CheckCircle2,
   AlertTriangle,
-  FileText,
   History,
   TrendingUp,
-  AlertCircle
+  AlertCircle,
+  BedDouble,
+  ShoppingBag,
+  ShieldAlert,
+  ArrowDownCircle,
+  Receipt
 } from 'lucide-react';
 
 export function ShiftsPage({ onOpenShiftModal = () => {}, onCloseShiftModal = () => {} }) {
   const { activeShift, hasActiveShift } = useShift();
   const [history, setHistory] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
+  const [activeTransactions, setActiveTransactions] = useState([]);
+  const [loadingTransactions, setLoadingTransactions] = useState(false);
+
+  // Ticket Modal de Arqueo
+  const [isTicketOpen, setIsTicketOpen] = useState(false);
+  const [ticketData, setTicketData] = useState(null);
 
   const fetchHistory = async () => {
     try {
@@ -32,9 +43,46 @@ export function ShiftsPage({ onOpenShiftModal = () => {}, onCloseShiftModal = ()
     }
   };
 
+  const fetchActiveTransactions = async () => {
+    if (!hasActiveShift) return;
+    try {
+      setLoadingTransactions(true);
+      const res = await api.get('/shifts/active/transactions');
+      setActiveTransactions(res.data || []);
+    } catch (err) {
+      console.error('Error cargando transacciones de turno:', err.message);
+    } finally {
+      setLoadingTransactions(false);
+    }
+  };
+
   useEffect(() => {
     fetchHistory();
-  }, [activeShift]);
+    if (hasActiveShift) {
+      fetchActiveTransactions();
+    }
+  }, [activeShift, hasActiveShift]);
+
+  const handlePrintShiftTicket = (shiftInfo) => {
+    const data = {
+      ticket_number: `ARQ-${shiftInfo.id?.substring(0, 6) || Date.now().toString().slice(-6)}`,
+      date: shiftInfo.closed_at || new Date(),
+      customer_name: `Cajero: ${shiftInfo.user_full_name}`,
+      room_number: `RELEVO CAJA`,
+      total_amount: Number(shiftInfo.total_revenue_pen || 0),
+      payment_method: 'Resumen de Arqueo',
+      items: [
+        { name: 'Fondo Inicial', quantity: 1, unit_price: Number(shiftInfo.initial_cash_pen || 0), total_price: Number(shiftInfo.initial_cash_pen || 0) },
+        { name: 'Efectivo Esperado', quantity: 1, unit_price: Number(shiftInfo.expected_cash_pen || 0), total_price: Number(shiftInfo.expected_cash_pen || 0) },
+        { name: 'Efectivo Real Contado', quantity: 1, unit_price: Number(shiftInfo.actual_cash_pen || 0), total_price: Number(shiftInfo.actual_cash_pen || 0) },
+        { name: 'Yape / Plin Total', quantity: 1, unit_price: Number(shiftInfo.total_yape_plin_pen || 0), total_price: Number(shiftInfo.total_yape_plin_pen || 0) },
+        { name: 'Tarjetas POS Total', quantity: 1, unit_price: Number(shiftInfo.total_card_pen || 0), total_price: Number(shiftInfo.total_card_pen || 0) },
+        { name: 'Diferencia de Cierre', quantity: 1, unit_price: Number(shiftInfo.difference_pen || 0), total_price: Number(shiftInfo.difference_pen || 0) }
+      ]
+    };
+    setTicketData(data);
+    setIsTicketOpen(true);
+  };
 
   return (
     <div className="space-y-6">
@@ -99,9 +147,8 @@ export function ShiftsPage({ onOpenShiftModal = () => {}, onCloseShiftModal = ()
             </div>
           </div>
 
-          {/* Metrics Grid */}
+          {/* Metrics Grid por Métodos de Pago */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* Efectivo Esperado en Caja */}
             <div className="p-4 bg-emerald-50/50 border border-emerald-200 rounded-2xl space-y-1">
               <div className="flex items-center justify-between text-xs text-emerald-700 font-bold">
                 <span>Efectivo en Gaveta</span>
@@ -113,7 +160,6 @@ export function ShiftsPage({ onOpenShiftModal = () => {}, onCloseShiftModal = ()
               <p className="text-[11px] text-slate-500">Fondo inicial + ingresos en efectivo</p>
             </div>
 
-            {/* Yape / Plin */}
             <div className="p-4 bg-violet-50/50 border border-violet-200 rounded-2xl space-y-1">
               <div className="flex items-center justify-between text-xs text-violet-700 font-bold">
                 <span>Yape / Plin (Billeteras)</span>
@@ -125,7 +171,6 @@ export function ShiftsPage({ onOpenShiftModal = () => {}, onCloseShiftModal = ()
               <p className="text-[11px] text-slate-500">Pagos vía QR / Móvil</p>
             </div>
 
-            {/* Tarjetas POS */}
             <div className="p-4 bg-blue-50/50 border border-blue-200 rounded-2xl space-y-1">
               <div className="flex items-center justify-between text-xs text-blue-700 font-bold">
                 <span>Tarjetas POS</span>
@@ -137,7 +182,6 @@ export function ShiftsPage({ onOpenShiftModal = () => {}, onCloseShiftModal = ()
               <p className="text-[11px] text-slate-500">Débito / Crédito en terminal</p>
             </div>
 
-            {/* Total Facturado en el Turno */}
             <div className="p-4 bg-emerald-600 text-white rounded-2xl space-y-1 shadow-sm">
               <div className="flex items-center justify-between text-xs font-bold text-emerald-100">
                 <span>Total Facturado</span>
@@ -148,6 +192,99 @@ export function ShiftsPage({ onOpenShiftModal = () => {}, onCloseShiftModal = ()
               </p>
               <p className="text-[11px] text-emerald-100/90">Suma de los 3 métodos de pago</p>
             </div>
+          </div>
+
+          {/* Desglose por Categoría de Ingreso */}
+          <div className="pt-2">
+            <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-3">
+              Desglose de Ingresos por Origen
+            </h4>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] text-slate-500 font-semibold block">Hospedaje / Check-ins</span>
+                  <strong className="text-sm font-mono text-emerald-700">
+                    {formatPEN(activeShift.live_revenue_stay || 0)}
+                  </strong>
+                </div>
+                <BedDouble className="w-4 h-4 text-emerald-600" />
+              </div>
+
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] text-slate-500 font-semibold block">Ventas de Tienda</span>
+                  <strong className="text-sm font-mono text-blue-700">
+                    {formatPEN(activeShift.live_revenue_store || 0)}
+                  </strong>
+                </div>
+                <ShoppingBag className="w-4 h-4 text-blue-600" />
+              </div>
+
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] text-slate-500 font-semibold block">Incidentes / Penalidad</span>
+                  <strong className="text-sm font-mono text-violet-700">
+                    {formatPEN(activeShift.live_revenue_incidents || 0)}
+                  </strong>
+                </div>
+                <ShieldAlert className="w-4 h-4 text-violet-600" />
+              </div>
+
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] text-slate-500 font-semibold block">Egresos / Gastos</span>
+                  <strong className="text-sm font-mono text-rose-700">
+                    -{formatPEN(activeShift.live_total_expenses || 0)}
+                  </strong>
+                </div>
+                <ArrowDownCircle className="w-4 h-4 text-rose-600" />
+              </div>
+            </div>
+          </div>
+
+          {/* Tabla de Movimientos del Turno Activo en Vivo */}
+          <div className="pt-2 border-t border-slate-100">
+            <h4 className="text-xs font-bold text-slate-800 mb-3 flex items-center gap-2">
+              <Receipt className="w-4 h-4 text-emerald-600" />
+              <span>Movimientos en Vivo Registrados en la Guardia</span>
+            </h4>
+            {loadingTransactions ? (
+              <div className="py-4 text-center text-xs text-slate-400">Cargando transacciones en vivo...</div>
+            ) : activeTransactions.length === 0 ? (
+              <div className="py-4 text-center text-xs text-slate-400">Aún no hay movimientos en este turno.</div>
+            ) : (
+              <div className="overflow-x-auto max-h-48">
+                <table className="w-full text-left text-xs">
+                  <thead className="border-b border-slate-200 text-slate-400 uppercase text-[9px] tracking-wider sticky top-0 bg-white">
+                    <tr>
+                      <th className="py-2 px-2">Hora</th>
+                      <th className="py-2 px-2">Concepto</th>
+                      <th className="py-2 px-2">Medio Pago</th>
+                      <th className="py-2 px-2 text-right">Monto (S/)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {activeTransactions.map((t) => (
+                      <tr key={t.id} className="hover:bg-slate-50">
+                        <td className="py-2 px-2 font-mono text-slate-500">{formatDatePeru(t.created_at)}</td>
+                        <td className="py-2 px-2 font-semibold text-slate-800">{t.concept}</td>
+                        <td className="py-2 px-2">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                            t.payment_method === 'YAPE_PLIN' ? 'bg-violet-100 text-violet-800' :
+                            t.payment_method === 'CARD' ? 'bg-blue-100 text-blue-800' : 'bg-emerald-100 text-emerald-800'
+                          }`}>
+                            {t.payment_method === 'YAPE_PLIN' ? 'Yape/Plin' : t.payment_method === 'CARD' ? 'Tarjeta' : 'Efectivo'}
+                          </span>
+                        </td>
+                        <td className={`py-2 px-2 text-right font-mono font-bold ${t.transaction_type === 'expense' ? 'text-rose-600' : 'text-emerald-700'}`}>
+                          {t.transaction_type === 'expense' ? `-` : `+`}{formatPEN(t.amount_pen)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
       ) : (
@@ -178,7 +315,7 @@ export function ShiftsPage({ onOpenShiftModal = () => {}, onCloseShiftModal = ()
             <History className="w-4 h-4 text-slate-500" />
             <span>Historial Reciente de Turnos Cerrados</span>
           </h3>
-          <span className="text-xs text-slate-400">Arqueos y Descuadres</span>
+          <span className="text-xs text-slate-400">Arqueos y Auditoría</span>
         </div>
 
         {loadingHistory ? (
@@ -197,11 +334,12 @@ export function ShiftsPage({ onOpenShiftModal = () => {}, onCloseShiftModal = ()
                   <th className="py-3 px-3 text-right">Efectivo Esperado</th>
                   <th className="py-3 px-3 text-right">Efectivo Real</th>
                   <th className="py-3 px-3 text-right">Diferencia</th>
+                  <th className="py-3 px-3 text-center">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {history.map((s) => {
-                  const diff = Number(s.difference_pen || 0);
+                  const diff = Number(s.difference_cash_pen || s.difference_pen || 0);
                   return (
                     <tr key={s.id} className="hover:bg-slate-50 transition-colors">
                       <td className="py-3 px-3 font-semibold text-slate-900">
@@ -214,12 +352,28 @@ export function ShiftsPage({ onOpenShiftModal = () => {}, onCloseShiftModal = ()
                       <td className="py-3 px-3 text-right font-mono font-bold text-slate-900">{formatPEN(s.actual_cash_pen)}</td>
                       <td className="py-3 px-3 text-right font-mono font-bold">
                         {diff === 0 ? (
-                          <span className="text-emerald-600">S/ 0.00 (Cuadre Exacto)</span>
+                          <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded font-black text-[10px]">
+                            Cuadre Exacto
+                          </span>
                         ) : diff > 0 ? (
-                          <span className="text-blue-600">+{formatPEN(diff)} (Sobrante)</span>
+                          <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded font-black text-[10px]">
+                            +{formatPEN(diff)} (Sobrante)
+                          </span>
                         ) : (
-                          <span className="text-rose-600">{formatPEN(diff)} (Faltante)</span>
+                          <span className="px-2 py-0.5 bg-rose-100 text-rose-800 rounded font-black text-[10px]">
+                            {formatPEN(diff)} (Faltante)
+                          </span>
                         )}
+                      </td>
+                      <td className="py-3 px-3 text-center">
+                        <button
+                          onClick={() => handlePrintShiftTicket(s)}
+                          className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[11px] font-semibold inline-flex items-center gap-1 transition-all"
+                          title="Imprimir Ticket de Arqueo"
+                        >
+                          <Receipt className="w-3 h-3 text-slate-600" />
+                          <span>Ticket</span>
+                        </button>
                       </td>
                     </tr>
                   );
@@ -229,6 +383,13 @@ export function ShiftsPage({ onOpenShiftModal = () => {}, onCloseShiftModal = ()
           </div>
         )}
       </div>
+
+      {/* Ticket Modal para Impresión de Arqueo */}
+      <TicketPrintModal
+        isOpen={isTicketOpen}
+        onClose={() => setIsTicketOpen(false)}
+        ticketData={ticketData}
+      />
     </div>
   );
 }

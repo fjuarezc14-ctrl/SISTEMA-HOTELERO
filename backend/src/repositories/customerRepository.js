@@ -12,20 +12,25 @@ export const customerRepository = {
   },
 
   async findAll({ search = '', limit = 100, offset = 0 } = {}) {
+    let sql = `
+      SELECT 
+        c.*,
+        COALESCE(COUNT(DISTINCT s.id), 0) AS stay_count,
+        COALESCE(SUM(s.total_paid_pen), 0) AS total_spent_pen,
+        COALESCE(COUNT(DISTINCT i.id), 0) AS incident_count
+      FROM customers c
+      LEFT JOIN stays s ON c.id = s.customer_id
+      LEFT JOIN stay_incidents i ON s.id = i.stay_id
+    `;
+    const params = [];
     if (search) {
-      const searchPattern = `%${search}%`;
-      const res = await query(
-        `SELECT * FROM customers 
-         WHERE document_number ILIKE $1 OR full_name ILIKE $1 OR phone ILIKE $1
-         ORDER BY full_name ASC LIMIT $2 OFFSET $3`,
-        [searchPattern, limit, offset]
-      );
-      return res.rows;
+      sql += ` WHERE c.document_number ILIKE $1 OR c.full_name ILIKE $1 OR c.phone ILIKE $1`;
+      params.push(`%${search}%`);
     }
-    const res = await query(
-      `SELECT * FROM customers ORDER BY full_name ASC LIMIT $1 OFFSET $2`,
-      [limit, offset]
-    );
+    sql += ` GROUP BY c.id ORDER BY c.full_name ASC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+    params.push(limit, offset);
+
+    const res = await query(sql, params);
     return res.rows;
   },
 
@@ -54,6 +59,19 @@ export const customerRepository = {
        WHERE id = $1
        RETURNING *`,
       [id, document_type, document_number, full_name, phone, email, is_blacklisted, blacklist_reason, total_debt_pen]
+    );
+    return res.rows[0] || null;
+  },
+
+  async toggleBlacklist(id, { is_blacklisted, blacklist_reason = '' }) {
+    const res = await query(
+      `UPDATE customers
+       SET is_blacklisted = $2,
+           blacklist_reason = CASE WHEN $2 = true THEN $3 ELSE NULL END,
+           updated_at = NOW()
+       WHERE id = $1
+       RETURNING *`,
+      [id, is_blacklisted, blacklist_reason]
     );
     return res.rows[0] || null;
   },

@@ -4,6 +4,7 @@ import { api } from '../api/apiClient';
 import { formatPEN } from '../utils/formatters';
 import { validateQuantity } from '../utils/validators';
 import { useGlobalStore } from '../context/GlobalStoreContext';
+import { ProductCardGrid } from './ProductCardGrid';
 import { ShoppingBag, Plus, AlertCircle, Check } from 'lucide-react';
 
 export function ConsumptionModal({ isOpen, onClose, room, onSuccess }) {
@@ -43,7 +44,7 @@ export function ConsumptionModal({ isOpen, onClose, room, onSuccess }) {
     }
 
     if (!selectedProduct) {
-      setError('Debes seleccionar un producto.');
+      setError('Debes seleccionar un producto del catálogo.');
       return;
     }
 
@@ -76,7 +77,7 @@ export function ConsumptionModal({ isOpen, onClose, room, onSuccess }) {
   const subtotal = (Number(currentProduct?.sale_price_pen || 0) * Number(quantity || 1)).toFixed(2);
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={`Cargar Consumo: Habitación ${room.room_number}`} maxWidth="max-w-md">
+    <Modal isOpen={isOpen} onClose={onClose} title={`Cargar Consumo: Habitación ${room.room_number}`} maxWidth="max-w-lg">
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
           <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs flex items-center gap-2">
@@ -86,20 +87,17 @@ export function ConsumptionModal({ isOpen, onClose, room, onSuccess }) {
         )}
 
         <div>
-          <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-            Seleccionar Producto
+          <label className="block text-xs font-semibold text-slate-700 mb-2">
+            Catálogo de Productos Disponibles
           </label>
-          <select
-            value={selectedProduct}
-            onChange={(e) => setSelectedProduct(e.target.value)}
-            className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs text-slate-900 focus:outline-none focus:border-emerald-600"
-          >
-            {products.map((p) => (
-              <option key={p.id} value={p.id} disabled={p.stock <= 0}>
-                {p.name} - {formatPEN(p.sale_price_pen)} (Stock: {p.stock})
-              </option>
-            ))}
-          </select>
+          <ProductCardGrid
+            products={products}
+            selectedProductId={selectedProduct}
+            onSelectProduct={(p) => {
+              setSelectedProduct(p.id);
+              setQuantity(1);
+            }}
+          />
         </div>
 
         <div className="grid grid-cols-2 gap-3">

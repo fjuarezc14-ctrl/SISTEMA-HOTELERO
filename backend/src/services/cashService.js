@@ -65,5 +65,44 @@ export const cashService = {
 
   async getTransactions({ limit, offset, dateFrom, dateTo }) {
     return await cashRepository.findAll({ limit, offset, dateFrom, dateTo });
+  },
+
+  async cancelTransaction(id, { reason = '' }) {
+    const transaction = await cashRepository.findById(id);
+    if (!transaction) {
+      const error = new Error('Transacción de caja no encontrada.');
+      error.statusCode = 404;
+      error.isOperational = true;
+      throw error;
+    }
+
+    if (transaction.is_cancelled) {
+      const error = new Error('Esta transacción ya fue anulada anteriormente.');
+      error.statusCode = 400;
+      error.isOperational = true;
+      throw error;
+    }
+
+    // Revertir pago de estadía si estaba vinculada
+    if (transaction.stay_id && transaction.transaction_type === TRANSACTION_TYPES.INCOME) {
+      const stay = await stayRepository.findById(transaction.stay_id);
+      if (stay) {
+        const newPaid = Math.max(0, Number(stay.total_paid_pen) - Number(transaction.amount_pen));
+        await stayRepository.updateStayPrices(stay.id, { total_paid_pen: newPaid });
+      }
+    }
+
+    return await cashRepository.cancelTransaction(id, { reason });
+  },
+
+  async updateVoucher(id, voucherData) {
+    const transaction = await cashRepository.findById(id);
+    if (!transaction) {
+      const error = new Error('Transacción de caja no encontrada.');
+      error.statusCode = 404;
+      error.isOperational = true;
+      throw error;
+    }
+    return await cashRepository.updateVoucher(id, voucherData);
   }
 };

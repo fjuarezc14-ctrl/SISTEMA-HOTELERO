@@ -12,6 +12,7 @@ import maintenanceRoutes from './maintenanceRoutes.js';
 import reservationRoutes from './reservationRoutes.js';
 import receiptRoutes from './receiptRoutes.js';
 import incidentRoutes from './incidentRoutes.js';
+import reportRoutes from './reportRoutes.js';
 
 const apiRouter = Router();
 
@@ -28,6 +29,7 @@ apiRouter.use('/maintenance', maintenanceRoutes);
 apiRouter.use('/reservations', reservationRoutes);
 apiRouter.use('/receipts', receiptRoutes);
 apiRouter.use('/incidents', incidentRoutes);
+apiRouter.use('/reports', reportRoutes);
 
 export default apiRouter;
 

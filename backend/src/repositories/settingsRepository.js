@@ -6,7 +6,7 @@ export const settingsRepository = {
     return res.rows[0] || null;
   },
 
-  async updateHotelInfo({ business_name, trade_name, ruc, address, phone, email }) {
+  async updateHotelInfo({ business_name, trade_name, ruc, address, phone, email, overnight_checkout_time, grace_period_minutes, ticket_footer_legend }) {
     const res = await query(
       `UPDATE hotel_info
        SET business_name = COALESCE($1, business_name),
@@ -15,9 +15,12 @@ export const settingsRepository = {
            address = COALESCE($4, address),
            phone = COALESCE($5, phone),
            email = COALESCE($6, email),
+           overnight_checkout_time = COALESCE($7, overnight_checkout_time),
+           grace_period_minutes = COALESCE($8, grace_period_minutes),
+           ticket_footer_legend = COALESCE($9, ticket_footer_legend),
            updated_at = NOW()
        RETURNING *`,
-      [business_name, trade_name, ruc, address, phone, email]
+      [business_name, trade_name, ruc, address, phone, email, overnight_checkout_time, grace_period_minutes, ticket_footer_legend]
     );
     return res.rows[0] || null;
   },

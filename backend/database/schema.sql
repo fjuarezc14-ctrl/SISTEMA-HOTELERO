@@ -17,6 +17,9 @@ CREATE TABLE IF NOT EXISTS hotel_info (
     email VARCHAR(100) DEFAULT 'contacto@hotelperu.com',
     currency_symbol VARCHAR(5) NOT NULL DEFAULT 'S/',
     currency_code VARCHAR(5) NOT NULL DEFAULT 'PEN',
+    overnight_checkout_time VARCHAR(10) NOT NULL DEFAULT '12:00',
+    grace_period_minutes INT NOT NULL DEFAULT 10,
+    ticket_footer_legend TEXT NOT NULL DEFAULT '¡Gracias por su preferencia en Hotel Zafiro! Conserve sus objetos de valor.',
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -123,6 +126,13 @@ CREATE TABLE IF NOT EXISTS cash_transactions (
     amount_pen NUMERIC(10, 2) NOT NULL,
     payment_method VARCHAR(20) NOT NULL, -- YAPE_PLIN, CASH, CARD
     reference_number VARCHAR(50), -- Número de operación / voucher
+    is_cancelled BOOLEAN NOT NULL DEFAULT false,
+    cancellation_reason TEXT,
+    cancelled_at TIMESTAMPTZ,
+    voucher_type VARCHAR(20) DEFAULT 'NONE', -- NONE, BOLETA, FACTURA
+    voucher_number VARCHAR(30),
+    customer_ruc VARCHAR(20),
+    customer_business_name VARCHAR(255),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

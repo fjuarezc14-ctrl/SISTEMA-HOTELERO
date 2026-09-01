@@ -1,25 +1,44 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { api } from '../api/apiClient';
-import { formatPEN } from '../utils/formatters';
+import { formatPEN, printElectronicVoucherTicket } from '../utils/formatters';
 import { useShift } from '../context/ShiftContext';
 import { useGlobalStore } from '../context/GlobalStoreContext';
 import { validateText, validatePrice, validateQuantity, validateSupplierName } from '../utils/validators';
-import { ShoppingBag, Plus, QrCode, Wallet, CreditCard, AlertCircle, Check } from 'lucide-react';
+import { ProductCardGrid } from '../components/ProductCardGrid';
+import { PaymentSelector } from '../components/PaymentSelector';
+import { VoucherSelector } from '../components/VoucherSelector';
+import { TicketPrintModal } from '../components/TicketPrintModal';
+import { ShoppingBag, Plus, QrCode, Wallet, CreditCard, AlertCircle, Check, Bed, Printer } from 'lucide-react';
 import { Modal } from '../components/Modal';
 
 export function StorePage() {
   const { hasActiveShift } = useShift();
   const { getProducts, invalidateCache } = useGlobalStore();
   const [products, setProducts] = useState([]);
+  const [activeStays, setActiveStays] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Venta Rápida de Mostrador
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [quantity, setQuantity] = useState(1);
+  const [selectedStayId, setSelectedStayId] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('CASH');
+  const [singleAmount, setSingleAmount] = useState('');
+  const [referenceNumber, setReferenceNumber] = useState('');
+  const [splitPayments, setSplitPayments] = useState([]);
   const [selling, setSelling] = useState(false);
   const [sellSuccess, setSellSuccess] = useState('');
   const [sellError, setSellError] = useState('');
+
+  // Comprobante Electrónico (Boleta / Factura SUNAT)
+  const [voucherType, setVoucherType] = useState('NONE');
+  const [rucNumber, setRucNumber] = useState('');
+  const [businessName, setBusinessName] = useState('');
+  const [businessAddress, setBusinessAddress] = useState('');
+
+  // Ticket Modal
+  const [isTicketModalOpen, setIsTicketModalOpen] = useState(false);
+  const [ticketData, setTicketData] = useState(null);
 
   // Modal para Crear / Editar Producto
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
@@ -41,10 +60,14 @@ export function StorePage() {
   const fetchProducts = useCallback(async (forceRefresh = false) => {
     try {
       setLoading(true);
-      const data = await getProducts(forceRefresh);
+      const [data, staysRes] = await Promise.all([
+        getProducts(forceRefresh),
+        api.get('/stays/active').catch(() => ({ data: [] }))
+      ]);
       setProducts(data || []);
+      setActiveStays(staysRes.data || []);
     } catch (err) {
-      console.error('Error cargando productos:', err.message);
+      console.error('Error cargando datos de tienda:', err.message);
     } finally {
       setLoading(false);
     }
@@ -95,7 +118,7 @@ export function StorePage() {
     setSellSuccess('');
 
     if (!selectedProduct) {
-      setSellError('Selecciona un producto para vender.');
+      setSellError('Debes seleccionar un producto del catálogo.');
       return;
     }
 
@@ -105,17 +128,89 @@ export function StorePage() {
       return;
     }
 
+    const unitPrice = Number(selectedProduct.sale_price_pen || 0);
+    const qtyNum = Number(quantity || 1);
+    const totalSaleCost = unitPrice * qtyNum;
+
+    if (paymentMethod === 'MIXED') {
+      const splitSum = splitPayments.reduce((acc, curr) => acc + (parseFloat(curr.amount) || 0), 0);
+      if (Math.abs(splitSum - totalSaleCost) > 0.01) {
+        setSellError(`El desglose de Pago Mixto (${formatPEN(splitSum)}) debe ser igual al total de la venta (${formatPEN(totalSaleCost)}).`);
+        return;
+      }
+    }
+
     try {
       setSelling(true);
-      await api.post('/products/direct-sale', {
+      const res = await api.post('/products/direct-sale', {
         product_id: selectedProduct.id,
-        quantity: Number(quantity),
-        payment_method: paymentMethod
+        quantity: qtyNum,
+        payment_method: paymentMethod,
+        reference_number: referenceNumber.trim(),
+        split_payments: paymentMethod === 'MIXED' ? splitPayments : null,
+        stay_id: selectedStayId || null,
+        voucher_type: voucherType,
+        customer_ruc: rucNumber.trim(),
+        customer_business_name: businessName.trim()
       });
 
-      setSellSuccess(`¡Venta registrada con éxito! (${selectedProduct.name} x${quantity})`);
+      const linkedStay = activeStays.find((s) => s.id === selectedStayId);
+      const linkedText = linkedStay ? ` (Vinculado a Hab. ${linkedStay.room_number})` : '';
+
+      // Si seleccionó Boleta o Factura, gatillar impresor de comprobante electrónico
+      if (voucherType !== 'NONE') {
+        const isFactura = voucherType === 'FACTURA';
+        printElectronicVoucherTicket({
+          voucherType,
+          customerDocType: isFactura ? 'RUC' : (linkedStay?.document_type || 'DNI'),
+          customerDocNumber: isFactura ? rucNumber.trim() : (linkedStay?.document_number || '12345678'),
+          customerName: isFactura ? businessName.trim() : (linkedStay ? linkedStay.customer_name : 'CLIENTE MOSTRADOR'),
+          customerAddress: isFactura ? businessAddress.trim() : '',
+          paymentMethod: paymentMethod === 'MIXED' ? 'PAGO MIXTO' : paymentMethod,
+          totalAmount: totalSaleCost,
+          items: [
+            {
+              qty: qtyNum,
+              description: selectedProduct.name,
+              price: totalSaleCost
+            }
+          ]
+        });
+      } else {
+        // Generar ticket de venta interno estándar
+        const newTicketData = {
+          ticket_number: `TND-${Date.now().toString().slice(-6)}`,
+          date: new Date(),
+          customer_name: linkedStay ? linkedStay.customer_name : 'Cliente Mostrador',
+          room_number: linkedStay ? linkedStay.room_number : null,
+          total_amount: totalSaleCost,
+          payment_method: paymentMethod === 'MIXED' ? 'Pago Mixto' : paymentMethod,
+          items: [
+            {
+              name: selectedProduct.name,
+              quantity: qtyNum,
+              unit_price: unitPrice,
+              total_price: totalSaleCost
+            }
+          ]
+        };
+
+        setTicketData(newTicketData);
+        setIsTicketModalOpen(true);
+      }
+
+      setSellSuccess(`¡Venta procesada con éxito! (${selectedProduct.name} x${qtyNum})${linkedText}`);
+
+      // Resetear estado del formulario
       setQuantity(1);
       setSelectedProduct(null);
+      setSelectedStayId('');
+      setReferenceNumber('');
+      setSplitPayments([]);
+      setVoucherType('NONE');
+      setRucNumber('');
+      setBusinessName('');
+      setBusinessAddress('');
       invalidateCache('products');
       await fetchProducts(true);
     } catch (err) {
@@ -214,10 +309,11 @@ export function StorePage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Panel de Venta Rápida */}
-        <div className="p-6 bg-white border border-slate-200 rounded-3xl space-y-4 shadow-sm">
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+        {/* Panel de Venta Rápida (Ampliación Principal) */}
+        <div className="xl:col-span-7 p-6 bg-white border border-slate-200 rounded-3xl space-y-4 shadow-sm">
           <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+            <ShoppingBag className="w-4 h-4 text-emerald-600" />
             <span>Venta Rápida Mostrador</span>
           </h3>
 
@@ -244,25 +340,20 @@ export function StorePage() {
 
           <form onSubmit={handleDirectSale} className="space-y-3">
             <div>
-              <label className="block text-[11px] font-semibold text-slate-700 mb-1">Producto</label>
-              <select
-                value={selectedProduct?.id || ''}
-                onChange={(e) => {
-                  const prod = products.find((p) => p.id === e.target.value);
-                  setSelectedProduct(prod || null);
+              <label className="block text-[11px] font-semibold text-slate-700 mb-1.5">
+                Seleccionar Producto del Catálogo
+              </label>
+              <ProductCardGrid
+                products={products}
+                selectedProductId={selectedProduct?.id}
+                onSelectProduct={(p) => {
+                  setSelectedProduct(p);
+                  setQuantity(1);
                 }}
-                className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs text-slate-900 focus:outline-none focus:border-emerald-600"
-              >
-                <option value="">-- Selecciona un producto --</option>
-                {products.map((p) => (
-                  <option key={p.id} value={p.id} disabled={p.stock <= 0}>
-                    {p.name} - {formatPEN(p.sale_price_pen)} (Stock: {p.stock})
-                  </option>
-                ))}
-              </select>
+              />
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-[11px] font-semibold text-slate-700 mb-1">Cantidad</label>
                 <input
@@ -283,48 +374,55 @@ export function StorePage() {
               </div>
             </div>
 
-            {/* Medio de pago */}
+            {/* Vincular a Habitación (Opcional) */}
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-700 mb-1 flex items-center gap-1">
+                <Bed className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Vincular a Habitación Ocupada (Opcional)</span>
+              </label>
+              <select
+                value={selectedStayId}
+                onChange={(e) => setSelectedStayId(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 text-xs text-slate-900 font-semibold focus:outline-none focus:border-emerald-600"
+              >
+                <option value="">-- Ninguna (Venta a Cliente Externo / Mostrador) --</option>
+                {activeStays.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    Hab. {s.room_number} — Huésped: {s.customer_name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Medio de pago con Pago Mixto */}
             <div>
               <label className="block text-[11px] font-semibold text-slate-700 mb-1">Medio de Pago</label>
-              <div className="grid grid-cols-3 gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => setPaymentMethod('YAPE_PLIN')}
-                  className={`py-1.5 px-2 rounded-lg border text-[11px] font-semibold flex items-center justify-center gap-1 transition-colors ${
-                    paymentMethod === 'YAPE_PLIN'
-                      ? 'bg-violet-50 border-violet-200 text-violet-800'
-                      : 'bg-slate-50 border-slate-200 text-slate-600'
-                  }`}
-                >
-                  <QrCode className="w-3 h-3 text-violet-600" />
-                  <span>Yape/Plin</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPaymentMethod('CASH')}
-                  className={`py-1.5 px-2 rounded-lg border text-[11px] font-semibold flex items-center justify-center gap-1 transition-colors ${
-                    paymentMethod === 'CASH'
-                      ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
-                      : 'bg-slate-50 border-slate-200 text-slate-600'
-                  }`}
-                >
-                  <Wallet className="w-3 h-3 text-emerald-600" />
-                  <span>Efectivo</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPaymentMethod('CARD')}
-                  className={`py-1.5 px-2 rounded-lg border text-[11px] font-semibold flex items-center justify-center gap-1 transition-colors ${
-                    paymentMethod === 'CARD'
-                      ? 'bg-blue-50 border-blue-200 text-blue-800'
-                      : 'bg-slate-50 border-slate-200 text-slate-600'
-                  }`}
-                >
-                  <CreditCard className="w-3 h-3 text-blue-600" />
-                  <span>Tarjeta</span>
-                </button>
-              </div>
+              <PaymentSelector
+                totalAmount={Number(selectedProduct?.sale_price_pen || 0) * Number(quantity || 1)}
+                paymentMethod={paymentMethod}
+                setPaymentMethod={setPaymentMethod}
+                singleAmount={singleAmount || String(Number(selectedProduct?.sale_price_pen || 0) * Number(quantity || 1))}
+                setSingleAmount={setSingleAmount}
+                referenceNumber={referenceNumber}
+                setReferenceNumber={setReferenceNumber}
+                splitPayments={splitPayments}
+                setSplitPayments={setSplitPayments}
+              />
             </div>
+
+            {/* Selector de Comprobante Electrónico (Boleta / Factura SUNAT) */}
+            <VoucherSelector
+              voucherType={voucherType}
+              setVoucherType={setVoucherType}
+              customerDoc={activeStays.find((s) => s.id === selectedStayId)?.document_number || ''}
+              customerName={activeStays.find((s) => s.id === selectedStayId)?.customer_name || ''}
+              rucNumber={rucNumber}
+              setRucNumber={setRucNumber}
+              businessName={businessName}
+              setBusinessName={setBusinessName}
+              businessAddress={businessAddress}
+              setBusinessAddress={setBusinessAddress}
+            />
 
             <button
               type="submit"
@@ -336,8 +434,8 @@ export function StorePage() {
           </form>
         </div>
 
-        {/* Catálogo e Inventario de Productos */}
-        <div className="lg:col-span-2 p-6 bg-white border border-slate-200 rounded-3xl space-y-4 shadow-sm">
+        {/* Catálogo e Inventario de Productos (Columna Secundaria 5/12) */}
+        <div className="xl:col-span-5 p-6 bg-white border border-slate-200 rounded-3xl space-y-4 shadow-sm">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-bold text-slate-900">Inventario de Productos & Precios</h3>
             <button
@@ -547,6 +645,13 @@ export function StorePage() {
           </div>
         </form>
       </Modal>
+
+      {/* Ticket Modal para Impresión/WhatsApp de Venta Tienda */}
+      <TicketPrintModal
+        isOpen={isTicketModalOpen}
+        onClose={() => setIsTicketModalOpen(false)}
+        ticketData={ticketData}
+      />
     </div>
   );
 }

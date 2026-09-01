@@ -57,5 +57,20 @@ export const customerController = {
     } catch (error) {
       next(error);
     }
+  },
+
+  async toggleBlacklist(req, res, next) {
+    try {
+      const { id } = req.params;
+      const { is_blacklisted, blacklist_reason } = req.body;
+      const customer = await customerService.toggleBlacklist(id, { is_blacklisted, blacklist_reason });
+      res.json({
+        success: true,
+        message: is_blacklisted ? '🛑 Cliente agregado a Lista Negra.' : '✅ Veto retirado del cliente.',
+        data: customer
+      });
+    } catch (error) {
+      next(error);
+    }
   }
 };

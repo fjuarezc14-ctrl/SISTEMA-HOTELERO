@@ -12,11 +12,13 @@ import { ShiftsPage } from './pages/ShiftsPage';
 import { CashPage } from './pages/CashPage';
 import { CustomersPage } from './pages/CustomersPage';
 import { StorePage } from './pages/StorePage';
+import { TextilesPage } from './pages/TextilesPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { UsersPage } from './pages/UsersPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { OpenShiftModal } from './components/OpenShiftModal';
 import { CloseShiftModal } from './components/CloseShiftModal';
+import { TicketPrintModal } from './components/TicketPrintModal';
 
 function MainLayout() {
   const { user, isAuthenticated } = useAuth();
@@ -24,6 +26,10 @@ function MainLayout() {
   const [isOpenShiftModalOpen, setIsOpenShiftModalOpen] = useState(false);
   const [isCloseShiftModalOpen, setIsCloseShiftModalOpen] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+
+  // Ticket Cierre Global
+  const [isClosureTicketOpen, setIsClosureTicketOpen] = useState(false);
+  const [closureTicketData, setClosureTicketData] = useState(null);
 
   const isAdmin = user?.role === 'super_admin' || user?.role === 'admin';
 
@@ -52,6 +58,8 @@ function MainLayout() {
         return <CustomersPage />;
       case 'store':
         return <StorePage />;
+      case 'textiles':
+        return <TextilesPage />;
       case 'settings':
         return isAdmin ? <SettingsPage /> : <ReceptionPage />;
       case 'users':
@@ -94,6 +102,16 @@ function MainLayout() {
       <CloseShiftModal
         isOpen={isCloseShiftModalOpen}
         onClose={() => setIsCloseShiftModalOpen(false)}
+        onShiftClosed={(ticketData) => {
+          setClosureTicketData(ticketData);
+          setIsClosureTicketOpen(true);
+        }}
+      />
+
+      <TicketPrintModal
+        isOpen={isClosureTicketOpen}
+        onClose={() => setIsClosureTicketOpen(false)}
+        ticketData={closureTicketData}
       />
     </div>
   );

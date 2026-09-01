@@ -110,5 +110,13 @@ export const customerService = {
       is_blacklisted,
       blacklist_reason: is_blacklisted ? blacklist_reason : ''
     });
+  },
+
+  async toggleBlacklist(id, { is_blacklisted, blacklist_reason = '' }) {
+    const customer = await this.getCustomerById(id);
+    return await customerRepository.toggleBlacklist(customer.id, {
+      is_blacklisted,
+      blacklist_reason
+    });
   }
 };

@@ -7,6 +7,7 @@ const router = Router();
 router.use(authenticateToken);
 
 router.get('/active', shiftController.getActiveShift);
+router.get('/active/transactions', shiftController.getActiveTransactions);
 router.post('/open', shiftController.openShift);
 router.post('/:id/close', shiftController.closeShift);
 router.get('/history', shiftController.getHistory);

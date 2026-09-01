@@ -1,11 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { Modal } from './Modal';
 import { api } from '../api/apiClient';
-import { formatPEN, formatDatePeru } from '../utils/formatters';
+import { formatPEN, formatDatePeru, printElectronicVoucherTicket } from '../utils/formatters';
 import { PaymentSelector } from './PaymentSelector';
+import { VoucherSelector } from './VoucherSelector';
 import { LogOut, AlertCircle, Receipt, AlertTriangle } from 'lucide-react';
 
+import { useGlobalStore } from '../context/GlobalStoreContext';
+
 export function CheckOutModal({ isOpen, onClose, room, onSuccess }) {
+  const { hotelInfo } = useGlobalStore();
+  const graceMinutes = hotelInfo?.grace_period_minutes !== undefined ? Number(hotelInfo.grace_period_minutes) : 10;
   const [stayData, setStayData] = useState(null);
   const [loadingStay, setLoadingStay] = useState(false);
   const [finalPaymentAmount, setFinalPaymentAmount] = useState('0.00');
@@ -20,6 +25,12 @@ export function CheckOutModal({ isOpen, onClose, room, onSuccess }) {
   const [incidentType, setIncidentType] = useState('damage');
   const [incidentDescription, setIncidentDescription] = useState('');
   const [incidentPenalty, setIncidentPenalty] = useState('0.00');
+
+  // Estados de Comprobante Electrónico (Boleta / Factura SUNAT)
+  const [voucherType, setVoucherType] = useState('NONE'); // NONE | BOLETA | FACTURA
+  const [rucNumber, setRucNumber] = useState('');
+  const [businessName, setBusinessName] = useState('');
+  const [businessAddress, setBusinessAddress] = useState('');
 
   useEffect(() => {
     if (room && isOpen) {
@@ -37,16 +48,16 @@ export function CheckOutModal({ isOpen, onClose, room, onSuccess }) {
             const pending = Math.max(0, stayPrice + consumptions - paid);
             setFinalPaymentAmount(pending.toFixed(2));
 
-            // Detectar sobrestadía
+            // Detectar sobrestadía aplicando Minutos de Tolerancia de Gracia
             const now = new Date();
             const expectedEnd = new Date(res.data.expected_end_time);
             const isOverdue = now > expectedEnd;
             if (isOverdue) {
               const diffMs = now.getTime() - expectedEnd.getTime();
               const diffMinutes = Math.floor(diffMs / 60000);
-              if (diffMinutes > 10) {
-                const extraHours = Math.ceil(diffMinutes / 60);
-                setOverdueWarning(`⏰ SOBRESTADÍA DETECTADA: El huésped lleva ${extraHours}h${diffMinutes % 60 > 0 ? ` ${diffMinutes % 60}min` : ''} adicional(es) pasado el horario de salida. El sistema calculará automáticamente el cargo extra al confirmar la salida.`);
+              if (diffMinutes > graceMinutes) {
+                const extraHours = Math.ceil((diffMinutes - graceMinutes) / 60);
+                setOverdueWarning(`⏰ SOBRESTADÍA DETECTADA: Excede por ${diffMinutes} min el horario (superando la tolerancia de ${graceMinutes} min). El sistema aplicará recargo por ${extraHours} hora(s) adicional(es).`);
               }
             }
           }
@@ -62,7 +73,22 @@ export function CheckOutModal({ isOpen, onClose, room, onSuccess }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!stayData) return;
+
+    // Si la habitación figura como ocupada pero no hay estadía registrada en BD, permitir liberar e ir a limpieza
+    if (!stayData) {
+      try {
+        setLoading(true);
+        setError('');
+        await api.patch(`/rooms/${room.id}/status`, { status: 'cleaning' });
+        onSuccess();
+        onClose();
+      } catch (err) {
+        setError(err.message || 'Error al enviar habitación a limpieza.');
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
 
     const penaltyVal = hasIncident ? (parseFloat(incidentPenalty) || 0) : 0;
     const baseAmount = parseFloat(finalPaymentAmount) || 0;
@@ -86,7 +112,10 @@ export function CheckOutModal({ isOpen, onClose, room, onSuccess }) {
           amount: amountToPay,
           payment_method: paymentMethod,
           reference_number: referenceNumber.trim(),
-          split_payments: paymentMethod === 'MIXED' ? splitPayments : null
+          split_payments: paymentMethod === 'MIXED' ? splitPayments : null,
+          voucher_type: voucherType,
+          customer_ruc: rucNumber.trim(),
+          customer_business_name: businessName.trim()
         } : null,
         incident_data: hasIncident ? {
           incident_type: incidentType,
@@ -94,6 +123,37 @@ export function CheckOutModal({ isOpen, onClose, room, onSuccess }) {
           penalty_amount_pen: penaltyVal
         } : null
       });
+
+      // Si se seleccionó Boleta o Factura, imprimir el comprobante electrónico 80mm en modo demo
+      if (voucherType !== 'NONE') {
+        const isFactura = voucherType === 'FACTURA';
+        printElectronicVoucherTicket({
+          voucherType,
+          customerDocType: isFactura ? 'RUC' : (stayData.document_type || 'DNI'),
+          customerDocNumber: isFactura ? rucNumber.trim() : (stayData.document_number || ''),
+          customerName: isFactura ? businessName.trim() : (stayData.customer_name || ''),
+          customerAddress: isFactura ? businessAddress.trim() : '',
+          paymentMethod: paymentMethod === 'MIXED' ? 'PAGO MIXTO' : paymentMethod,
+          totalAmount: amountToPay > 0 ? amountToPay : (Number(stayData.total_stay_price_pen || 0) + Number(stayData.total_consumptions_price_pen || 0)),
+          items: [
+            {
+              qty: 1,
+              description: `Hospedaje Hab. ${room.room_number} (${stayData.stay_type || 'Estadía'})`,
+              price: Number(stayData.total_stay_price_pen || 0)
+            },
+            ...(Number(stayData.total_consumptions_price_pen || 0) > 0 ? [{
+              qty: 1,
+              description: 'Consumos Tienda / Minibar',
+              price: Number(stayData.total_consumptions_price_pen || 0)
+            }] : []),
+            ...(penaltyVal > 0 ? [{
+              qty: 1,
+              description: 'Penalidad / Novedad en Habitación',
+              price: penaltyVal
+            }] : [])
+          ]
+        });
+      }
 
       onSuccess();
       onClose();
@@ -130,7 +190,14 @@ export function CheckOutModal({ isOpen, onClose, room, onSuccess }) {
             </div>
           )}
 
-          {overdueWarning && (
+          {!stayData && (
+            <div className="p-3.5 bg-blue-50 border border-blue-200 rounded-xl text-blue-900 text-xs font-semibold flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 text-blue-600" />
+              <span>ℹ️ Esta habitación figura como ocupada pero sin registros de estadía activos. Puedes presionar el botón inferior para enviarla directamente a Limpieza y liberarla.</span>
+            </div>
+          )}
+
+          {overdueWarning && stayData && (
             <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl text-amber-800 text-xs font-semibold flex items-start gap-2">
               <AlertTriangle className="w-4 h-4 shrink-0 text-amber-600 mt-0.5" />
               <span>{overdueWarning}</span>
@@ -251,6 +318,20 @@ export function CheckOutModal({ isOpen, onClose, room, onSuccess }) {
               />
             </div>
           )}
+
+          {/* Selector de Comprobante Electrónico (Boleta / Factura SUNAT) */}
+          <VoucherSelector
+            voucherType={voucherType}
+            setVoucherType={setVoucherType}
+            customerDoc={stayData?.document_number || ''}
+            customerName={stayData?.customer_name || ''}
+            rucNumber={rucNumber}
+            setRucNumber={setRucNumber}
+            businessName={businessName}
+            setBusinessName={setBusinessName}
+            businessAddress={businessAddress}
+            setBusinessAddress={setBusinessAddress}
+          />
 
           {/* Botones de acción */}
           <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">

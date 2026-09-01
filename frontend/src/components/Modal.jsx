@@ -19,8 +19,8 @@ export function Modal({ isOpen, onClose, title, children, maxWidth = 'max-w-xl' 
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50">
-          <h3 className="text-lg font-bold text-slate-900 tracking-tight">{title}</h3>
+        <div className="flex items-center justify-between px-4 py-3 sm:px-6 sm:py-4 border-b border-slate-100 bg-slate-50">
+          <h3 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">{title}</h3>
           <button
             onClick={onClose}
             className="p-1 text-slate-400 hover:text-slate-800 rounded-lg hover:bg-slate-200 transition-colors"
@@ -30,7 +30,7 @@ export function Modal({ isOpen, onClose, title, children, maxWidth = 'max-w-xl' 
         </div>
 
         {/* Content */}
-        <div className="p-6 overflow-y-auto">{children}</div>
+        <div className="p-4 sm:p-6 overflow-y-auto">{children}</div>
       </div>
     </div>
   );

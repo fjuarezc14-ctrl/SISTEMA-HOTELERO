@@ -84,12 +84,31 @@ export const shiftRepository = {
         
         COALESCE(SUM(CASE WHEN transaction_type = 'income' THEN amount_pen ELSE 0 END), 0) AS total_income,
         
-        COALESCE(SUM(CASE WHEN transaction_type = 'expense' THEN amount_pen ELSE 0 END), 0) AS total_expense
+        COALESCE(SUM(CASE WHEN transaction_type = 'expense' THEN amount_pen ELSE 0 END), 0) AS total_expense,
+
+        COALESCE(SUM(CASE WHEN transaction_type = 'income' AND (category = 'stay' OR category IS NULL) THEN amount_pen ELSE 0 END), 0) AS revenue_stay,
+
+        COALESCE(SUM(CASE WHEN transaction_type = 'income' AND category = 'store' THEN amount_pen ELSE 0 END), 0) AS revenue_store,
+
+        COALESCE(SUM(CASE WHEN transaction_type = 'income' AND category = 'incident' THEN amount_pen ELSE 0 END), 0) AS revenue_incidents
       FROM cash_transactions
       WHERE work_shift_id = $1
     `;
     const res = await query(sql, [shiftId]);
     return res.rows[0];
+  },
+
+  async findShiftTransactions(shiftId, { limit = 100 } = {}) {
+    const sql = `
+      SELECT ct.*, u.full_name AS user_name
+      FROM cash_transactions ct
+      LEFT JOIN users u ON ct.user_id = u.id
+      WHERE ct.work_shift_id = $1
+      ORDER BY ct.created_at DESC
+      LIMIT $2
+    `;
+    const res = await query(sql, [shiftId, limit]);
+    return res.rows;
   },
 
   async updateShiftTotals(shiftId, { expected_cash_pen, total_yape_plin_pen, total_card_pen, total_revenue_pen }) {

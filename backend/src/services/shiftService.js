@@ -26,8 +26,16 @@ export const shiftService = {
       live_expected_cash_pen: expectedCash,
       live_total_yape_plin_pen: Number(totals.total_yape_plin || 0),
       live_total_card_pen: Number(totals.total_card || 0),
-      live_total_revenue_pen: Number(totals.total_income || 0)
+      live_total_revenue_pen: Number(totals.total_income || 0),
+      live_revenue_stay: Number(totals.revenue_stay || 0),
+      live_revenue_store: Number(totals.revenue_store || 0),
+      live_revenue_incidents: Number(totals.revenue_incidents || 0),
+      live_total_expenses: Number(totals.total_expense || 0)
     };
+  },
+
+  async getActiveShiftTransactions(shiftId) {
+    return await shiftRepository.findShiftTransactions(shiftId);
   },
 
   async openShift({ user_id, initial_cash_pen = 0, shift_notes = '' }) {

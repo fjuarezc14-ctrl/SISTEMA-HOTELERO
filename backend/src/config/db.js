@@ -57,6 +57,28 @@ export async function getClient() {
 }
 
 /**
+ * Ejecuta una función dentro de una transacción atómica (BEGIN / COMMIT / ROLLBACK).
+ * El callback recibe una función `txQuery(sql, params)` que ejecuta queries dentro de la transacción.
+ * @param {Function} callback - async (txQuery) => resultado
+ * @returns {*} El valor retornado por el callback
+ */
+export async function withTransaction(callback) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const txQuery = (text, params) => client.query(text, params);
+    const result = await callback(txQuery);
+    await client.query('COMMIT');
+    return result;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+/**
  * Inicializa el esquema y los datos iniciales si no existen
  */
 export async function initDatabase() {

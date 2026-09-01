@@ -41,9 +41,24 @@ export function SettingsPage() {
   const [ruc, setRuc] = useState('');
   const [address, setAddress] = useState('');
   const [phone, setPhone] = useState('');
+  const [overnightCheckoutTime, setOvernightCheckoutTime] = useState('12:00');
+  const [gracePeriodMinutes, setGracePeriodMinutes] = useState(10);
+  const [ticketFooterLegend, setTicketFooterLegend] = useState('');
   const [savingHotel, setSavingHotel] = useState(false);
   const [hotelSuccess, setHotelSuccess] = useState('');
   const [hotelError, setHotelError] = useState('');
+
+  // Modal Crear Tipo de Habitación
+  const [isCreateTypeModalOpen, setIsCreateTypeModalOpen] = useState(false);
+  const [typeName, setTypeName] = useState('');
+  const [typeDesc, setTypeDesc] = useState('');
+  const [typePriceHours, setTypePriceHours] = useState('30.00');
+  const [typePriceOvernight, setTypePriceOvernight] = useState('60.00');
+  const [typePriceFullDay, setTypePriceFullDay] = useState('90.00');
+  const [typePriceExtraHour, setTypePriceExtraHour] = useState('10.00');
+  const [typeHoursCount, setTypeHoursCount] = useState(3);
+  const [savingNewType, setSavingNewType] = useState(false);
+  const [createTypeError, setCreateTypeError] = useState('');
 
   const fetchData = useCallback(async (forceRefresh = false) => {
     try {
@@ -62,6 +77,9 @@ export function SettingsPage() {
         setRuc(infoData.ruc || '');
         setAddress(infoData.address || '');
         setPhone(infoData.phone || '');
+        setOvernightCheckoutTime(infoData.overnight_checkout_time || '12:00');
+        setGracePeriodMinutes(infoData.grace_period_minutes !== undefined ? infoData.grace_period_minutes : 10);
+        setTicketFooterLegend(infoData.ticket_footer_legend || '¡Gracias por su preferencia en Hotel Zafiro! Conserve sus objetos de valor.');
       }
     } catch (err) {
       console.error('Error cargando ajustes:', err.message);
@@ -193,6 +211,38 @@ export function SettingsPage() {
     }
   };
 
+  const handleCreateType = async (e) => {
+    e.preventDefault();
+    setCreateTypeError('');
+
+    if (!typeName.trim()) {
+      setCreateTypeError('El nombre de la categoría es obligatorio.');
+      return;
+    }
+
+    try {
+      setSavingNewType(true);
+      await api.post('/rooms/types', {
+        name: typeName.trim(),
+        description: typeDesc.trim(),
+        hours_quantity_default: parseInt(typeHoursCount, 10) || 3,
+        price_hours_default: parseFloat(typePriceHours) || 30,
+        price_overnight_default: parseFloat(typePriceOvernight) || 60,
+        price_full_day_default: parseFloat(typePriceFullDay) || 90,
+        price_extra_hour_default: parseFloat(typePriceExtraHour) || 10
+      });
+      invalidateCache('room_types');
+      setIsCreateTypeModalOpen(false);
+      setTypeName('');
+      setTypeDesc('');
+      await fetchData(true);
+    } catch (err) {
+      setCreateTypeError(err.message || 'Error al crear tipo de habitación.');
+    } finally {
+      setSavingNewType(false);
+    }
+  };
+
   const handleSaveHotelInfo = async (e) => {
     e.preventDefault();
     setHotelError('');
@@ -214,10 +264,13 @@ export function SettingsPage() {
         trade_name: tradeName.trim(),
         ruc: ruc.trim(),
         address: address.trim(),
-        phone: phone.trim()
+        phone: phone.trim(),
+        overnight_checkout_time: overnightCheckoutTime,
+        grace_period_minutes: parseInt(gracePeriodMinutes, 10) || 0,
+        ticket_footer_legend: ticketFooterLegend.trim()
       });
       invalidateCache('hotel_info');
-      setHotelSuccess('Información fiscal y del hotel actualizada con éxito.');
+      setHotelSuccess('Información fiscal, parámetros de tolerancia y leyenda de ticket actualizados.');
     } catch (err) {
       setHotelError(err.message || 'Error guardando datos del hotel.');
     } finally {
@@ -275,9 +328,28 @@ export function SettingsPage() {
       {/* TAB 1: TARIFAS EDITABLES */}
       {activeTab === 'rates' && (
         <div className="p-6 bg-white border border-slate-200 rounded-3xl space-y-4 shadow-sm">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-slate-900">Tarifas por Defecto en Soles (PEN - S/)</h3>
-            <span className="text-xs text-slate-500">Precios base aplicados al hacer Check-in</span>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-bold text-slate-900">Tarifas por Defecto en Soles (PEN - S/)</h3>
+              <p className="text-xs text-slate-500">Precios base aplicados al hacer Check-in (Modificar no altera el historial previo)</p>
+            </div>
+            <button
+              onClick={() => {
+                setTypeName('');
+                setTypeDesc('');
+                setTypePriceHours('30.00');
+                setTypePriceOvernight('60.00');
+                setTypePriceFullDay('90.00');
+                setTypePriceExtraHour('10.00');
+                setTypeHoursCount(3);
+                setCreateTypeError('');
+                setIsCreateTypeModalOpen(true);
+              }}
+              className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center gap-1.5 self-start sm:self-auto"
+            >
+              <Plus className="w-4 h-4" />
+              <span>+ Nueva Categoría</span>
+            </button>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -450,6 +522,50 @@ export function SettingsPage() {
                 onChange={(e) => setPhone(e.target.value)}
                 className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs text-slate-900 focus:outline-none focus:border-emerald-600"
               />
+            </div>
+
+            {/* Parámetros de Operación & Tolerancia */}
+            <div className="p-4 bg-emerald-50/60 border border-emerald-200 rounded-2xl space-y-3">
+              <h4 className="text-xs font-bold text-emerald-900 uppercase tracking-wider">
+                Tiempos de Check-out & Tolerancia de Gracia
+              </h4>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Hora Salida Pernocte</label>
+                  <input
+                    type="time"
+                    value={overnightCheckoutTime}
+                    onChange={(e) => setOvernightCheckoutTime(e.target.value)}
+                    className="w-full bg-white border border-slate-300 rounded-xl p-2 text-xs font-bold font-mono text-slate-900 focus:outline-none focus:border-emerald-600"
+                  />
+                  <span className="text-[10px] text-slate-500">Ej: 12:00 PM del día siguiente</span>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Minutos de Gracia (Sobrestadía)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="60"
+                    value={gracePeriodMinutes}
+                    onChange={(e) => setGracePeriodMinutes(e.target.value)}
+                    className="w-full bg-white border border-slate-300 rounded-xl p-2 text-xs font-bold font-mono text-slate-900 focus:outline-none focus:border-emerald-600"
+                  />
+                  <span className="text-[10px] text-slate-500">Margen libre sin cobro extra</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Leyenda y Pie de Ticket Personalizado */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Leyenda al Pie del Ticket Térmico (80mm)</label>
+              <textarea
+                rows="2"
+                value={ticketFooterLegend}
+                onChange={(e) => setTicketFooterLegend(e.target.value)}
+                placeholder="Ej: ¡Gracias por su preferencia en Hotel Zafiro! Conserve sus objetos de valor."
+                className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs text-slate-900 focus:outline-none focus:border-emerald-600"
+              />
+              <span className="text-[10px] text-slate-500">Aparecerá impreso al final de todas las ventas y liquidaciones.</span>
             </div>
 
             <div className="pt-2">
@@ -649,6 +765,128 @@ export function SettingsPage() {
               className="px-5 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl shadow-md"
             >
               {savingRoom ? 'Guardando...' : (editingRoom ? 'Guardar Cambios' : 'Crear Habitación')}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Modal Crear Nuevo Tipo de Habitación */}
+      <Modal
+        isOpen={isCreateTypeModalOpen}
+        onClose={() => setIsCreateTypeModalOpen(false)}
+        title="Crear Nueva Categoría de Habitación"
+      >
+        <form onSubmit={handleCreateType} className="space-y-4">
+          {createTypeError && (
+            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{createTypeError}</span>
+            </div>
+          )}
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">Nombre de la Categoría</label>
+            <input
+              type="text"
+              required
+              placeholder="Ej: Suite Jacuzzi Presidencial"
+              value={typeName}
+              onChange={(e) => setTypeName(e.target.value)}
+              className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs font-bold text-slate-900 focus:outline-none focus:border-emerald-600"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">Descripción corta / Equipamiento</label>
+            <input
+              type="text"
+              placeholder="Ej: Tina de hidromasajes, cama King, TV 65''"
+              value={typeDesc}
+              onChange={(e) => setTypeDesc(e.target.value)}
+              className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs text-slate-900 focus:outline-none focus:border-emerald-600"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Horas Base Incluidas</label>
+              <input
+                type="number"
+                min="1"
+                max="24"
+                required
+                value={typeHoursCount}
+                onChange={(e) => setTypeHoursCount(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs font-bold text-slate-900 focus:outline-none focus:border-emerald-600"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Precio por Horas Base (S/)</label>
+              <input
+                type="number"
+                step="1"
+                min="0"
+                required
+                value={typePriceHours}
+                onChange={(e) => setTypePriceHours(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs font-bold text-emerald-700 focus:outline-none focus:border-emerald-600"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Por Noche (S/)</label>
+              <input
+                type="number"
+                step="1"
+                min="0"
+                required
+                value={typePriceOvernight}
+                onChange={(e) => setTypePriceOvernight(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs font-bold text-indigo-700 focus:outline-none focus:border-emerald-600"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Día Completo (S/)</label>
+              <input
+                type="number"
+                step="1"
+                min="0"
+                required
+                value={typePriceFullDay}
+                onChange={(e) => setTypePriceFullDay(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs font-bold text-amber-700 focus:outline-none focus:border-emerald-600"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Hora Extra (S/)</label>
+              <input
+                type="number"
+                step="1"
+                min="0"
+                required
+                value={typePriceExtraHour}
+                onChange={(e) => setTypePriceExtraHour(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs font-bold text-slate-700 focus:outline-none focus:border-emerald-600"
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
+            <button
+              type="button"
+              onClick={() => setIsCreateTypeModalOpen(false)}
+              className="px-4 py-2 text-xs font-medium text-slate-500 hover:text-slate-900"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={savingNewType}
+              className="px-5 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl shadow-md"
+            >
+              {savingNewType ? 'Creando...' : 'Crear Categoría'}
             </button>
           </div>
         </form>

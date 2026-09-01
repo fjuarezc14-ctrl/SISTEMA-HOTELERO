@@ -13,6 +13,22 @@ export const shiftController = {
     }
   },
 
+  async getActiveTransactions(req, res, next) {
+    try {
+      const activeShift = await shiftService.getActiveShift(req.user.id);
+      if (!activeShift) {
+        return res.json({ success: true, data: [] });
+      }
+      const transactions = await shiftService.getActiveShiftTransactions(activeShift.id);
+      res.json({
+        success: true,
+        data: transactions
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+
   async openShift(req, res, next) {
     try {
       const { initial_cash_pen, shift_notes } = req.body;

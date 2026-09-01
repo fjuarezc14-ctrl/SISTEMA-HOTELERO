@@ -8,5 +8,7 @@ router.use(authenticateToken);
 
 router.post('/transaction', cashController.createTransaction);
 router.get('/transactions', cashController.getAll);
+router.patch('/transactions/:id/cancel', cashController.cancelTransaction);
+router.patch('/transactions/:id/voucher', cashController.updateVoucher);
 
 export default router;

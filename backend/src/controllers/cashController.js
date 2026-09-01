@@ -28,5 +28,34 @@ export const cashController = {
     } catch (error) {
       next(error);
     }
+  },
+
+  async cancelTransaction(req, res, next) {
+    try {
+      const { id } = req.params;
+      const { reason } = req.body;
+      const transaction = await cashService.cancelTransaction(id, { reason });
+      res.json({
+        success: true,
+        message: '🛑 Transacción de caja anulada correctamente.',
+        data: transaction
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async updateVoucher(req, res, next) {
+    try {
+      const { id } = req.params;
+      const transaction = await cashService.updateVoucher(id, req.body);
+      res.json({
+        success: true,
+        message: '📄 Comprobante electrónico emitido/actualizado correctamente.',
+        data: transaction
+      });
+    } catch (error) {
+      next(error);
+    }
   }
 };

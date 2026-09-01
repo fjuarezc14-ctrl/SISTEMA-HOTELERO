@@ -338,16 +338,16 @@ export function ReceptionPage() {
                 return (
                   <div
                     key={room.id}
-                    className={`bg-white border-2 rounded-3xl p-4 flex flex-col justify-between items-center text-center transition-all duration-200 shadow-sm relative ${
+                    className={`border-2 rounded-3xl p-4 flex flex-col justify-between items-center text-center transition-all duration-200 shadow-sm relative ${
                       upcomingRes && isAvailable
-                        ? 'border-violet-400 bg-violet-50/40 ring-4 ring-violet-400/20 shadow-md'
+                        ? 'border-violet-500 bg-violet-50 ring-4 ring-violet-400/30 shadow-md'
                         : isOccupied
-                        ? 'border-rose-300'
+                        ? 'border-rose-400 bg-rose-50/80 shadow-rose-500/10'
                         : isCleaning
-                        ? 'border-amber-300'
+                        ? 'border-amber-400 bg-amber-50/90 ring-2 ring-amber-400/40 shadow-amber-500/10'
                         : isAvailable
-                        ? 'border-emerald-300'
-                        : 'border-slate-300'
+                        ? 'border-emerald-400 bg-emerald-50/80 ring-2 ring-emerald-500/20 shadow-emerald-500/10'
+                        : 'border-slate-300 bg-slate-50'
                     }`}
                   >
                     {/* Botón rápido para editar habitación */}
@@ -355,7 +355,7 @@ export function ReceptionPage() {
                       type="button"
                       onClick={() => handleOpenEditRoom(room)}
                       title="Configurar / Editar Habitación"
-                      className="absolute top-3 right-3 p-1.5 text-slate-300 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors"
+                      className="absolute top-3 right-3 p-1.5 text-slate-400 hover:text-slate-900 hover:bg-white/80 rounded-xl transition-colors"
                     >
                       <Settings className="w-4 h-4" />
                     </button>
@@ -365,28 +365,30 @@ export function ReceptionPage() {
                       <h3 className="text-3xl font-black text-slate-900 font-mono tracking-tight">
                         {room.room_number}
                       </h3>
-                      <p className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider">
+                      <p className="text-[11px] font-extrabold text-slate-600 uppercase tracking-wider">
                         {room.room_type_name}
                       </p>
                       
                       {/* Pricing Tag in Soles */}
-                      <p className="text-xs font-bold text-emerald-700 font-mono">
-                        {formatPEN(room.price_hours_default)} <span className="text-[10px] text-slate-400 font-sans font-normal">(3h)</span>
+                      <p className="text-xs font-bold text-emerald-800 font-mono">
+                        {formatPEN(room.price_hours_default)} <span className="text-[10px] text-slate-500 font-sans font-normal">(3h)</span>
                       </p>
 
-                      {/* Pill Badge Centered */}
+                      {/* Pill Badge Centered Resaltado con Colores Vibrantes */}
                       <div className="pt-2 flex justify-center">
                         <span
-                          className={`px-3 py-1 rounded-full text-[11px] font-black tracking-wide uppercase ${
+                          className={`px-3.5 py-1 rounded-full text-[11px] font-black tracking-wide uppercase shadow-md flex items-center gap-1.5 ${
                             isOccupied
-                              ? 'bg-rose-500 text-white'
+                              ? 'bg-rose-600 text-white shadow-rose-600/30'
                               : isCleaning
-                              ? 'bg-amber-400 text-amber-950'
+                              ? 'bg-amber-500 text-amber-950 shadow-amber-500/40 animate-pulse border border-amber-600/30'
                               : isAvailable
-                              ? 'bg-emerald-500 text-white'
-                              : 'bg-slate-400 text-white'
+                              ? 'bg-emerald-600 text-white shadow-emerald-600/30'
+                              : 'bg-slate-600 text-white'
                           }`}
                         >
+                          {isAvailable && <Sparkles className="w-3.5 h-3.5 text-emerald-200" />}
+                          {isCleaning && <Sparkles className="w-3.5 h-3.5 text-amber-900 animate-spin" />}
                           {ROOM_STATUS_CONFIG[room.status]?.label || room.status}
                         </span>
                       </div>
@@ -402,16 +404,16 @@ export function ReceptionPage() {
                         const pendingDebt = Math.max(0, totalAmount - paidAmount);
 
                         return (
-                          <div className="space-y-2 pt-1 border-t border-slate-100">
-                            <div className="flex items-center justify-center gap-1.5 text-xs font-black text-rose-900 truncate">
-                              <User className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                          <div className="space-y-2 pt-1.5 border-t border-rose-200">
+                            <div className="flex items-center justify-center gap-1.5 text-xs font-black text-rose-950 truncate">
+                              <User className="w-3.5 h-3.5 text-rose-700 shrink-0" />
                               <span className="truncate">{room.customer_name}</span>
                             </div>
 
                             {/* Badge de Deuda / Saldo Pendiente */}
-                            <div className="text-[11px] font-bold p-1.5 rounded-xl border flex items-center justify-between shadow-2xs">
-                              <span className="text-slate-500 text-[10px]">Deuda / Saldo:</span>
-                              <span className={`font-mono text-xs font-black ${pendingDebt > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                            <div className="text-[11px] font-bold p-1.5 bg-white/90 rounded-xl border border-rose-200 flex items-center justify-between shadow-2xs">
+                              <span className="text-slate-600 text-[10px]">Deuda / Saldo:</span>
+                              <span className={`font-mono text-xs font-black ${pendingDebt > 0 ? 'text-rose-700' : 'text-emerald-700'}`}>
                                 {pendingDebt > 0 ? formatPEN(pendingDebt) : 'S/ 0.00 (Pagado)'}
                               </span>
                             </div>
@@ -433,10 +435,10 @@ export function ReceptionPage() {
                           </div>
                         );
                       })() : isCleaning ? (
-                        <div className="pt-2 border-t border-slate-100">
-                          <p className="text-[11px] text-amber-800 font-bold flex items-center justify-center gap-1">
-                            <Sparkles className="w-3.5 h-3.5 text-amber-600 animate-spin" />
-                            <span>En desinfección</span>
+                        <div className="pt-2 border-t border-amber-200">
+                          <p className="text-[11px] text-amber-900 font-black flex items-center justify-center gap-1 bg-amber-100/90 py-1 px-2 rounded-xl border border-amber-300">
+                            <Sparkles className="w-3.5 h-3.5 text-amber-700 animate-spin" />
+                            <span>En desinfección / limpieza</span>
                           </p>
                         </div>
                       ) : upcomingRes ? (() => {
@@ -461,22 +463,22 @@ export function ReceptionPage() {
                           </div>
                         );
                       })() : (
-                        <div className="text-[10px] text-slate-400 pt-2 border-t border-slate-100 space-y-0.5">
-                          <div>Noche: <strong className="text-slate-700 font-mono">{formatPEN(room.price_overnight_default)}</strong></div>
-                          <div>24h: <strong className="text-slate-700 font-mono">{formatPEN(room.price_full_day_default)}</strong></div>
+                        <div className="text-[10px] text-emerald-800 font-medium pt-2 border-t border-emerald-200 space-y-0.5">
+                          <div>Noche: <strong className="text-slate-800 font-mono">{formatPEN(room.price_overnight_default)}</strong></div>
+                          <div>24h: <strong className="text-slate-800 font-mono">{formatPEN(room.price_full_day_default)}</strong></div>
                         </div>
                       )}
                     </div>
 
                     {/* Action Buttons Footer */}
-                    <div className="w-full pt-2 border-t border-slate-100 space-y-1.5">
+                    <div className="w-full pt-2 border-t border-slate-200/60 space-y-1.5">
                       {isAvailable && (
                         <button
                           onClick={() => handleOpenCheckIn(room)}
-                          className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-1"
+                          className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow-md shadow-emerald-600/30 transition-all flex items-center justify-center gap-1.5"
                         >
-                          <UserCheck className="w-3.5 h-3.5" />
-                          <span>Ingreso</span>
+                          <UserCheck className="w-4 h-4" />
+                          <span>Check-in (Ingreso)</span>
                         </button>
                       )}
 
@@ -484,7 +486,7 @@ export function ReceptionPage() {
                         <div className="flex items-center gap-1.5">
                           <button
                             onClick={() => handleOpenConsumption(room)}
-                            className="flex-1 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1"
+                            className="flex-1 py-1.5 bg-white hover:bg-slate-100 text-slate-800 font-bold text-xs rounded-xl border border-slate-200 transition-all flex items-center justify-center gap-1"
                             title="Frigobar / Snacks"
                           >
                             <ShoppingBag className="w-3.5 h-3.5 text-emerald-600" />
@@ -503,9 +505,10 @@ export function ReceptionPage() {
                       {isCleaning && (
                         <button
                           onClick={() => handleQuickStatusChange(room.id, 'available')}
-                          className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs rounded-xl shadow-xs transition-all"
+                          className="w-full py-2.5 bg-amber-500 hover:bg-amber-400 text-amber-950 font-black text-xs rounded-xl shadow-md shadow-amber-500/30 border border-amber-600 transition-all flex items-center justify-center gap-1.5"
                         >
-                          Aseo Listo → Libre
+                          <Sparkles className="w-4 h-4 text-amber-950 animate-pulse" />
+                          <span>Aseo Listo → Habitación Limpia</span>
                         </button>
                       )}
                     </div>

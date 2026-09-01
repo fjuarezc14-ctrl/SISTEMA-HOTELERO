@@ -26,16 +26,17 @@ export const userRepository = {
     return res.rows[0];
   },
 
-  async update(id, { full_name, role, is_active }) {
+  async update(id, { username, full_name, role, is_active }) {
     const res = await query(
       `UPDATE users 
-       SET full_name = COALESCE($2, full_name),
-           role = COALESCE($3, role),
-           is_active = COALESCE($4, is_active),
+       SET username = COALESCE($2, username),
+           full_name = COALESCE($3, full_name),
+           role = COALESCE($4, role),
+           is_active = COALESCE($5, is_active),
            updated_at = NOW()
        WHERE id = $1
        RETURNING id, username, full_name, role, is_active, updated_at`,
-      [id, full_name, role, is_active]
+      [id, username, full_name, role, is_active]
     );
     return res.rows[0] || null;
   },

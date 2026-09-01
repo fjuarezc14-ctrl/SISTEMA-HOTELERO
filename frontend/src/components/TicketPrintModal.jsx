@@ -2,12 +2,16 @@ import React, { useState } from 'react';
 import { Modal } from './Modal';
 import { formatPEN, formatDatePeru } from '../utils/formatters';
 import { Printer, Share2, Send } from 'lucide-react';
+import { useGlobalStore } from '../context/GlobalStoreContext';
 
 export function TicketPrintModal({ isOpen, onClose, ticketData }) {
+  const { hotelInfo } = useGlobalStore();
   const [phone, setPhone] = useState('');
   const [showWhatsAppInput, setShowWhatsAppInput] = useState(false);
 
   if (!ticketData) return null;
+
+  const legendText = hotelInfo?.ticket_footer_legend || '¡Gracias por su preferencia en Hotel Zafiro! Conserve sus objetos de valor.';
 
   const handlePrint = () => {
     window.print();
@@ -90,8 +94,7 @@ export function TicketPrintModal({ isOpen, onClose, ticketData }) {
           </div>
 
           <div className="text-center text-[9px] pt-3 border-t border-dashed border-black space-y-0.5">
-            <p className="font-bold">¡Gracias por su preferencia!</p>
-            <p>Conserve este ticket para su control</p>
+            <p className="font-bold whitespace-pre-line">{legendText}</p>
           </div>
         </div>
 
