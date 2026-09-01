@@ -11,6 +11,7 @@ import userRoutes from './userRoutes.js';
 import maintenanceRoutes from './maintenanceRoutes.js';
 import reservationRoutes from './reservationRoutes.js';
 import receiptRoutes from './receiptRoutes.js';
+import incidentRoutes from './incidentRoutes.js';
 
 const apiRouter = Router();
 
@@ -26,5 +27,7 @@ apiRouter.use('/users', userRoutes);
 apiRouter.use('/maintenance', maintenanceRoutes);
 apiRouter.use('/reservations', reservationRoutes);
 apiRouter.use('/receipts', receiptRoutes);
+apiRouter.use('/incidents', incidentRoutes);
 
 export default apiRouter;
+

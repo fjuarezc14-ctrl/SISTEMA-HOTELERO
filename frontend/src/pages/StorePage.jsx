@@ -1,12 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { api } from '../api/apiClient';
 import { formatPEN } from '../utils/formatters';
 import { useShift } from '../context/ShiftContext';
+import { useGlobalStore } from '../context/GlobalStoreContext';
+import { validateText, validatePrice, validateQuantity, validateSupplierName } from '../utils/validators';
 import { ShoppingBag, Plus, QrCode, Wallet, CreditCard, AlertCircle, Check } from 'lucide-react';
 import { Modal } from '../components/Modal';
 
 export function StorePage() {
   const { hasActiveShift } = useShift();
+  const { getProducts, invalidateCache } = useGlobalStore();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -35,36 +38,50 @@ export function StorePage() {
   const [supplierName, setSupplierName] = useState('Distribuidora San José');
   const [submittingPurchase, setSubmittingPurchase] = useState(false);
 
-  const fetchProducts = async () => {
+  const fetchProducts = useCallback(async (forceRefresh = false) => {
     try {
       setLoading(true);
-      const res = await api.get('/products');
-      setProducts(res.data || []);
+      const data = await getProducts(forceRefresh);
+      setProducts(data || []);
     } catch (err) {
       console.error('Error cargando productos:', err.message);
     } finally {
       setLoading(false);
     }
-  };
+  }, [getProducts]);
 
   useEffect(() => {
     fetchProducts();
-  }, []);
+  }, [fetchProducts]);
 
   const handleRegisterPurchase = async (e) => {
     e.preventDefault();
-    if (!purchaseProdId || purchaseQty <= 0 || !purchaseUnitCost) return;
+    if (!purchaseProdId) {
+      alert('Selecciona un producto para la compra.');
+      return;
+    }
+
+    const qtyErr = validateQuantity(purchaseQty, 'Cantidad comprada');
+    const costErr = validatePrice(purchaseUnitCost, 'Costo unitario');
+    const supErr = validateSupplierName(supplierName);
+    const firstErr = qtyErr || costErr || supErr;
+    if (firstErr) {
+      alert(firstErr);
+      return;
+    }
+
     try {
       setSubmittingPurchase(true);
       await api.post('/products/purchase', {
         product_id: purchaseProdId,
         quantity: Number(purchaseQty),
         unit_cost_pen: parseFloat(purchaseUnitCost),
-        supplier_name: supplierName
+        supplier_name: supplierName.trim()
       });
+      invalidateCache('products');
       alert('Compra registrada correctamente. Stock actualizado en Almacén.');
       setIsPurchaseModalOpen(false);
-      fetchProducts();
+      fetchProducts(true);
     } catch (err) {
       alert(err.message || 'Error registrando compra.');
     } finally {
@@ -82,6 +99,12 @@ export function StorePage() {
       return;
     }
 
+    const qtyErr = validateQuantity(quantity, 'Cantidad a vender', 1, selectedProduct.stock || 999);
+    if (qtyErr) {
+      setSellError(qtyErr);
+      return;
+    }
+
     try {
       setSelling(true);
       await api.post('/products/direct-sale', {
@@ -90,10 +113,11 @@ export function StorePage() {
         payment_method: paymentMethod
       });
 
-      setSellSuccess(`¡Venta realizada con éxito! (${selectedProduct.name} x${quantity})`);
-      setSelectedProduct(null);
+      setSellSuccess(`¡Venta registrada con éxito! (${selectedProduct.name} x${quantity})`);
       setQuantity(1);
-      await fetchProducts();
+      setSelectedProduct(null);
+      invalidateCache('products');
+      await fetchProducts(true);
     } catch (err) {
       setSellError(err.message || 'Error al procesar la venta.');
     } finally {
@@ -105,16 +129,16 @@ export function StorePage() {
     setEditingProduct(null);
     setProdName('');
     setProdPrice('');
-    setProdStock('10');
+    setProdStock('');
     setProductError('');
     setIsProductModalOpen(true);
   };
 
-  const handleOpenEditProduct = (p) => {
-    setEditingProduct(p);
-    setProdName(p.name);
-    setProdPrice(p.sale_price_pen);
-    setProdStock(p.stock);
+  const handleOpenEditProduct = (prod) => {
+    setEditingProduct(prod);
+    setProdName(prod.name);
+    setProdPrice(prod.sale_price_pen);
+    setProdStock(prod.stock);
     setProductError('');
     setIsProductModalOpen(true);
   };
@@ -123,8 +147,12 @@ export function StorePage() {
     e.preventDefault();
     setProductError('');
 
-    if (!prodName.trim() || !prodPrice) {
-      setProductError('El nombre y el precio de venta son obligatorios.');
+    const nameErr = validateText(prodName, 'Nombre del producto', 2, 100);
+    const priceErr = validatePrice(prodPrice, 'Precio de venta');
+    const stockErr = validateQuantity(prodStock, 'Stock inicial', 0, 99999);
+    const firstErr = nameErr || priceErr || stockErr;
+    if (firstErr) {
+      setProductError(firstErr);
       return;
     }
 
@@ -144,8 +172,9 @@ export function StorePage() {
         });
       }
 
+      invalidateCache('products');
       setIsProductModalOpen(false);
-      await fetchProducts();
+      await fetchProducts(true);
     } catch (err) {
       setProductError(err.message || 'Error guardando producto.');
     } finally {
@@ -158,11 +187,11 @@ export function StorePage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-white flex items-center gap-2">
-            <ShoppingBag className="w-5 h-5 text-emerald-400" />
+          <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+            <ShoppingBag className="w-5 h-5 text-emerald-600" />
             <span>Tienda / Snack Bar & Frigobar (Perú)</span>
           </h2>
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-slate-500">
             Venta directa por mostrador en Soles y control de inventario de bebidas/snacks.
           </p>
         </div>
@@ -170,14 +199,14 @@ export function StorePage() {
         <div className="flex items-center gap-2">
           <button
             onClick={() => setIsPurchaseModalOpen(true)}
-            className="px-4 py-2 bg-indigo-500 hover:bg-indigo-400 text-white text-xs font-bold rounded-xl shadow-lg shadow-indigo-500/20 transition-all flex items-center gap-2"
+            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-md shadow-indigo-600/20 transition-all flex items-center gap-2"
           >
             <Plus className="w-4 h-4" />
             <span>+ Ingreso Almacén / Kardex</span>
           </button>
           <button
             onClick={handleOpenCreateProduct}
-            className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold rounded-xl shadow-lg shadow-emerald-500/20 transition-all flex items-center gap-2"
+            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-md shadow-emerald-600/20 transition-all flex items-center gap-2"
           >
             <Plus className="w-4 h-4" />
             <span>+ Nuevo Producto</span>
@@ -187,27 +216,27 @@ export function StorePage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Panel de Venta Rápida */}
-        <div className="p-6 bg-slate-900 border border-slate-800 rounded-3xl space-y-4 shadow-xl">
-          <h3 className="text-sm font-bold text-white flex items-center gap-2">
+        <div className="p-6 bg-white border border-slate-200 rounded-3xl space-y-4 shadow-sm">
+          <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
             <span>Venta Rápida Mostrador</span>
           </h3>
 
           {!hasActiveShift && (
-            <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-400 text-xs flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0" />
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-xs flex items-center gap-2 font-medium">
+              <AlertCircle className="w-4 h-4 shrink-0 text-amber-600" />
               <span>Abre un turno de caja para procesar ventas.</span>
             </div>
           )}
 
           {sellSuccess && (
-            <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400 text-xs flex items-center gap-2">
+            <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-700 text-xs flex items-center gap-2">
               <Check className="w-4 h-4 shrink-0" />
               <span>{sellSuccess}</span>
             </div>
           )}
 
           {sellError && (
-            <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-400 text-xs flex items-center gap-2">
+            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0" />
               <span>{sellError}</span>
             </div>
@@ -215,14 +244,14 @@ export function StorePage() {
 
           <form onSubmit={handleDirectSale} className="space-y-3">
             <div>
-              <label className="block text-[11px] font-medium text-slate-400 mb-1">Producto</label>
+              <label className="block text-[11px] font-semibold text-slate-700 mb-1">Producto</label>
               <select
                 value={selectedProduct?.id || ''}
                 onChange={(e) => {
                   const prod = products.find((p) => p.id === e.target.value);
                   setSelectedProduct(prod || null);
                 }}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-emerald-500"
+                className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs text-slate-900 focus:outline-none focus:border-emerald-600"
               >
                 <option value="">-- Selecciona un producto --</option>
                 {products.map((p) => (
@@ -235,20 +264,20 @@ export function StorePage() {
 
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="block text-[11px] font-medium text-slate-400 mb-1">Cantidad</label>
+                <label className="block text-[11px] font-semibold text-slate-700 mb-1">Cantidad</label>
                 <input
                   type="number"
                   min="1"
                   max={selectedProduct?.stock || 99}
                   value={quantity}
                   onChange={(e) => setQuantity(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs font-bold text-white focus:outline-none focus:border-emerald-500"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs font-bold text-slate-900 focus:outline-none focus:border-emerald-600"
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] font-medium text-slate-400 mb-1">Total (S/)</label>
-                <div className="p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-emerald-400 font-bold text-sm text-right">
+                <label className="block text-[11px] font-semibold text-slate-700 mb-1">Total (S/)</label>
+                <div className="p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-emerald-700 font-bold text-sm text-right">
                   {formatPEN((Number(selectedProduct?.sale_price_pen || 0) * Number(quantity || 1)).toFixed(2))}
                 </div>
               </div>
@@ -256,18 +285,18 @@ export function StorePage() {
 
             {/* Medio de pago */}
             <div>
-              <label className="block text-[11px] font-medium text-slate-400 mb-1">Medio de Pago</label>
+              <label className="block text-[11px] font-semibold text-slate-700 mb-1">Medio de Pago</label>
               <div className="grid grid-cols-3 gap-1.5">
                 <button
                   type="button"
                   onClick={() => setPaymentMethod('YAPE_PLIN')}
                   className={`py-1.5 px-2 rounded-lg border text-[11px] font-semibold flex items-center justify-center gap-1 transition-colors ${
                     paymentMethod === 'YAPE_PLIN'
-                      ? 'bg-violet-500/20 border-violet-500/50 text-violet-300'
-                      : 'bg-slate-950 border-slate-800 text-slate-400'
+                      ? 'bg-violet-50 border-violet-200 text-violet-800'
+                      : 'bg-slate-50 border-slate-200 text-slate-600'
                   }`}
                 >
-                  <QrCode className="w-3 h-3" />
+                  <QrCode className="w-3 h-3 text-violet-600" />
                   <span>Yape/Plin</span>
                 </button>
                 <button
@@ -275,11 +304,11 @@ export function StorePage() {
                   onClick={() => setPaymentMethod('CASH')}
                   className={`py-1.5 px-2 rounded-lg border text-[11px] font-semibold flex items-center justify-center gap-1 transition-colors ${
                     paymentMethod === 'CASH'
-                      ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300'
-                      : 'bg-slate-950 border-slate-800 text-slate-400'
+                      ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                      : 'bg-slate-50 border-slate-200 text-slate-600'
                   }`}
                 >
-                  <Wallet className="w-3 h-3" />
+                  <Wallet className="w-3 h-3 text-emerald-600" />
                   <span>Efectivo</span>
                 </button>
                 <button
@@ -287,11 +316,11 @@ export function StorePage() {
                   onClick={() => setPaymentMethod('CARD')}
                   className={`py-1.5 px-2 rounded-lg border text-[11px] font-semibold flex items-center justify-center gap-1 transition-colors ${
                     paymentMethod === 'CARD'
-                      ? 'bg-blue-500/20 border-blue-500/50 text-blue-300'
-                      : 'bg-slate-950 border-slate-800 text-slate-400'
+                      ? 'bg-blue-50 border-blue-200 text-blue-800'
+                      : 'bg-slate-50 border-slate-200 text-slate-600'
                   }`}
                 >
-                  <CreditCard className="w-3 h-3" />
+                  <CreditCard className="w-3 h-3 text-blue-600" />
                   <span>Tarjeta</span>
                 </button>
               </div>
@@ -300,7 +329,7 @@ export function StorePage() {
             <button
               type="submit"
               disabled={selling || !selectedProduct || !hasActiveShift || selectedProduct.stock <= 0}
-              className="w-full mt-2 py-2.5 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-slate-950 font-bold rounded-xl shadow-lg shadow-emerald-500/20 transition-all text-xs flex items-center justify-center gap-2"
+              className="w-full mt-2 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold rounded-xl shadow-md transition-all text-xs flex items-center justify-center gap-2"
             >
               <span>{selling ? 'Procesando...' : 'Cobrar Venta'}</span>
             </button>
@@ -308,23 +337,23 @@ export function StorePage() {
         </div>
 
         {/* Catálogo e Inventario de Productos */}
-        <div className="lg:col-span-2 p-6 bg-slate-900 border border-slate-800 rounded-3xl space-y-4 shadow-xl">
+        <div className="lg:col-span-2 p-6 bg-white border border-slate-200 rounded-3xl space-y-4 shadow-sm">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-white">Inventario de Productos & Precios</h3>
+            <h3 className="text-sm font-bold text-slate-900">Inventario de Productos & Precios</h3>
             <button
               onClick={fetchProducts}
-              className="text-xs text-slate-400 hover:text-white transition-colors"
+              className="text-xs font-semibold text-slate-500 hover:text-slate-900 transition-colors"
             >
               Refrescar
             </button>
           </div>
 
           {loading ? (
-            <div className="py-8 text-center text-xs text-slate-500">Cargando inventario...</div>
+            <div className="py-8 text-center text-xs text-slate-400">Cargando inventario...</div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
-                <thead className="border-b border-slate-800 text-slate-400 uppercase text-[10px] tracking-wider">
+                <thead className="border-b border-slate-200 text-slate-500 uppercase text-[10px] tracking-wider">
                   <tr>
                     <th className="py-3 px-3">Producto</th>
                     <th className="py-3 px-3 text-right">Precio Venta</th>
@@ -332,19 +361,19 @@ export function StorePage() {
                     <th className="py-3 px-3 text-right">Acciones</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800/60">
+                <tbody className="divide-y divide-slate-100">
                   {products.map((p) => (
-                    <tr key={p.id} className="hover:bg-slate-800/30 transition-colors">
-                      <td className="py-3 px-3 font-semibold text-white">{p.name}</td>
-                      <td className="py-3 px-3 text-right font-mono font-bold text-emerald-400">
+                    <tr key={p.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="py-3 px-3 font-semibold text-slate-900">{p.name}</td>
+                      <td className="py-3 px-3 text-right font-mono font-bold text-emerald-700">
                         {formatPEN(p.sale_price_pen)}
                       </td>
                       <td className="py-3 px-3 text-center">
                         <span
                           className={`px-2.5 py-1 rounded-lg text-xs font-bold ${
                             p.stock <= 5
-                              ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
-                              : 'bg-slate-800 text-slate-200'
+                              ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                              : 'bg-slate-100 text-slate-700'
                           }`}
                         >
                           {p.stock} unid.
@@ -353,7 +382,7 @@ export function StorePage() {
                       <td className="py-3 px-3 text-right">
                         <button
                           onClick={() => handleOpenEditProduct(p)}
-                          className="text-xs text-slate-400 hover:text-white transition-colors"
+                          className="text-xs text-slate-600 hover:text-slate-900 font-medium"
                         >
                           Editar / Stock
                         </button>
@@ -375,27 +404,27 @@ export function StorePage() {
       >
         <form onSubmit={handleSaveProduct} className="space-y-4">
           {productError && (
-            <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-400 text-xs flex items-center gap-2">
+            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0" />
               <span>{productError}</span>
             </div>
           )}
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Nombre del Producto</label>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">Nombre del Producto</label>
             <input
               type="text"
               required
               value={prodName}
               onChange={(e) => setProdName(e.target.value)}
               placeholder="Ej: Gaseosa Coca Cola 500ml"
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-emerald-500"
+              className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs text-slate-900 focus:outline-none focus:border-emerald-600"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Precio de Venta (S/)</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Precio de Venta (S/)</label>
               <input
                 type="number"
                 step="0.50"
@@ -404,11 +433,11 @@ export function StorePage() {
                 value={prodPrice}
                 onChange={(e) => setProdPrice(e.target.value)}
                 placeholder="4.00"
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs font-bold text-white focus:outline-none focus:border-emerald-500"
+                className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs font-bold text-slate-900 focus:outline-none focus:border-emerald-600"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Stock Disponible</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Stock Disponible</label>
               <input
                 type="number"
                 min="0"
@@ -416,23 +445,23 @@ export function StorePage() {
                 value={prodStock}
                 onChange={(e) => setProdStock(e.target.value)}
                 placeholder="20"
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs font-bold text-white focus:outline-none focus:border-emerald-500"
+                className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs font-bold text-slate-900 focus:outline-none focus:border-emerald-600"
               />
             </div>
           </div>
 
-          <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+          <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
             <button
               type="button"
               onClick={() => setIsProductModalOpen(false)}
-              className="px-4 py-2 text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-colors"
+              className="px-4 py-2 text-xs font-medium text-slate-500 hover:text-slate-900"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={submittingProduct}
-              className="px-5 py-2 text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-xl shadow-lg shadow-emerald-500/20 transition-all"
+              className="px-5 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl shadow-md"
             >
               {submittingProduct ? 'Guardando...' : 'Guardar Producto'}
             </button>
@@ -444,12 +473,12 @@ export function StorePage() {
       <Modal isOpen={isPurchaseModalOpen} onClose={() => setIsPurchaseModalOpen(false)} title="Ingreso a Almacén / Registro de Compra (Kardex)">
         <form onSubmit={handleRegisterPurchase} className="space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Producto</label>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">Producto</label>
             <select
               required
               value={purchaseProdId}
               onChange={(e) => setPurchaseProdId(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-indigo-500"
+              className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs text-slate-900 focus:outline-none focus:border-indigo-600"
             >
               <option value="">Seleccionar Producto</option>
               {products.map(p => (
@@ -460,18 +489,18 @@ export function StorePage() {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Cantidad Comprada</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Cantidad Comprada</label>
               <input
                 type="number"
                 min="1"
                 required
                 value={purchaseQty}
                 onChange={(e) => setPurchaseQty(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs font-bold text-white focus:outline-none focus:border-indigo-500"
+                className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs font-bold text-slate-900 focus:outline-none focus:border-indigo-600"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Costo Unitario (S/)</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Costo Unitario (S/)</label>
               <input
                 type="number"
                 step="0.10"
@@ -479,39 +508,39 @@ export function StorePage() {
                 required
                 value={purchaseUnitCost}
                 onChange={(e) => setPurchaseUnitCost(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs font-bold text-white focus:outline-none focus:border-indigo-500"
+                className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs font-bold text-slate-900 focus:outline-none focus:border-indigo-600"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Proveedor / Distribuidor</label>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">Proveedor / Distribuidor</label>
             <input
               type="text"
               value={supplierName}
               onChange={(e) => setSupplierName(e.target.value)}
               placeholder="Ej: Distribuidora San José..."
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-indigo-500"
+              className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs text-slate-900 focus:outline-none focus:border-indigo-600"
             />
           </div>
 
-          <div className="p-3 bg-indigo-500/10 border border-indigo-500/30 rounded-xl text-xs text-indigo-300 flex justify-between font-bold">
+          <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-xl text-xs text-indigo-800 flex justify-between font-bold">
             <span>Costo Total Compra:</span>
             <span>S/ {(Number(purchaseQty) * parseFloat(purchaseUnitCost || 0)).toFixed(2)}</span>
           </div>
 
-          <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+          <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
             <button
               type="button"
               onClick={() => setIsPurchaseModalOpen(false)}
-              className="px-4 py-2 text-xs text-slate-400 hover:text-white"
+              className="px-4 py-2 text-xs text-slate-500 hover:text-slate-900"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={submittingPurchase}
-              className="px-5 py-2 text-xs font-bold bg-indigo-500 hover:bg-indigo-400 text-white rounded-xl shadow-lg shadow-indigo-500/20"
+              className="px-5 py-2 text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl shadow-md"
             >
               {submittingPurchase ? 'Registrando...' : 'Registrar en Almacén'}
             </button>

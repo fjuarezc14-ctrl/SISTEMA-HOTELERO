@@ -110,5 +110,52 @@ export const stayRepository = {
       [id]
     );
     return res.rows[0] || null;
+  },
+
+  async updateExpectedEndTime(id, expected_end_time) {
+    const res = await query(
+      `UPDATE stays
+       SET expected_end_time = $2,
+           updated_at = NOW()
+       WHERE id = $1
+       RETURNING *`,
+      [id, expected_end_time]
+    );
+    return res.rows[0] || null;
+  },
+
+  async findHistory({ limit = 100, offset = 0, dateFrom, dateTo } = {}) {
+    let whereClause = `WHERE s.status IN ('completed', 'cancelled')`;
+    const params = [];
+    let paramCount = 1;
+
+    if (dateFrom) {
+      whereClause += ` AND s.start_time >= $${paramCount++}`;
+      params.push(dateFrom);
+    }
+    if (dateTo) {
+      whereClause += ` AND s.start_time <= $${paramCount++}`;
+      params.push(dateTo);
+    }
+
+    params.push(limit, offset);
+
+    const sql = `
+      SELECT
+        s.*,
+        c.full_name AS customer_name,
+        c.document_number,
+        r.room_number,
+        rt.name AS room_type_name
+      FROM stays s
+      JOIN customers c ON s.customer_id = c.id
+      JOIN rooms r ON s.room_id = r.id
+      JOIN room_types rt ON r.room_type_id = rt.id
+      ${whereClause}
+      ORDER BY s.actual_end_time DESC
+      LIMIT $${paramCount++} OFFSET $${paramCount}
+    `;
+    const res = await query(sql, params);
+    return res.rows;
   }
 };

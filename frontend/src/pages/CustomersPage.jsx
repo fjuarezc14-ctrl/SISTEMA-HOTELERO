@@ -3,6 +3,7 @@ import { api } from '../api/apiClient';
 import { formatPEN, formatDatePeru } from '../utils/formatters';
 import { Users, Search, UserX, UserCheck, ShieldAlert, Plus, AlertCircle } from 'lucide-react';
 import { Modal } from '../components/Modal';
+import { validateDocument, validateFullName, validatePhone, validateEmail, getDocumentConstraints } from '../utils/validators';
 
 export function CustomersPage() {
   const [customers, setCustomers] = useState([]);
@@ -67,26 +68,42 @@ export function CustomersPage() {
     setIsModalOpen(true);
   };
 
-  const handleSave = async (e) => {
+  const handleSaveCustomer = async (e) => {
     e.preventDefault();
     setError('');
 
-    if (!docNum.trim() || !fullName.trim()) {
-      setError('Número de documento y nombre son obligatorios.');
-      return;
-    }
+
+    const docError = validateDocument(docType, docNum);
+    const nameError = validateFullName(fullName);
+    const phoneError = validatePhone(phone, false);
+    const emailError = validateEmail(email, false);
+    const firstErr = docError || nameError || phoneError || emailError;
+    if (firstErr) { setError(firstErr); return; }
+
 
     try {
       setSubmitting(true);
-      await api.post('/customers', {
-        document_type: docType,
-        document_number: docNum.trim(),
-        full_name: fullName.trim(),
-        phone: phone.trim(),
-        email: email.trim(),
-        is_blacklisted: isBlacklisted,
-        blacklist_reason: isBlacklisted ? blacklistReason.trim() : ''
-      });
+      if (editingCustomer) {
+        await api.put(`/customers/${editingCustomer.id}`, {
+          document_type: docType,
+          document_number: docNum.trim(),
+          full_name: fullName.trim(),
+          phone: phone.trim(),
+          email: email.trim(),
+          is_blacklisted: isBlacklisted,
+          blacklist_reason: isBlacklisted ? blacklistReason.trim() : null
+        });
+      } else {
+        await api.post('/customers', {
+          document_type: docType,
+          document_number: docNum.trim(),
+          full_name: fullName.trim(),
+          phone: phone.trim(),
+          email: email.trim(),
+          is_blacklisted: isBlacklisted,
+          blacklist_reason: isBlacklisted ? blacklistReason.trim() : null
+        });
+      }
 
       setIsModalOpen(false);
       await fetchCustomers();
@@ -97,122 +114,87 @@ export function CustomersPage() {
     }
   };
 
-  const handleToggleBlacklist = async (customer) => {
-    const willBlacklist = !customer.is_blacklisted;
-    let reason = customer.blacklist_reason;
-    if (willBlacklist) {
-      reason = prompt('Ingresa el motivo del veto del huésped (Lista Negra):');
-      if (reason === null) return;
-    }
-
-    try {
-      await api.patch(`/customers/${customer.id}/blacklist`, {
-        is_blacklisted: willBlacklist,
-        blacklist_reason: reason || ''
-      });
-      await fetchCustomers();
-    } catch (err) {
-      alert(err.message || 'Error al actualizar estado de veto.');
-    }
-  };
-
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-white flex items-center gap-2">
-            <Users className="w-5 h-5 text-emerald-400" />
-            <span>Directorio de Clientes / Huéspedes (Perú)</span>
+          <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+            <Users className="w-5 h-5 text-emerald-600" />
+            <span>Padrón de Clientes & Lista Negra</span>
           </h2>
-          <p className="text-xs text-slate-400">
-            Registro con DNI, CE, Pasaporte o RUC, historial de visitas y control de veto.
+          <p className="text-xs text-slate-500">
+            Búsqueda rápida por DNI/RUC, historial de hospedaje y control de huérfanos/incidencias.
           </p>
         </div>
 
         <button
           onClick={handleOpenCreate}
-          className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold rounded-xl shadow-lg shadow-emerald-500/20 transition-all flex items-center gap-2"
+          className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-md shadow-emerald-600/20 transition-all flex items-center gap-2"
         >
           <Plus className="w-4 h-4" />
-          <span>+ Nuevo Huésped</span>
+          <span>+ Registrar Cliente</span>
         </button>
       </div>
 
-      {/* Search Bar */}
-      <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl flex items-center gap-3">
-        <Search className="w-4 h-4 text-slate-500" />
+      {/* Bar Búsqueda */}
+      <div className="p-4 bg-white border border-slate-200 rounded-2xl shadow-sm flex items-center gap-3">
+        <Search className="w-4 h-4 text-slate-400" />
         <input
           type="text"
-          placeholder="Buscar por DNI, RUC, nombre o celular..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full bg-transparent text-xs text-white placeholder-slate-500 focus:outline-none"
+          placeholder="Buscar por DNI, RUC o Nombre del cliente..."
+          className="w-full bg-transparent text-xs text-slate-900 placeholder-slate-400 focus:outline-none"
         />
       </div>
 
-      {/* Customers Table */}
-      <div className="p-6 bg-slate-900 border border-slate-800 rounded-3xl shadow-xl space-y-4">
+      {/* Tabla Clientes */}
+      <div className="p-6 bg-white border border-slate-200 rounded-3xl shadow-sm space-y-4">
+        <h3 className="text-sm font-bold text-slate-900">Listado Oficial de Huéspedes</h3>
+
         {loading ? (
-          <div className="py-8 text-center text-xs text-slate-500">Cargando clientes...</div>
+          <div className="py-8 text-center text-xs text-slate-400">Cargando clientes...</div>
         ) : customers.length === 0 ? (
-          <div className="py-8 text-center text-xs text-slate-500">No se encontraron clientes registrados.</div>
+          <div className="py-8 text-center text-xs text-slate-400">No se encontraron clientes registrados.</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="border-b border-slate-800 text-slate-400 uppercase text-[10px] tracking-wider">
+              <thead className="border-b border-slate-200 text-slate-500 uppercase text-[10px] tracking-wider">
                 <tr>
                   <th className="py-3 px-3">Documento</th>
-                  <th className="py-3 px-3">Huésped / Razón Social</th>
+                  <th className="py-3 px-3">Nombre Completo</th>
                   <th className="py-3 px-3">Teléfono</th>
-                  <th className="py-3 px-3 text-center">Visitas</th>
-                  <th className="py-3 px-3 text-center">Estado</th>
+                  <th className="py-3 px-3">Estado</th>
                   <th className="py-3 px-3 text-right">Acciones</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/60">
+              <tbody className="divide-y divide-slate-100">
                 {customers.map((c) => (
-                  <tr key={c.id} className="hover:bg-slate-800/30 transition-colors">
-                    <td className="py-3 px-3 font-mono text-slate-300">
-                      <span className="font-semibold text-emerald-400">{c.document_type}</span> {c.document_number}
+                  <tr key={c.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="py-3 px-3 font-mono font-bold text-slate-900">
+                      {c.document_type}: {c.document_number}
                     </td>
-                    <td className="py-3 px-3 font-semibold text-white">
-                      {c.full_name}
-                      {c.is_blacklisted && (
-                        <span className="block text-[10px] text-rose-400 font-normal mt-0.5">
-                          Motivo veto: {c.blacklist_reason || 'Sin motivo'}
-                        </span>
-                      )}
-                    </td>
-                    <td className="py-3 px-3 text-slate-400">{c.phone || '--'}</td>
-                    <td className="py-3 px-3 text-center font-bold text-white">{c.total_visits}</td>
-                    <td className="py-3 px-3 text-center">
+                    <td className="py-3 px-3 font-semibold text-slate-800">{c.full_name}</td>
+                    <td className="py-3 px-3 text-slate-600">{c.phone || 'Sin registrar'}</td>
+                    <td className="py-3 px-3">
                       {c.is_blacklisted ? (
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20 flex items-center justify-center gap-1">
-                          <UserX className="w-3 h-3" />
-                          <span>Vetado</span>
+                        <span className="px-2.5 py-1 rounded text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200 inline-flex items-center gap-1">
+                          <ShieldAlert className="w-3 h-3 text-rose-600" />
+                          <span>Lista Negra ({c.blacklist_reason || 'Incidencia'})</span>
                         </span>
                       ) : (
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center gap-1">
-                          <UserCheck className="w-3 h-3" />
-                          <span>Permitido</span>
+                        <span className="px-2.5 py-1 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          Huésped Frecuente
                         </span>
                       )}
                     </td>
-                    <td className="py-3 px-3 text-right space-x-2">
+                    <td className="py-3 px-3 text-right">
                       <button
                         onClick={() => handleOpenEdit(c)}
-                        className="text-xs text-slate-400 hover:text-white transition-colors"
+                        className="px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg text-xs transition-colors"
                       >
                         Editar
-                      </button>
-                      <button
-                        onClick={() => handleToggleBlacklist(c)}
-                        className={`text-xs font-semibold ${
-                          c.is_blacklisted ? 'text-emerald-400 hover:underline' : 'text-rose-400 hover:underline'
-                        }`}
-                      >
-                        {c.is_blacklisted ? 'Quitar Veto' : 'Vetar'}
                       </button>
                     </td>
                   </tr>
@@ -223,15 +205,15 @@ export function CustomersPage() {
         )}
       </div>
 
-      {/* Modal Crear / Editar */}
+      {/* Modal Agregar / Editar Cliente */}
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title={editingCustomer ? 'Editar Huésped' : 'Registrar Nuevo Huésped'}
+        title={editingCustomer ? `Editar Cliente: ${editingCustomer.full_name}` : 'Registrar Nuevo Huésped'}
       >
-        <form onSubmit={handleSave} className="space-y-4">
+        <form onSubmit={handleSaveCustomer} className="space-y-4">
           {error && (
-            <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-400 text-xs flex items-center gap-2">
+            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0" />
               <span>{error}</span>
             </div>
@@ -239,100 +221,98 @@ export function CustomersPage() {
 
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Tipo Doc.</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Tipo Doc.</label>
               <select
                 value={docType}
                 onChange={(e) => setDocType(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-emerald-500"
+                className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs text-slate-900 focus:outline-none focus:border-emerald-600"
               >
-                <option value="DNI">DNI (8 dígitos)</option>
+                <option value="DNI">DNI</option>
                 <option value="CE">Carné Extranjería</option>
                 <option value="PASSPORT">Pasaporte</option>
-                <option value="RUC">RUC (11 dígitos)</option>
+                <option value="RUC">RUC</option>
               </select>
             </div>
             <div className="col-span-2">
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Número de Documento</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Número de Documento</label>
               <input
                 type="text"
                 required
                 value={docNum}
                 onChange={(e) => setDocNum(e.target.value)}
-                placeholder="Ej: 71234567"
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-emerald-500"
+                {...getDocumentConstraints(docType)}
+                className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs text-slate-900 focus:outline-none focus:border-emerald-600"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Nombre Completo / Razón Social</label>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">Nombre Completo / Razón Social</label>
             <input
               type="text"
               required
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
-              placeholder="Nombres y Apellidos"
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-emerald-500"
+              className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs text-slate-900 focus:outline-none focus:border-emerald-600"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Teléfono / Celular</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Teléfono WhatsApp</label>
               <input
                 type="text"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                placeholder="Ej: 987654321"
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-emerald-500"
+                className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs text-slate-900 focus:outline-none focus:border-emerald-600"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Correo Electrónico (Opcional)</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Correo Electrónico</label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="cliente@email.com"
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-emerald-500"
+                className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs text-slate-900 focus:outline-none focus:border-emerald-600"
               />
             </div>
           </div>
 
-          {/* Veto */}
-          <div className="p-3 bg-slate-950/60 border border-slate-800 rounded-xl space-y-2">
-            <label className="flex items-center gap-2 text-xs text-rose-400 font-semibold cursor-pointer">
+          {/* Lista Negra */}
+          <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl space-y-2">
+            <label className="flex items-center gap-2 text-xs font-bold text-rose-800 cursor-pointer">
               <input
                 type="checkbox"
                 checked={isBlacklisted}
                 onChange={(e) => setIsBlacklisted(e.target.checked)}
-                className="rounded border-slate-800 text-rose-500 focus:ring-rose-500 bg-slate-900"
+                className="rounded border-rose-300 text-rose-600 focus:ring-rose-500"
               />
-              <span>Vetar huésped (Lista Negra)</span>
+              <span>Marcar en Lista Negra (Bloquear o advertir ingreso)</span>
             </label>
+
             {isBlacklisted && (
-              <textarea
-                rows={2}
+              <input
+                type="text"
                 value={blacklistReason}
                 onChange={(e) => setBlacklistReason(e.target.value)}
-                placeholder="Motivo del veto (daños a la propiedad, disturbios, etc.)..."
-                className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-rose-500"
+                placeholder="Motivo de la advertencia / incidencia..."
+                className="w-full bg-white border border-rose-300 rounded-lg p-2 text-xs text-slate-900 focus:outline-none focus:border-rose-600"
               />
             )}
           </div>
 
-          <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+          <div className="flex justify-end gap-3 pt-3 border-t border-slate-200">
             <button
               type="button"
               onClick={() => setIsModalOpen(false)}
-              className="px-4 py-2 text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-colors"
+              className="px-4 py-2 text-xs text-slate-500 hover:text-slate-900"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={submitting}
-              className="px-5 py-2 text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-xl shadow-lg shadow-emerald-500/20 transition-all"
+              className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-md"
             >
               {submitting ? 'Guardando...' : 'Guardar Huésped'}
             </button>

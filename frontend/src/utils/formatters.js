@@ -66,6 +66,12 @@ export const PAYMENT_METHOD_LABELS = {
   CARD: 'Tarjeta (POS)'
 };
 
+export const STAY_TYPE_LABELS = {
+  hours: 'Por Horas',
+  overnight: 'Por Noche',
+  full_day: 'Día Completo'
+};
+
 export const ROOM_STATUS_CONFIG = {
   available: {
     label: 'Disponible',

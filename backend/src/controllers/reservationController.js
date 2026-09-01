@@ -57,5 +57,31 @@ export const reservationController = {
     } catch (error) {
       next(error);
     }
+  },
+
+  async update(req, res, next) {
+    try {
+      const reservation = await reservationService.updateReservation(req.params.id, req.body);
+      res.json({
+        success: true,
+        message: 'Reserva actualizada exitosamente.',
+        data: reservation
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async noShow(req, res, next) {
+    try {
+      const reservation = await reservationService.noShowReservation(req.params.id);
+      res.json({
+        success: true,
+        message: 'Reserva marcada como No-Show (Inasistencia).',
+        data: reservation
+      });
+    } catch (error) {
+      next(error);
+    }
   }
 };

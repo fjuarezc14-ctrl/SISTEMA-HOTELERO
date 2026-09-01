@@ -50,7 +50,7 @@ services:
     ports:
       - "5185:5185"
     environment:
-      - VITE_API_URL=http://localhost:4020/api/v1
+      - VITE_PROXY_TARGET=http://backend:4020
     volumes:
       - ./frontend:/app
       - /app/node_modules

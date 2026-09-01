@@ -50,14 +50,11 @@ export function calculateExpectedEndTime(startDate = new Date(), stayType = 'hou
   const result = new Date(start);
 
   if (stayType === 'hours') {
-    result.setHours(result.getHours() + Number(hoursCount));
-  } else if (stayType === 'overnight') {
-    // Pernocta: Salida al día siguiente a las 12:00 PM (Mediodía)
+    result.setHours(result.getHours() + Number(hoursCount || 3));
+  } else if (stayType === 'overnight' || stayType === 'full_day') {
+    // Pernocte / Día Completo (Estándar Perú): Salida al día siguiente a las 12:00 PM (Mediodía)
     result.setDate(result.getDate() + 1);
     result.setHours(12, 0, 0, 0);
-  } else if (stayType === 'full_day') {
-    // Día completo: 24 horas después
-    result.setHours(result.getHours() + 24);
   }
 
   return result.toISOString();

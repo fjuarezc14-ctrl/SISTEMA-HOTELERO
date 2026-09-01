@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api/apiClient';
 import { formatDatePeru } from '../utils/formatters';
+import { validateUsername, validatePassword, validateFullName } from '../utils/validators';
 import { UserCog, Plus, KeyRound, Check, AlertCircle, ShieldCheck } from 'lucide-react';
 import { Modal } from '../components/Modal';
 
@@ -43,6 +44,16 @@ export function UsersPage() {
   const handleCreateUser = async (e) => {
     e.preventDefault();
     setCreateError('');
+
+    const usernameErr = validateUsername(username);
+    const passwordErr = validatePassword(password);
+    const nameErr = validateFullName(fullName);
+    const firstErr = usernameErr || passwordErr || nameErr;
+    if (firstErr) {
+      setCreateError(firstErr);
+      return;
+    }
+
     try {
       setCreating(true);
       await api.post('/users', {
@@ -75,6 +86,13 @@ export function UsersPage() {
   const handleResetPassword = async (e) => {
     e.preventDefault();
     setResetError('');
+
+    const pwdErr = validatePassword(newPassword, 'Nueva Contraseña');
+    if (pwdErr) {
+      setResetError(pwdErr);
+      return;
+    }
+
     try {
       setResetting(true);
       await api.post(`/users/${selectedUser.id}/reset-password`, { password: newPassword });
@@ -94,12 +112,12 @@ export function UsersPage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-white flex items-center gap-2">
-            <UserCog className="w-5 h-5 text-emerald-400" />
+          <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+            <UserCog className="w-5 h-5 text-emerald-600" />
             <span>Usuarios & Roles del Sistema</span>
           </h2>
-          <p className="text-xs text-slate-400">
-            Administración de credenciales, roles de acceso y activación de personal.
+          <p className="text-xs text-slate-500">
+            Administración de credenciales, roles de acceso y personal autorizado para caja.
           </p>
         </div>
 
@@ -108,7 +126,7 @@ export function UsersPage() {
             setCreateError('');
             setIsCreateModalOpen(true);
           }}
-          className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold rounded-xl shadow-lg shadow-emerald-500/20 transition-all flex items-center gap-2"
+          className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-md shadow-emerald-600/20 transition-all flex items-center gap-2"
         >
           <Plus className="w-4 h-4" />
           <span>+ Nuevo Usuario</span>
@@ -116,13 +134,13 @@ export function UsersPage() {
       </div>
 
       {/* Users Table */}
-      <div className="p-6 bg-slate-900 border border-slate-800 rounded-3xl shadow-xl space-y-4">
+      <div className="p-6 bg-white border border-slate-200 rounded-3xl shadow-sm space-y-4">
         {loading ? (
-          <div className="py-8 text-center text-xs text-slate-500">Cargando usuarios...</div>
+          <div className="py-8 text-center text-xs text-slate-400">Cargando usuarios...</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="border-b border-slate-800 text-slate-400 uppercase text-[10px] tracking-wider">
+              <thead className="border-b border-slate-200 text-slate-500 uppercase text-[10px] tracking-wider">
                 <tr>
                   <th className="py-3 px-3">Usuario</th>
                   <th className="py-3 px-3">Nombre Completo</th>
@@ -131,13 +149,13 @@ export function UsersPage() {
                   <th className="py-3 px-3 text-right">Acciones</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/60">
+              <tbody className="divide-y divide-slate-100">
                 {users.map((u) => (
-                  <tr key={u.id} className="hover:bg-slate-800/30 transition-colors">
-                    <td className="py-3 px-3 font-mono font-bold text-white">@{u.username}</td>
-                    <td className="py-3 px-3 font-semibold text-slate-200">{u.full_name}</td>
+                  <tr key={u.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="py-3 px-3 font-mono font-bold text-slate-900">@{u.username}</td>
+                    <td className="py-3 px-3 font-semibold text-slate-700">{u.full_name}</td>
                     <td className="py-3 px-3">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-800 text-slate-300 capitalize border border-slate-700">
+                      <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700 capitalize border border-slate-200">
                         {u.role?.replace('_', ' ')}
                       </span>
                     </td>
@@ -146,8 +164,8 @@ export function UsersPage() {
                         onClick={() => handleToggleActive(u)}
                         className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                           u.is_active
-                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                            : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                            : 'bg-rose-50 text-rose-700 border border-rose-200'
                         }`}
                       >
                         {u.is_active ? 'Activo' : 'Desactivado'}
@@ -161,7 +179,7 @@ export function UsersPage() {
                           setResetError('');
                           setIsPasswordModalOpen(true);
                         }}
-                        className="text-xs text-slate-400 hover:text-emerald-400 transition-colors inline-flex items-center gap-1"
+                        className="text-xs font-medium text-slate-500 hover:text-emerald-700 transition-colors inline-flex items-center gap-1"
                       >
                         <KeyRound className="w-3.5 h-3.5" />
                         <span>Restablecer Clave</span>
@@ -183,76 +201,76 @@ export function UsersPage() {
       >
         <form onSubmit={handleCreateUser} className="space-y-4">
           {createError && (
-            <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-400 text-xs flex items-center gap-2">
+            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0" />
               <span>{createError}</span>
             </div>
           )}
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Nombre de Usuario (Login)</label>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">Nombre de Usuario (Login)</label>
             <input
               type="text"
               required
-              placeholder="ej: juanperez"
+              placeholder="ej: recepcion"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-emerald-500"
+              className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs text-slate-900 focus:outline-none focus:border-emerald-600"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Nombre Completo del Trabajador</label>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">Nombre Completo del Trabajador</label>
             <input
               type="text"
               required
-              placeholder="Juan Pérez"
+              placeholder="María López"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-emerald-500"
+              className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs text-slate-900 focus:outline-none focus:border-emerald-600"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Contraseña</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Contraseña</label>
               <input
                 type="password"
                 required
                 placeholder="Mínimo 6 caracteres"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-emerald-500"
+                className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs text-slate-900 focus:outline-none focus:border-emerald-600"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Rol / Cargo</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Rol / Cargo</label>
               <select
                 value={role}
                 onChange={(e) => setRole(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-emerald-500"
+                className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs text-slate-900 focus:outline-none focus:border-emerald-600"
               >
                 <option value="receptionist">Recepcionista</option>
-                <option value="admin">Administrador</option>
-                <option value="housekeeper">Limpieza / Ama de Llaves</option>
+                <option value="admin">Administrador / Dueño</option>
+                <option value="housekeeper">Limpieza / Aseo</option>
                 <option value="super_admin">Super Administrador</option>
               </select>
             </div>
           </div>
 
-          <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+          <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
             <button
               type="button"
               onClick={() => setIsCreateModalOpen(false)}
-              className="px-4 py-2 text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-colors"
+              className="px-4 py-2 text-xs font-medium text-slate-500 hover:text-slate-900"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={creating}
-              className="px-5 py-2 text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-xl shadow-lg shadow-emerald-500/20 transition-all"
+              className="px-5 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl shadow-md"
             >
               {creating ? 'Creando...' : 'Crear Usuario'}
             </button>
@@ -269,14 +287,14 @@ export function UsersPage() {
       >
         <form onSubmit={handleResetPassword} className="space-y-4">
           {resetError && (
-            <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-400 text-xs flex items-center gap-2">
+            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0" />
               <span>{resetError}</span>
             </div>
           )}
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Nueva Contraseña</label>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">Nueva Contraseña</label>
             <input
               type="password"
               required
@@ -284,22 +302,22 @@ export function UsersPage() {
               placeholder="Nueva clave secreta"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-emerald-500"
+              className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs text-slate-900 focus:outline-none focus:border-emerald-600"
             />
           </div>
 
-          <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+          <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
             <button
               type="button"
               onClick={() => setIsPasswordModalOpen(false)}
-              className="px-4 py-2 text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-colors"
+              className="px-4 py-2 text-xs font-medium text-slate-500 hover:text-slate-900"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={resetting}
-              className="px-5 py-2 text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-xl shadow-lg shadow-emerald-500/20 transition-all"
+              className="px-5 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl shadow-md"
             >
               {resetting ? 'Guardando...' : 'Actualizar Clave'}
             </button>

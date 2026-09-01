@@ -5,6 +5,7 @@ import { cashRepository } from '../repositories/cashRepository.js';
 import { shiftRepository } from '../repositories/shiftRepository.js';
 import { productRepository } from '../repositories/productRepository.js';
 import { companionRepository } from '../repositories/companionRepository.js';
+import { incidentRepository } from '../repositories/incidentRepository.js';
 import { calculateExpectedEndTime } from '../utils/timeHelper.js';
 
 export const stayService = {
@@ -20,6 +21,14 @@ export const stayService = {
       payments,
       companions
     };
+  },
+
+  async getAllActiveStays() {
+    return await stayRepository.findAllActive();
+  },
+
+  async getStayHistory({ limit = 100, offset = 0, dateFrom, dateTo } = {}) {
+    return await stayRepository.findHistory({ limit, offset, dateFrom, dateTo });
   },
 
   async checkIn({
@@ -117,22 +126,46 @@ export const stayService = {
     // 6. Cambiar estado de la habitación a 'occupied'
     await roomRepository.updateRoomStatus(room.id, 'occupied', `Huésped: ${customer.full_name}`);
 
-    // 7. Si hay pago inicial, registrarlo en caja
+    // 7. Si hay pago inicial, registrarlo en caja (evitando duplicación si es abono de reserva)
     if (initial_payment && Number(initial_payment.amount) > 0) {
-      await cashRepository.create({
-        work_shift_id: activeShift.id,
-        stay_id: stay.id,
-        user_id,
-        transaction_type: 'income',
-        concept: `Hospedaje Hab. ${room.room_number} - ${customer.full_name}`,
-        category: 'stay',
-        amount_pen: Number(initial_payment.amount),
-        payment_method: initial_payment.payment_method, // YAPE_PLIN, CASH, CARD
-        reference_number: initial_payment.reference_number || ''
-      });
+      const { amount, payment_method, reference_number, split_payments, skip_cash_transaction } = initial_payment;
+
+      if (!skip_cash_transaction && activeShift) {
+        if (payment_method === 'MIXED' && Array.isArray(split_payments) && split_payments.length > 0) {
+          for (const item of split_payments) {
+            const itemAmt = Number(item.amount || 0);
+            if (itemAmt > 0) {
+              const methodLabel = item.payment_method === 'YAPE_PLIN' ? 'Yape/Plin' : item.payment_method === 'CARD' ? 'Tarjeta' : 'Efectivo';
+              await cashRepository.create({
+                work_shift_id: activeShift.id,
+                stay_id: stay.id,
+                user_id,
+                transaction_type: 'income',
+                concept: `Hospedaje Hab. ${room.room_number} - ${customer.full_name} (${methodLabel})`,
+                category: 'stay',
+                amount_pen: itemAmt,
+                payment_method: item.payment_method,
+                reference_number: item.reference_number || reference_number || ''
+              });
+            }
+          }
+        } else {
+          await cashRepository.create({
+            work_shift_id: activeShift.id,
+            stay_id: stay.id,
+            user_id,
+            transaction_type: 'income',
+            concept: `Hospedaje Hab. ${room.room_number} - ${customer.full_name}`,
+            category: 'stay',
+            amount_pen: Number(amount),
+            payment_method: payment_method || 'CASH',
+            reference_number: reference_number || ''
+          });
+        }
+      }
 
       await stayRepository.updateStayPrices(stay.id, {
-        total_paid_pen: Number(initial_payment.amount)
+        total_paid_pen: Number(amount)
       });
     }
 
@@ -158,7 +191,7 @@ export const stayService = {
     return stay;
   },
 
-  async checkOut({ stay_id, user_id, final_payment = null }) {
+  async checkOut({ stay_id, user_id, final_payment = null, incident_data = null }) {
     const stay = await stayRepository.findById(stay_id);
     if (!stay) {
       const error = new Error('Estadía no encontrada.');
@@ -203,23 +236,57 @@ export const stayService = {
       }
 
       if (activeShift) {
-        await cashRepository.create({
-          work_shift_id: activeShift.id,
-          stay_id: stay.id,
-          user_id,
-          transaction_type: 'income',
-          concept: `Pago Check-out Hab. ${stay.room_number} - ${stay.customer_name}`,
-          category: 'stay',
-          amount_pen: Number(final_payment.amount),
-          payment_method: final_payment.payment_method,
-          reference_number: final_payment.reference_number || ''
-        });
+        const { amount, payment_method, reference_number, split_payments } = final_payment;
+        if (payment_method === 'MIXED' && Array.isArray(split_payments) && split_payments.length > 0) {
+          for (const item of split_payments) {
+            const itemAmt = Number(item.amount || 0);
+            if (itemAmt > 0) {
+              const methodLabel = item.payment_method === 'YAPE_PLIN' ? 'Yape/Plin' : item.payment_method === 'CARD' ? 'Tarjeta' : 'Efectivo';
+              await cashRepository.create({
+                work_shift_id: activeShift.id,
+                stay_id: stay.id,
+                user_id,
+                transaction_type: 'income',
+                concept: `Pago Check-out Hab. ${stay.room_number} - ${stay.customer_name} (${methodLabel})`,
+                category: 'stay',
+                amount_pen: itemAmt,
+                payment_method: item.payment_method,
+                reference_number: item.reference_number || reference_number || ''
+              });
+            }
+          }
+        } else {
+          await cashRepository.create({
+            work_shift_id: activeShift.id,
+            stay_id: stay.id,
+            user_id,
+            transaction_type: 'income',
+            concept: `Pago Check-out Hab. ${stay.room_number} - ${stay.customer_name}`,
+            category: 'stay',
+            amount_pen: Number(amount),
+            payment_method: payment_method || 'CASH',
+            reference_number: reference_number || ''
+          });
+        }
 
-        const updatedPaid = Number(stay.total_paid_pen) + Number(final_payment.amount);
+        const updatedPaid = Number(stay.total_paid_pen) + Number(amount);
         await stayRepository.updateStayPrices(stay.id, {
           total_paid_pen: updatedPaid
         });
       }
+    }
+
+    // Registrar incidente si fue reportado en Check-out
+    if (incident_data && incident_data.description && incident_data.description.trim()) {
+      await incidentRepository.create({
+        stay_id: stay.id,
+        room_id: stay.room_id,
+        customer_id: stay.customer_id,
+        user_id,
+        incident_type: incident_data.incident_type || 'damage',
+        description: incident_data.description.trim(),
+        penalty_amount_pen: Number(incident_data.penalty_amount_pen || 0)
+      });
     }
 
     // Completar estadía
@@ -229,5 +296,83 @@ export const stayService = {
     await roomRepository.updateRoomStatus(stay.room_id, 'cleaning', 'Pendiente de limpieza tras check-out');
 
     return completedStay;
+  },
+
+  async addExtraHours({ stay_id, hours_count = 1, payment_method = 'CASH', reference_number = '', split_payments = null, user_id }) {
+    const stay = await stayRepository.findById(stay_id);
+    if (!stay || stay.status !== 'active') {
+      const error = new Error('Estadía activa no encontrada.');
+      error.statusCode = 404;
+      error.isOperational = true;
+      throw error;
+    }
+
+    const room = await roomRepository.findRoomById(stay.room_id);
+    const pricePerExtraHour = Number(room?.price_extra_hour_default || 10.00);
+    const extraHoursCost = Number(hours_count) * pricePerExtraHour;
+
+    // 1. Extender hora de salida esperada
+    const currentExpectedEnd = new Date(stay.expected_end_time);
+    currentExpectedEnd.setHours(currentExpectedEnd.getHours() + Number(hours_count));
+    const newExpectedEndISO = currentExpectedEnd.toISOString();
+
+    // 2. Buscar turno de caja activo
+    let activeShift = await shiftRepository.findActiveShiftByUserId(user_id);
+    if (!activeShift) {
+      activeShift = await shiftRepository.findAnyActiveShift();
+    }
+    if (!activeShift) {
+      const error = new Error('No hay un turno de caja abierto para registrar el cobro de horas extras.');
+      error.statusCode = 400;
+      error.isOperational = true;
+      throw error;
+    }
+
+    // 3. Registrar transacción de ingreso en caja chica
+    if (payment_method === 'MIXED' && Array.isArray(split_payments) && split_payments.length > 0) {
+      for (const item of split_payments) {
+        const itemAmt = Number(item.amount || 0);
+        if (itemAmt > 0) {
+          const methodLabel = item.payment_method === 'YAPE_PLIN' ? 'Yape/Plin' : item.payment_method === 'CARD' ? 'Tarjeta' : 'Efectivo';
+          await cashRepository.create({
+            work_shift_id: activeShift.id,
+            stay_id: stay.id,
+            user_id,
+            transaction_type: 'income',
+            concept: `Hora Extra (x${hours_count}) Hab. ${stay.room_number} - ${stay.customer_name} (${methodLabel})`,
+            category: 'stay',
+            amount_pen: itemAmt,
+            payment_method: item.payment_method,
+            reference_number: item.reference_number || reference_number || ''
+          });
+        }
+      }
+    } else {
+      await cashRepository.create({
+        work_shift_id: activeShift.id,
+        stay_id: stay.id,
+        user_id,
+        transaction_type: 'income',
+        concept: `Hora Extra (x${hours_count}) Hab. ${stay.room_number} - ${stay.customer_name}`,
+        category: 'stay',
+        amount_pen: extraHoursCost,
+        payment_method: payment_method || 'CASH',
+        reference_number: reference_number.trim()
+      });
+    }
+
+    // 4. Actualizar total de la estadía y total pagado
+    const newTotalStayPrice = Number(stay.total_stay_price_pen) + extraHoursCost;
+    const newTotalPaid = Number(stay.total_paid_pen) + extraHoursCost;
+
+    await stayRepository.updateStayPrices(stay.id, {
+      total_stay_price_pen: newTotalStayPrice,
+      total_paid_pen: newTotalPaid
+    });
+
+    // 5. Actualizar la fecha límite en la tabla stays
+    await stayRepository.updateExpectedEndTime(stay.id, newExpectedEndISO);
+
+    return await this.getActiveStayByRoom(stay.room_id);
   }
 };

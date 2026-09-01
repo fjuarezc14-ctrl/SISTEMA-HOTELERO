@@ -55,7 +55,7 @@ CREATE TABLE IF NOT EXISTS room_types (
     description TEXT,
     hours_quantity_default INT NOT NULL DEFAULT 3, -- Horas base (ej: 3h o 4h)
     price_hours_default NUMERIC(10, 2) NOT NULL DEFAULT 30.00, -- Tarifa base por horas en Soles (S/)
-    price_overnight_default NUMERIC(10, 2) NOT NULL DEFAULT 60.00, -- Tarifa pernocta en Soles (S/)
+    price_overnight_default NUMERIC(10, 2) NOT NULL DEFAULT 60.00, -- Tarifa pernocte en Soles (S/)
     price_full_day_default NUMERIC(10, 2) NOT NULL DEFAULT 90.00, -- Tarifa 24h en Soles (S/)
     price_extra_hour_default NUMERIC(10, 2) NOT NULL DEFAULT 10.00, -- Hora adicional en Soles (S/)
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -217,6 +217,20 @@ CREATE TABLE IF NOT EXISTS product_purchases (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- 16. Incidentes y Ocurrencias en Check-out
+CREATE TABLE IF NOT EXISTS stay_incidents (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    stay_id UUID REFERENCES stays(id) ON DELETE CASCADE,
+    room_id UUID NOT NULL REFERENCES rooms(id) ON DELETE RESTRICT,
+    customer_id UUID REFERENCES customers(id) ON DELETE SET NULL,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    incident_type VARCHAR(50) NOT NULL DEFAULT 'damage', -- damage, loss, unpaid_debt, disturbance, other
+    description TEXT NOT NULL,
+    penalty_amount_pen NUMERIC(10, 2) NOT NULL DEFAULT 0.00,
+    status VARCHAR(20) NOT NULL DEFAULT 'reported', -- reported, resolved, waived
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- Índices para optimización de consultas
 CREATE INDEX IF NOT EXISTS idx_rooms_status ON rooms(status);
 CREATE INDEX IF NOT EXISTS idx_stays_status ON stays(status);
@@ -226,4 +240,7 @@ CREATE INDEX IF NOT EXISTS idx_cash_transactions_shift ON cash_transactions(work
 CREATE INDEX IF NOT EXISTS idx_customers_document ON customers(document_number);
 CREATE INDEX IF NOT EXISTS idx_reservations_status ON reservations(status);
 CREATE INDEX IF NOT EXISTS idx_reservations_dates ON reservations(start_date, end_date);
+CREATE INDEX IF NOT EXISTS idx_stay_incidents_room ON stay_incidents(room_id);
+CREATE INDEX IF NOT EXISTS idx_stay_incidents_type ON stay_incidents(incident_type);
+
 

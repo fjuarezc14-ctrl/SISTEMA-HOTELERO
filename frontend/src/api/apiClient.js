@@ -2,10 +2,9 @@
  * Cliente HTTP centralizado para comunicación con la API Backend
  */
 
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4020/api/v1';
-
 export async function apiRequest(endpoint, options = {}) {
   const token = localStorage.getItem('valetec_hotel_token');
+  const baseUrl = import.meta.env.VITE_API_URL || '/api/v1';
 
   const headers = {
     'Content-Type': 'application/json',
@@ -19,17 +18,15 @@ export async function apiRequest(endpoint, options = {}) {
   };
 
   try {
-    const res = await fetch(`${BASE_URL}${endpoint}`, config);
+    const res = await fetch(`${baseUrl}${endpoint}`, config);
     const data = await res.json();
 
     if (!res.ok) {
-      if (res.status === 401) {
-        // Token expirado o inválido
+      if (res.status === 401 || (data.message && data.message.toLowerCase().includes('token'))) {
+        // Token expirado o inválido -> Limpiar sesión y redirigir
         localStorage.removeItem('valetec_hotel_token');
         localStorage.removeItem('valetec_hotel_user');
-        if (!window.location.pathname.includes('/login')) {
-          window.location.href = '/';
-        }
+        window.location.reload();
       }
       throw new Error(data.message || 'Error en la solicitud al servidor.');
     }

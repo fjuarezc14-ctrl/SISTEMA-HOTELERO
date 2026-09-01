@@ -21,7 +21,7 @@ export function authenticateToken(req, res, next) {
     req.user = decoded;
     next();
   } catch (error) {
-    return res.status(403).json({
+    return res.status(401).json({
       success: false,
       message: 'Acceso denegado: Token inválido o expirado.'
     });

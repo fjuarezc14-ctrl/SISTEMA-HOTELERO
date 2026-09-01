@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, Wallet, AlertCircle, CheckCircle2, Maximize2 } from 'lucide-react';
+import { Clock, Wallet, AlertCircle, CheckCircle2, Maximize2, Menu } from 'lucide-react';
 import { useShift } from '../context/ShiftContext';
 import { formatPEN } from '../utils/formatters';
 
-export function Navbar({ onOpenShiftModal, onCloseShiftModal }) {
+export function Navbar({ onOpenShiftModal, onCloseShiftModal, onToggleMobileSidebar = () => {} }) {
   const { activeShift, hasActiveShift } = useShift();
   const [time, setTime] = useState('');
 
@@ -36,59 +36,67 @@ export function Navbar({ onOpenShiftModal, onCloseShiftModal }) {
   }, []);
 
   return (
-    <header className="h-16 bg-slate-900 border-b border-slate-800 px-6 flex items-center justify-between">
-      {/* Left: Clock & Timezone */}
+    <header className="h-16 bg-white border-b border-slate-200 px-4 sm:px-6 flex items-center justify-between">
+      {/* Left: Hamburger & Clock */}
       <div className="flex items-center gap-3">
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800/80 border border-slate-700 text-slate-300 text-xs font-medium">
-          <Clock className="w-3.5 h-3.5 text-emerald-400" />
+        <button
+          onClick={onToggleMobileSidebar}
+          className="md:hidden p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors"
+          title="Abrir Menú"
+        >
+          <Menu className="w-5 h-5 text-emerald-600" />
+        </button>
+
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-700 text-xs font-medium">
+          <Clock className="w-3.5 h-3.5 text-emerald-600" />
           <span>Hora Lima (UTC-5):</span>
-          <span className="text-white font-semibold font-mono">{time || '--:--:--'}</span>
-        </div>
-        <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold">
-          <span>Moneda Oficial: S/ (Soles)</span>
+          <span className="font-mono font-bold text-slate-900">{time || '00:00:00'}</span>
         </div>
       </div>
 
-      {/* Right: Work Shift Status */}
+      {/* Right: Shift Status & Kiosk Mode */}
       <div className="flex items-center gap-3">
         {hasActiveShift ? (
-          <div className="flex items-center gap-3 bg-slate-950/60 border border-slate-800 px-3.5 py-1.5 rounded-xl">
-            <div className="flex items-center gap-2">
-              <span className="relative flex h-2.5 w-2.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
-              </span>
-              <span className="text-xs text-slate-300">Turno Activo:</span>
-              <span className="text-xs font-semibold text-white">
-                Fondo: {formatPEN(activeShift.initial_cash_pen)}
+          <div className="flex items-center gap-2">
+            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+              <span className="font-semibold">Turno Abierto:</span>
+              <span className="font-mono font-bold text-emerald-800">
+                {formatPEN(activeShift.initial_cash_pen || 0)}
               </span>
             </div>
+
             <button
               onClick={onCloseShiftModal}
-              className="text-xs px-2.5 py-1 bg-rose-500/20 text-rose-300 hover:bg-rose-500/30 border border-rose-500/30 rounded-lg transition-colors font-medium"
+              className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-bold text-xs rounded-lg transition-colors flex items-center gap-1.5"
             >
-              Cerrar Turno
+              <Wallet className="w-3.5 h-3.5" />
+              <span>Cerrar Turno</span>
             </button>
           </div>
         ) : (
           <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1.5 text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 px-3 py-1.5 rounded-lg">
-              <AlertCircle className="w-4 h-4" />
+            <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-xs font-medium">
+              <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
               <span>Sin Turno Abierto</span>
             </div>
+
             <button
               onClick={onOpenShiftModal}
-              className="text-xs px-3 py-1.5 bg-emerald-500 text-slate-950 font-bold hover:bg-emerald-400 rounded-lg transition-all shadow-md shadow-emerald-500/20"
+              className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-lg shadow-sm shadow-emerald-600/20 transition-all flex items-center gap-1.5"
             >
-              + Abrir Turno
+              <Wallet className="w-3.5 h-3.5" />
+              <span>Abrir Turno</span>
             </button>
           </div>
         )}
 
+        <div className="h-6 w-px bg-slate-200 hidden sm:block" />
+
         <button
           onClick={toggleFullscreen}
           title="Pantalla Completa (Modo Kiosco)"
-          className="p-2 text-slate-400 hover:text-emerald-400 hover:bg-slate-800 rounded-lg transition-colors"
+          className="p-2 text-slate-500 hover:text-emerald-600 hover:bg-slate-100 rounded-lg transition-colors"
         >
           <Maximize2 className="w-4 h-4" />
         </button>

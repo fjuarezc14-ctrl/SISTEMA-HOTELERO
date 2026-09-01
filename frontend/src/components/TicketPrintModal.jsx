@@ -1,13 +1,37 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Modal } from './Modal';
 import { formatPEN, formatDatePeru } from '../utils/formatters';
-import { Printer } from 'lucide-react';
+import { Printer, Share2, Send } from 'lucide-react';
 
 export function TicketPrintModal({ isOpen, onClose, ticketData }) {
+  const [phone, setPhone] = useState('');
+  const [showWhatsAppInput, setShowWhatsAppInput] = useState(false);
+
   if (!ticketData) return null;
 
   const handlePrint = () => {
     window.print();
+  };
+
+  // FEATURE 2: Notificación WhatsApp Business API / Direct Message
+  const handleSendWhatsApp = () => {
+    const targetPhone = phone.trim().replace(/\D/g, '');
+    const clientName = ticketData.customer_name || 'Huésped';
+    const roomInfo = ticketData.room_number ? `Hab. ${ticketData.room_number}` : 'Hospedaje';
+    const total = formatPEN(ticketData.total_amount || ticketData.amount || 0);
+
+    const message = `*Hotel Zafiro - Comprobante de Servicio*%0A` +
+      `Estimado(a) *${clientName}*, gracias por alojarte en Hotel Zafiro.%0A%0A` +
+      `📌 *Detalle:* ${roomInfo}%0A` +
+      `💰 *Total:* ${total}%0A` +
+      `💳 *Pago:* ${ticketData.payment_method || 'Efectivo S/'}%0A%0A` +
+      `¡Deseamos que tengas una excelente estadía! 🏨✨`;
+
+    const waUrl = targetPhone
+      ? `https://wa.me/51${targetPhone}?text=${message}`
+      : `https://wa.me/?text=${message}`;
+
+    window.open(waUrl, '_blank');
   };
 
   return (
@@ -71,23 +95,58 @@ export function TicketPrintModal({ isOpen, onClose, ticketData }) {
           </div>
         </div>
 
+        {/* WhatsApp Sending Input */}
+        {showWhatsAppInput ? (
+          <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl space-y-2">
+            <label className="block text-xs font-semibold text-emerald-800">Número de WhatsApp del Huésped (Perú)</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="Ej: 987654321"
+                className="flex-1 bg-white border border-emerald-300 rounded-lg p-2 text-xs text-slate-900 focus:outline-none focus:border-emerald-600"
+              />
+              <button
+                type="button"
+                onClick={handleSendWhatsApp}
+                className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-lg flex items-center gap-1.5 shadow-sm"
+              >
+                <Send className="w-3.5 h-3.5" />
+                <span>Enviar</span>
+              </button>
+            </div>
+          </div>
+        ) : null}
+
         {/* Action Controls */}
-        <div className="flex items-center justify-end gap-3 pt-2">
+        <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-200">
           <button
             type="button"
-            onClick={onClose}
-            className="px-4 py-2 text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-colors"
+            onClick={() => setShowWhatsAppInput(!showWhatsAppInput)}
+            className="px-3 py-2 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl transition-colors flex items-center gap-1.5"
           >
-            Cerrar
+            <Share2 className="w-4 h-4 text-emerald-600" />
+            <span>📲 WhatsApp</span>
           </button>
-          <button
-            type="button"
-            onClick={handlePrint}
-            className="px-5 py-2 text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-xl shadow-lg shadow-emerald-500/20 transition-all flex items-center gap-2"
-          >
-            <Printer className="w-4 h-4" />
-            <span>Imprimir Ticket (80mm)</span>
-          </button>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-3 py-2 text-xs font-medium text-slate-500 hover:text-slate-900 rounded-xl"
+            >
+              Cerrar
+            </button>
+            <button
+              type="button"
+              onClick={handlePrint}
+              className="px-4 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl shadow-md shadow-emerald-600/20 flex items-center gap-1.5"
+            >
+              <Printer className="w-4 h-4" />
+              <span>Imprimir</span>
+            </button>
+          </div>
         </div>
       </div>
     </Modal>
