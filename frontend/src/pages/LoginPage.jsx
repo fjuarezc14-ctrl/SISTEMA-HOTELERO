@@ -4,8 +4,8 @@ import { Hotel, Lock, User, AlertCircle } from 'lucide-react';
 
 export function LoginPage() {
   const { login, loading } = useAuth();
-  const [username, setUsername] = useState('admin');
-  const [password, setPassword] = useState('admin123');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
   const handleSubmit = async (e) => {
@@ -37,7 +37,7 @@ export function LoginPage() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} autoComplete="off" className="space-y-4">
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1.5">Usuario</label>
             <div className="relative">
@@ -45,6 +45,7 @@ export function LoginPage() {
               <input
                 type="text"
                 required
+                autoComplete="off"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 className="w-full bg-slate-50 border border-slate-300 rounded-xl py-2.5 pl-10 pr-4 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-emerald-600"
@@ -60,6 +61,7 @@ export function LoginPage() {
               <input
                 type="password"
                 required
+                autoComplete="new-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full bg-slate-50 border border-slate-300 rounded-xl py-2.5 pl-10 pr-4 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-emerald-600"
@@ -76,12 +78,6 @@ export function LoginPage() {
             <span>{loading ? 'Ingresando...' : 'Iniciar Sesión'}</span>
           </button>
         </form>
-
-        <div className="text-center pt-2 border-t border-slate-100">
-          <p className="text-[11px] text-slate-500">
-            Usuario demo: <span className="font-mono text-slate-700 font-semibold">admin</span> | Clave: <span className="font-mono text-slate-700 font-semibold">admin123</span>
-          </p>
-        </div>
       </div>
     </div>
   );
