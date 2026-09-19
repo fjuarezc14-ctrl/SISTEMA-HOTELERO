@@ -26,7 +26,7 @@ export function LoginPage() {
           <div className="w-14 h-14 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center justify-center text-emerald-600 mx-auto shadow-sm">
             <Hotel className="w-8 h-8" />
           </div>
-          <h2 className="text-2xl font-black text-slate-900 tracking-tight">Hotel Zafiro</h2>
+          <h2 className="text-2xl font-black text-slate-900 tracking-tight">Hotel Prueba</h2>
           <p className="text-xs text-emerald-600 font-semibold">VT VALETEC • Moneda Soles (PEN - S/)</p>
         </div>
 
