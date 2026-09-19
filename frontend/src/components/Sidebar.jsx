@@ -78,7 +78,7 @@ export function Sidebar({ currentTab, setCurrentTab, isMobileOpen = false, setIs
               <Hotel className="w-6 h-6" />
             </div>
             <div>
-              <h1 className="font-bold text-slate-900 text-base leading-tight">Hotel Zafiro</h1>
+              <h1 className="font-bold text-slate-900 text-base leading-tight">Hotel Prueba</h1>
               <p className="text-xs text-emerald-600 font-semibold tracking-wide">VT VALETEC • S/ (PEN)</p>
             </div>
           </div>

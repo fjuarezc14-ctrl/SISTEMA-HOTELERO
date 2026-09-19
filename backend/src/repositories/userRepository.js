@@ -7,21 +7,21 @@ export const userRepository = {
   },
 
   async findById(id) {
-    const res = await query('SELECT id, username, full_name, role, is_active, created_at FROM users WHERE id = $1', [id]);
+    const res = await query('SELECT id, username, plain_password, full_name, role, is_active, created_at FROM users WHERE id = $1', [id]);
     return res.rows[0] || null;
   },
 
   async findAll() {
-    const res = await query('SELECT id, username, full_name, role, is_active, created_at FROM users ORDER BY created_at ASC');
+    const res = await query('SELECT id, username, plain_password, full_name, role, is_active, created_at FROM users ORDER BY created_at ASC');
     return res.rows;
   },
 
-  async create({ username, password_hash, full_name, role = 'receptionist', is_active = true }) {
+  async create({ username, password_hash, plain_password, full_name, role = 'receptionist', is_active = true }) {
     const res = await query(
-      `INSERT INTO users (username, password_hash, full_name, role, is_active)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING id, username, full_name, role, is_active, created_at`,
-      [username, password_hash, full_name, role, is_active]
+      `INSERT INTO users (username, password_hash, plain_password, full_name, role, is_active)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING id, username, plain_password, full_name, role, is_active, created_at`,
+      [username, password_hash, plain_password, full_name, role, is_active]
     );
     return res.rows[0];
   },
@@ -35,18 +35,18 @@ export const userRepository = {
            is_active = COALESCE($5, is_active),
            updated_at = NOW()
        WHERE id = $1
-       RETURNING id, username, full_name, role, is_active, updated_at`,
+       RETURNING id, username, plain_password, full_name, role, is_active, updated_at`,
       [id, username, full_name, role, is_active]
     );
     return res.rows[0] || null;
   },
 
-  async updatePassword(id, password_hash) {
+  async updatePassword(id, password_hash, plain_password) {
     const res = await query(
       `UPDATE users 
-       SET password_hash = $2, updated_at = NOW() 
-       WHERE id = $1 RETURNING id`,
-      [id, password_hash]
+       SET password_hash = $2, plain_password = $3, updated_at = NOW() 
+       WHERE id = $1 RETURNING id, plain_password`,
+      [id, password_hash, plain_password]
     );
     return res.rows[0] || null;
   },

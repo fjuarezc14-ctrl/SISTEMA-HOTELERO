@@ -108,7 +108,7 @@ export async function initDatabase() {
         const salt = await bcrypt.genSalt(10);
         const defaultHash = await bcrypt.hash('admin123', salt);
         await client.query(
-          "INSERT INTO users (username, password_hash, full_name, role) VALUES ('admin', $1, 'Administrador General', 'super_admin')",
+          "INSERT INTO users (username, password_hash, plain_password, full_name, role) VALUES ('admin', $1, 'admin123', 'Administrador General', 'super_admin')",
           [defaultHash]
         );
         console.log('✅ Usuario inicial admin creado con clave default (admin123).');

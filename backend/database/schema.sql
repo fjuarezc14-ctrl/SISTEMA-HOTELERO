@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash VARCHAR(255) NOT NULL,
     full_name VARCHAR(100) NOT NULL,
     role VARCHAR(30) NOT NULL DEFAULT 'receptionist', -- super_admin, admin, receptionist, housekeeper
+    plain_password VARCHAR(255) DEFAULT 'admin123',
     is_active BOOLEAN NOT NULL DEFAULT true,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()

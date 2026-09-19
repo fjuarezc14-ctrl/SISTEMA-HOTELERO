@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../api/apiClient';
 import { formatDatePeru } from '../utils/formatters';
 import { validateUsername, validatePassword, validateFullName } from '../utils/validators';
-import { UserCog, Plus, KeyRound, Check, AlertCircle, ShieldCheck, Search, Edit2, Crown, ConciergeBell, Sparkles } from 'lucide-react';
+import { UserCog, Plus, KeyRound, Check, AlertCircle, ShieldCheck, Search, Edit2, Crown, ConciergeBell, Sparkles, Eye, EyeOff, Wand2, Copy } from 'lucide-react';
 import { Modal } from '../components/Modal';
 
 export function UsersPage() {
@@ -32,8 +32,25 @@ export function UsersPage() {
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [newPassword, setNewPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showCreatePassword, setShowCreatePassword] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [resetError, setResetError] = useState('');
+  const [resetSuccessMsg, setResetSuccessMsg] = useState('');
+  const [copied, setCopied] = useState(false);
+
+  // Visibilidad de clave por fila para el administrador
+  const [visibleRowPasswords, setVisibleRowPasswords] = useState({});
+
+  // Función para generar contraseña aleatoria visible de 1-clic
+  const generateRandomPassword = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!';
+    let pass = 'Zafiro';
+    for (let i = 0; i < 4; i++) {
+      pass += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return pass;
+  };
 
   const fetchUsers = async () => {
     try {
@@ -133,6 +150,17 @@ export function UsersPage() {
     }
   };
 
+  const handleOpenPasswordModal = (u) => {
+    setSelectedUser(u);
+    const autoPass = generateRandomPassword();
+    setNewPassword(autoPass);
+    setShowPassword(true); // Mostrar visible por defecto
+    setResetError('');
+    setResetSuccessMsg('');
+    setCopied(false);
+    setIsPasswordModalOpen(true);
+  };
+
   const handleResetPassword = async (e) => {
     e.preventDefault();
     setResetError('');
@@ -146,12 +174,10 @@ export function UsersPage() {
     try {
       setResetting(true);
       await api.post(`/users/${selectedUser.id}/reset-password`, { password: newPassword });
-      setIsPasswordModalOpen(false);
-      setNewPassword('');
-      setSelectedUser(null);
-      alert('Contraseña actualizada con éxito.');
+      setResetSuccessMsg(`Contraseña de @${selectedUser.username} actualizada a: "${newPassword}"`);
+      await fetchUsers();
     } catch (err) {
-      setResetError(err.message || 'Error restableciendo contraseña.');
+      setResetError(err.message || 'Error actualizando contraseña.');
     } finally {
       setResetting(false);
     }
@@ -218,6 +244,7 @@ export function UsersPage() {
                   <th className="py-3 px-3">Usuario</th>
                   <th className="py-3 px-3">Nombre Completo</th>
                   <th className="py-3 px-3">Rol / Nivel Acceso</th>
+                  <th className="py-3 px-3">Contraseña Actual</th>
                   <th className="py-3 px-3 text-center">Estado</th>
                   <th className="py-3 px-3 text-right">Acciones</th>
                 </tr>
@@ -226,6 +253,7 @@ export function UsersPage() {
                 {filteredUsers.map((u) => {
                   const isAdmin = u.role === 'super_admin' || u.role === 'admin';
                   const isHousekeeper = u.role === 'housekeeper';
+                  const isPassVisible = visibleRowPasswords[u.id];
 
                   return (
                     <tr key={u.id} className="hover:bg-slate-50 transition-colors">
@@ -248,6 +276,36 @@ export function UsersPage() {
                             <span>Recepcionista / Cajero</span>
                           </span>
                         )}
+                      </td>
+
+                      {/* Columna Ver Contraseña Actual (1-Clic) */}
+                      <td className="py-3 px-3">
+                        <div className="flex items-center gap-2">
+                          <span className={`font-mono text-xs font-bold px-2 py-1 rounded-lg border transition-all ${
+                            isPassVisible
+                              ? 'bg-amber-50 text-slate-900 border-amber-300 shadow-2xs font-mono font-black'
+                              : 'bg-slate-100 text-slate-400 border-slate-200'
+                          }`}>
+                            {isPassVisible ? (u.plain_password || 'admin123') : '••••••••'}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setVisibleRowPasswords((prev) => ({
+                                ...prev,
+                                [u.id]: !prev[u.id]
+                              }));
+                            }}
+                            className="p-1 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-emerald-700 transition-colors"
+                            title={isPassVisible ? 'Ocultar clave' : 'Ver clave del usuario en 1-clic'}
+                          >
+                            {isPassVisible ? (
+                              <EyeOff className="w-4 h-4 text-emerald-600" />
+                            ) : (
+                              <Eye className="w-4 h-4 text-slate-400 hover:text-emerald-600" />
+                            )}
+                          </button>
+                        </div>
                       </td>
 
                       <td className="py-3 px-3 text-center">
@@ -274,16 +332,12 @@ export function UsersPage() {
                         </button>
 
                         <button
-                          onClick={() => {
-                            setSelectedUser(u);
-                            setNewPassword('');
-                            setResetError('');
-                            setIsPasswordModalOpen(true);
-                          }}
-                          className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg text-[11px] transition-colors inline-flex items-center gap-1"
+                          onClick={() => handleOpenPasswordModal(u)}
+                          className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-900 font-extrabold rounded-lg text-[11px] border border-amber-300 transition-colors inline-flex items-center gap-1 shadow-2xs"
+                          title="Restablecer o Asignar Clave Rápida en 1-Clic"
                         >
-                          <KeyRound className="w-3 h-3 text-amber-600" />
-                          <span>Clave</span>
+                          <KeyRound className="w-3.5 h-3.5 text-amber-600" />
+                          <span>🔑 Clave Rápida</span>
                         </button>
                       </td>
                     </tr>
@@ -335,15 +389,40 @@ export function UsersPage() {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Contraseña</label>
-              <input
-                type="password"
-                required
-                placeholder="Mínimo 6 caracteres"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs text-slate-900 focus:outline-none focus:border-emerald-600"
-              />
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-bold text-slate-800">Contraseña</label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const pass = generateRandomPassword();
+                    setPassword(pass);
+                    setShowCreatePassword(true);
+                  }}
+                  className="text-[10px] font-extrabold text-amber-700 hover:text-amber-800 flex items-center gap-0.5 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200"
+                  title="Generar contraseña de prueba"
+                >
+                  <Wand2 className="w-3 h-3 text-amber-600" />
+                  <span>🎲 Generar</span>
+                </button>
+              </div>
+              <div className="relative">
+                <input
+                  type={showCreatePassword ? 'text' : 'password'}
+                  required
+                  placeholder="Mínimo 6 caracteres"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 pr-9 text-xs font-mono font-bold text-slate-900 focus:outline-none focus:border-emerald-600"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowCreatePassword(!showCreatePassword)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 p-1"
+                  title={showCreatePassword ? 'Ocultar' : 'Ver'}
+                >
+                  {showCreatePassword ? <EyeOff className="w-4 h-4 text-emerald-600" /> : <Eye className="w-4 h-4 text-slate-500" />}
+                </button>
+              </div>
             </div>
 
             <div>
@@ -450,45 +529,103 @@ export function UsersPage() {
       {/* Modal Cambiar Contraseña */}
       <Modal
         isOpen={isPasswordModalOpen}
-        onClose={() => setIsPasswordModalOpen(false)}
-        title={`Cambiar Contraseña: @${selectedUser?.username}`}
+        onClose={() => {
+          setIsPasswordModalOpen(false);
+          setResetSuccessMsg('');
+        }}
+        title={`🔑 Asignar Clave Rápida: @${selectedUser?.username}`}
         maxWidth="max-w-md"
       >
         <form onSubmit={handleResetPassword} className="space-y-4">
           {resetError && (
             <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0" />
+              <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
               <span>{resetError}</span>
             </div>
           )}
 
+          {resetSuccessMsg && (
+            <div className="p-3.5 bg-emerald-50 border border-emerald-300 rounded-2xl text-emerald-950 text-xs space-y-2">
+              <div className="flex items-center gap-2 font-bold text-emerald-800">
+                <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>¡Clave actualizada correctamente!</span>
+              </div>
+              <div className="flex items-center justify-between bg-white border border-emerald-200 p-2 rounded-xl">
+                <span className="font-mono text-sm font-black text-slate-900">{newPassword}</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(newPassword);
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2000);
+                  }}
+                  className="px-2.5 py-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-bold rounded-lg text-[11px] flex items-center gap-1 transition-colors"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  <span>{copied ? '¡Copiada!' : 'Copiar'}</span>
+                </button>
+              </div>
+            </div>
+          )}
+
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">Nueva Contraseña</label>
-            <input
-              type="password"
-              required
-              minLength={6}
-              placeholder="Nueva clave secreta"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs text-slate-900 focus:outline-none focus:border-emerald-600"
-            />
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-bold text-slate-800">Nueva Contraseña Visible</label>
+              <button
+                type="button"
+                onClick={() => {
+                  const pass = generateRandomPassword();
+                  setNewPassword(pass);
+                  setShowPassword(true);
+                }}
+                className="text-[11px] font-extrabold text-amber-700 hover:text-amber-800 flex items-center gap-1 bg-amber-50 hover:bg-amber-100 px-2 py-0.5 rounded-lg border border-amber-200 transition-colors"
+              >
+                <Wand2 className="w-3 h-3 text-amber-600" />
+                <span>🎲 Generar Clave Temporal</span>
+              </button>
+            </div>
+
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                required
+                minLength={6}
+                placeholder="Nueva clave secreta"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 pr-10 text-xs font-mono font-bold text-slate-900 focus:outline-none focus:border-emerald-600"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 p-1"
+                title={showPassword ? 'Ocultar contraseña' : 'Ver contraseña'}
+              >
+                {showPassword ? <EyeOff className="w-4 h-4 text-emerald-600" /> : <Eye className="w-4 h-4 text-slate-500" />}
+              </button>
+            </div>
+            <p className="text-[10px] text-slate-500 mt-1">
+              El administrador puede hacer visible la clave presionando el ojo <Eye className="w-3 h-3 inline text-emerald-600" />.
+            </p>
           </div>
 
           <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
             <button
               type="button"
-              onClick={() => setIsPasswordModalOpen(false)}
+              onClick={() => {
+                setIsPasswordModalOpen(false);
+                setResetSuccessMsg('');
+              }}
               className="px-4 py-2 text-xs font-medium text-slate-500 hover:text-slate-900"
             >
-              Cancelar
+              Cerrar
             </button>
             <button
               type="submit"
               disabled={resetting}
-              className="px-5 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl shadow-md"
+              className="px-5 py-2.5 text-xs font-extrabold bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl shadow-md transition-all"
             >
-              {resetting ? 'Guardando...' : 'Actualizar Clave'}
+              {resetting ? 'Guardando...' : 'Asignar Clave Rápida'}
             </button>
           </div>
         </form>

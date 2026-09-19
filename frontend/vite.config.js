@@ -6,6 +6,7 @@ export default defineConfig({
   server: {
     port: 5185,
     host: true,
+    allowedHosts: true,
     proxy: {
       '/api': {
         target: process.env.VITE_PROXY_TARGET || 'http://backend:4020',
