@@ -78,23 +78,38 @@ export const cashRepository = {
     return res.rows;
   },
 
-  async findAll({ limit = 100, offset = 0, dateFrom = null, dateTo = null } = {}) {
+  async findAll({ limit = 100, offset = 0, dateFrom = null, dateTo = null, shiftId = null } = {}) {
     let sql = `
       SELECT 
         t.*,
-        u.full_name AS user_full_name
+        u.full_name AS user_full_name,
+        r.room_number,
+        c.full_name AS customer_name
       FROM cash_transactions t
       JOIN users u ON t.user_id = u.id
+      LEFT JOIN stays s ON t.stay_id = s.id
+      LEFT JOIN rooms r ON s.room_id = r.id
+      LEFT JOIN customers c ON s.customer_id = c.id
     `;
     const params = [];
+    const conditions = [];
+
+    if (shiftId) {
+      params.push(shiftId);
+      conditions.push(`t.work_shift_id = $${params.length}`);
+    }
 
     if (dateFrom && dateTo) {
-      sql += ` WHERE t.created_at >= $1 AND t.created_at <= $2`;
       params.push(dateFrom, dateTo);
+      conditions.push(`t.created_at >= $${params.length - 1} AND t.created_at <= $${params.length}`);
+    }
+
+    if (conditions.length > 0) {
+      sql += ` WHERE ${conditions.join(' AND ')}`;
     }
 
     sql += ` ORDER BY t.created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
-    params.push(limit, offset);
+    params.push(Math.min(Number(limit) || 100, 2000), Number(offset) || 0);
 
     const res = await query(sql, params);
     return res.rows;

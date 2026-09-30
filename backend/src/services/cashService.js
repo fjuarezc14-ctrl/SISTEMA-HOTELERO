@@ -63,8 +63,8 @@ export const cashService = {
     return transaction;
   },
 
-  async getTransactions({ limit, offset, dateFrom, dateTo }) {
-    return await cashRepository.findAll({ limit, offset, dateFrom, dateTo });
+  async getTransactions({ limit, offset, dateFrom, dateTo, shiftId }) {
+    return await cashRepository.findAll({ limit, offset, dateFrom, dateTo, shiftId });
   },
 
   async cancelTransaction(id, { reason = '' }) {

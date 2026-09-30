@@ -12,8 +12,15 @@ import {
   FileText,
   Printer,
   Lock,
-  Unlock
+  Unlock,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
+
+const PAGE_SIZE = 15;
+
+// Fecha de hoy en Lima como YYYY-MM-DD
+const todayLima = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date());
 
 export function CashPage({ onOpenShiftModal = () => {}, onCloseShiftModal = () => {} }) {
   const { activeShift, hasActiveShift } = useShift();
@@ -27,10 +34,30 @@ export function CashPage({ onOpenShiftModal = () => {}, onCloseShiftModal = () =
   const [selectedVoucherTx, setSelectedVoucherTx] = useState(null);
   const [isVoucherModalOpen, setIsVoucherModalOpen] = useState(false);
 
+  // Filtro y paginación del historial
+  const [scope, setScope] = useState('shift'); // shift, today, range
+  const [dateFrom, setDateFrom] = useState(todayLima());
+  const [dateTo, setDateTo] = useState(todayLima());
+  const [page, setPage] = useState(1);
+
   const fetchTransactions = async () => {
+    if (scope === 'shift' && !activeShift?.id) {
+      setTransactions([]);
+      setLoading(false);
+      return;
+    }
+    const params = new URLSearchParams({ limit: '2000' });
+    if (scope === 'shift') {
+      params.set('shiftId', activeShift.id);
+    } else {
+      const from = scope === 'today' ? todayLima() : dateFrom;
+      const to = scope === 'today' ? todayLima() : dateTo;
+      params.set('dateFrom', `${from}T00:00:00-05:00`);
+      params.set('dateTo', `${to}T23:59:59.999-05:00`);
+    }
     try {
       setLoading(true);
-      const res = await api.get('/cash/transactions');
+      const res = await api.get(`/cash/transactions?${params.toString()}`);
       setTransactions(res.data || []);
     } catch (err) {
       console.error('Error cargando transacciones de caja:', err.message);
@@ -40,8 +67,9 @@ export function CashPage({ onOpenShiftModal = () => {}, onCloseShiftModal = () =
   };
 
   useEffect(() => {
+    setPage(1);
     fetchTransactions();
-  }, []);
+  }, [scope, dateFrom, dateTo, activeShift?.id]);
 
   const handleCancelTransaction = async (t) => {
     const reason = window.prompt(`Motivo de anulación para "${t.concept}":`, 'Error de marcado o devolución');
@@ -65,6 +93,10 @@ export function CashPage({ onOpenShiftModal = () => {}, onCloseShiftModal = () =
   const totalExpense = transactions
     .filter((t) => t.transaction_type === 'expense' && !t.is_cancelled)
     .reduce((sum, t) => sum + Number(t.amount_pen || 0), 0);
+
+  const totalPages = Math.max(1, Math.ceil(transactions.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pagedTransactions = transactions.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   return (
     <div className="space-y-6">
@@ -126,23 +158,65 @@ export function CashPage({ onOpenShiftModal = () => {}, onCloseShiftModal = () =
       <div className="space-y-4">
         <div className="grid grid-cols-2 gap-4">
           <div className="p-4 bg-white border border-slate-200 rounded-2xl shadow-sm space-y-1">
-            <span className="text-xs font-semibold text-emerald-700 uppercase">Total Ingresos Activos</span>
+            <span className="text-xs font-semibold text-emerald-700 uppercase">Total Ingresos</span>
             <p className="text-2xl font-black text-emerald-700 font-mono">{formatPEN(totalIncome)}</p>
           </div>
 
           <div className="p-4 bg-white border border-slate-200 rounded-2xl shadow-sm space-y-1">
-            <span className="text-xs font-semibold text-rose-700 uppercase">Total Egresos Activos</span>
+            <span className="text-xs font-semibold text-rose-700 uppercase">Total Egresos</span>
             <p className="text-2xl font-black text-rose-700 font-mono">{formatPEN(totalExpense)}</p>
           </div>
         </div>
 
         <div className="p-6 bg-white border border-slate-200 rounded-3xl shadow-sm space-y-4">
-          <h3 className="text-sm font-bold text-slate-900">Historial de Transacciones de Caja</h3>
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+            <h3 className="text-sm font-bold text-slate-900">Historial de Transacciones de Caja</h3>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="inline-flex p-0.5 bg-slate-100 border border-slate-200 rounded-xl">
+                {[
+                  { id: 'shift', label: 'Turno actual' },
+                  { id: 'today', label: 'Hoy' },
+                  { id: 'range', label: 'Rango de fechas' }
+                ].map((opt) => (
+                  <button
+                    key={opt.id}
+                    onClick={() => setScope(opt.id)}
+                    className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-colors ${
+                      scope === opt.id ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+              {scope === 'range' && (
+                <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
+                  <input
+                    type="date"
+                    value={dateFrom}
+                    max={dateTo}
+                    onChange={(e) => setDateFrom(e.target.value)}
+                    className="bg-slate-50 border border-slate-300 rounded-lg px-2 py-1 text-xs text-slate-900"
+                  />
+                  <span>al</span>
+                  <input
+                    type="date"
+                    value={dateTo}
+                    min={dateFrom}
+                    onChange={(e) => setDateTo(e.target.value)}
+                    className="bg-slate-50 border border-slate-300 rounded-lg px-2 py-1 text-xs text-slate-900"
+                  />
+                </div>
+              )}
+            </div>
+          </div>
 
           {loading ? (
             <div className="py-8 text-center text-xs text-slate-400">Cargando movimientos...</div>
+          ) : scope === 'shift' && !hasActiveShift ? (
+            <div className="py-8 text-center text-xs text-slate-400">No hay turno abierto. Usa el filtro "Hoy" o "Rango de fechas".</div>
           ) : transactions.length === 0 ? (
-            <div className="py-8 text-center text-xs text-slate-400">No hay movimientos registrados en este turno.</div>
+            <div className="py-8 text-center text-xs text-slate-400">No hay movimientos registrados en este periodo.</div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
@@ -158,7 +232,7 @@ export function CashPage({ onOpenShiftModal = () => {}, onCloseShiftModal = () =
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {transactions.map((t) => (
+                  {pagedTransactions.map((t) => (
                     <tr key={t.id} className={`hover:bg-slate-50 transition-colors ${t.is_cancelled ? 'bg-rose-50/30' : ''}`}>
                       <td className="py-3 px-3 text-slate-600 font-mono">{formatDatePeru(t.created_at)}</td>
                       <td className="py-3 px-3">
@@ -256,6 +330,7 @@ export function CashPage({ onOpenShiftModal = () => {}, onCloseShiftModal = () =
                   ))}
                 </tbody>
               </table>
+              <Pagination page={currentPage} totalPages={totalPages} totalItems={transactions.length} onChange={setPage} />
             </div>
           )}
         </div>
@@ -277,6 +352,33 @@ export function CashPage({ onOpenShiftModal = () => {}, onCloseShiftModal = () =
         onClose={() => setIsMovementModalOpen(false)}
         onSuccess={fetchTransactions}
       />
+    </div>
+  );
+}
+
+function Pagination({ page, totalPages, totalItems, onChange }) {
+  if (totalPages <= 1) return null;
+  return (
+    <div className="flex items-center justify-between pt-3 mt-2 border-t border-slate-100 text-xs text-slate-500">
+      <span>
+        {totalItems} registros · Página {page} de {totalPages}
+      </span>
+      <div className="flex items-center gap-1">
+        <button
+          onClick={() => onChange(page - 1)}
+          disabled={page <= 1}
+          className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          <ChevronLeft className="w-3.5 h-3.5" />
+        </button>
+        <button
+          onClick={() => onChange(page + 1)}
+          disabled={page >= totalPages}
+          className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          <ChevronRight className="w-3.5 h-3.5" />
+        </button>
+      </div>
     </div>
   );
 }

@@ -19,8 +19,8 @@ export const cashController = {
 
   async getAll(req, res, next) {
     try {
-      const { limit, offset, dateFrom, dateTo } = req.query;
-      const transactions = await cashService.getTransactions({ limit, offset, dateFrom, dateTo });
+      const { limit, offset, dateFrom, dateTo, shiftId } = req.query;
+      const transactions = await cashService.getTransactions({ limit, offset, dateFrom, dateTo, shiftId });
       res.json({
         success: true,
         data: transactions
