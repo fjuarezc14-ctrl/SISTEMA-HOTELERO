@@ -38,6 +38,7 @@ export function SettingsPage() {
   // Form Hotel Info
   const [businessName, setBusinessName] = useState('');
   const [tradeName, setTradeName] = useState('');
+  const [logoUrl, setLogoUrl] = useState('');
   const [ruc, setRuc] = useState('');
   const [address, setAddress] = useState('');
   const [phone, setPhone] = useState('');
@@ -74,6 +75,7 @@ export function SettingsPage() {
         setHotelInfo(infoData);
         setBusinessName(infoData.business_name || '');
         setTradeName(infoData.trade_name || '');
+        setLogoUrl(infoData.logo_url || '');
         setRuc(infoData.ruc || '');
         setAddress(infoData.address || '');
         setPhone(infoData.phone || '');
@@ -262,6 +264,7 @@ export function SettingsPage() {
       await api.put('/settings/hotel-info', {
         business_name: businessName.trim(),
         trade_name: tradeName.trim(),
+        logo_url: logoUrl.trim(),
         ruc: ruc.trim(),
         address: address.trim(),
         phone: phone.trim(),
@@ -270,7 +273,7 @@ export function SettingsPage() {
         ticket_footer_legend: ticketFooterLegend.trim()
       });
       invalidateCache('hotel_info');
-      setHotelSuccess('Información fiscal, parámetros de tolerancia y leyenda de ticket actualizados.');
+      setHotelSuccess('Información fiscal, logo, parámetros de tolerancia y leyenda de ticket actualizados.');
     } catch (err) {
       setHotelError(err.message || 'Error guardando datos del hotel.');
     } finally {
@@ -502,6 +505,18 @@ export function SettingsPage() {
                   className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs font-mono text-slate-900 focus:outline-none focus:border-emerald-600"
                 />
               </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">URL del Logo de la Empresa (Opcional)</label>
+              <input
+                type="text"
+                placeholder="Ej: https://miservidor.com/logo-hotel.png"
+                value={logoUrl}
+                onChange={(e) => setLogoUrl(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs font-mono text-slate-900 focus:outline-none focus:border-emerald-600"
+              />
+              <span className="text-[10px] text-slate-500">Enlace de imagen (PNG, JPG o SVG) que se mostrará en la barra lateral y en el login.</span>
             </div>
 
             <div>
