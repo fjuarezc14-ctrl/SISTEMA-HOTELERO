@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Calculator, ChevronDown, ChevronUp, Minus, Plus, RotateCcw } from 'lucide-react';
+import { Calculator, Minus, Plus, RotateCcw, X } from 'lucide-react';
 import { formatPEN } from '../utils/formatters';
 
 // Denominaciones vigentes en soles, en céntimos para evitar errores de redondeo
@@ -9,12 +9,29 @@ const COINS = [500, 200, 100, 50, 20, 10];
 const labelFor = (cents) =>
   cents >= 100 ? `S/ ${cents / 100}` : `S/ 0.${String(cents).padStart(2, '0')}`;
 
+/** Botón para mostrar/ocultar la calculadora */
+export function CashCounterToggle({ isOpen, onToggle }) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className={`w-full py-2 px-3 border rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors ${
+        isOpen
+          ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
+          : 'bg-white hover:bg-slate-100 border-slate-300 text-slate-700'
+      }`}
+    >
+      <Calculator className="w-3.5 h-3.5 text-emerald-600" />
+      <span>{isOpen ? 'Ocultar calculadora' : 'Calculadora de billetes y monedas'}</span>
+    </button>
+  );
+}
+
 /**
- * Calculadora de billetes y monedas peruanas.
+ * Panel de calculadora de billetes y monedas peruanas.
  * Llama a onTotalChange(totalEnSoles) cada vez que cambia el conteo.
  */
-export function CashCounter({ onTotalChange = () => {} }) {
-  const [isOpen, setIsOpen] = useState(false);
+export function CashCounter({ onTotalChange = () => {}, onClose }) {
   const [counts, setCounts] = useState({});
 
   const totalCents = [...BILLS, ...COINS].reduce((sum, d) => sum + d * (counts[d] || 0), 0);
@@ -69,46 +86,42 @@ export function CashCounter({ onTotalChange = () => {} }) {
   };
 
   return (
-    <div className="space-y-2">
-      <button
-        type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-full py-2 px-3 bg-white hover:bg-slate-100 border border-slate-300 rounded-xl text-xs font-bold text-slate-700 flex items-center justify-center gap-1.5 transition-colors"
-      >
-        <Calculator className="w-3.5 h-3.5 text-emerald-600" />
-        <span>Calculadora de billetes y monedas</span>
-        {isOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-      </button>
+    <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+      <div className="flex items-center justify-between">
+        <h4 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+          <Calculator className="w-3.5 h-3.5 text-emerald-600" />
+          <span>Conteo de billetes y monedas</span>
+        </h4>
+        {onClose && (
+          <button type="button" onClick={onClose} className="p-1 text-slate-400 hover:text-slate-800 rounded-lg hover:bg-slate-200">
+            <X className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </div>
 
-      {isOpen && (
-        <div className="p-3 bg-white border border-slate-200 rounded-xl space-y-3">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <p className="text-[10px] uppercase tracking-wider font-bold text-slate-500">Billetes</p>
-              {BILLS.map(renderRow)}
-            </div>
-            <div className="space-y-1.5">
-              <p className="text-[10px] uppercase tracking-wider font-bold text-slate-500">Monedas</p>
-              {COINS.map(renderRow)}
-            </div>
-          </div>
+      <div className="space-y-1.5">
+        <p className="text-[10px] uppercase tracking-wider font-bold text-slate-500">Billetes</p>
+        {BILLS.map(renderRow)}
+      </div>
+      <div className="space-y-1.5">
+        <p className="text-[10px] uppercase tracking-wider font-bold text-slate-500">Monedas</p>
+        {COINS.map(renderRow)}
+      </div>
 
-          <div className="flex items-center justify-between pt-2 border-t border-slate-200">
-            <button
-              type="button"
-              onClick={reset}
-              className="text-[11px] font-semibold text-slate-500 hover:text-slate-900 flex items-center gap-1"
-            >
-              <RotateCcw className="w-3 h-3" />
-              <span>Limpiar</span>
-            </button>
-            <div className="text-sm">
-              <span className="text-slate-500 font-semibold mr-2">Total contado:</span>
-              <span className="font-mono font-black text-emerald-700">{formatPEN(totalCents / 100)}</span>
-            </div>
-          </div>
+      <div className="flex items-center justify-between pt-2 border-t border-slate-200">
+        <button
+          type="button"
+          onClick={reset}
+          className="text-[11px] font-semibold text-slate-500 hover:text-slate-900 flex items-center gap-1"
+        >
+          <RotateCcw className="w-3 h-3" />
+          <span>Limpiar</span>
+        </button>
+        <div className="text-sm">
+          <span className="text-slate-500 font-semibold mr-2">Total:</span>
+          <span className="font-mono font-black text-emerald-700">{formatPEN(totalCents / 100)}</span>
         </div>
-      )}
+      </div>
     </div>
   );
 }

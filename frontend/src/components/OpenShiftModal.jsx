@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Modal } from './Modal';
 import { useShift } from '../context/ShiftContext';
-import { CashCounter } from './CashCounter';
+import { CashCounter, CashCounterToggle } from './CashCounter';
 import { Wallet, AlertCircle } from 'lucide-react';
 
 export function OpenShiftModal({ isOpen, onClose }) {
@@ -10,6 +10,7 @@ export function OpenShiftModal({ isOpen, onClose }) {
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showCounter, setShowCounter] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -32,7 +33,9 @@ export function OpenShiftModal({ isOpen, onClose }) {
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Apertura de Turno de Caja (Perú)">
+    <Modal isOpen={isOpen} onClose={onClose} title="Apertura de Turno de Caja (Perú)" maxWidth={showCounter ? 'max-w-4xl' : 'max-w-xl'}>
+      <div className={showCounter ? 'grid grid-cols-1 md:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] gap-4 items-start' : ''}>
+        {showCounter && <CashCounter onTotalChange={setInitialCash} onClose={() => setShowCounter(false)} />}
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
           <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs flex items-center gap-2">
@@ -63,7 +66,7 @@ export function OpenShiftModal({ isOpen, onClose }) {
           <p className="text-[11px] text-slate-500">
             Monto de cambio/sencillo disponible físicamente en gaveta al iniciar el turno.
           </p>
-          <CashCounter onTotalChange={setInitialCash} />
+          <CashCounterToggle isOpen={showCounter} onToggle={() => setShowCounter(!showCounter)} />
         </div>
 
         <div>
@@ -97,6 +100,7 @@ export function OpenShiftModal({ isOpen, onClose }) {
           </button>
         </div>
       </form>
+      </div>
     </Modal>
   );
 }

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Modal } from './Modal';
 import { useShift } from '../context/ShiftContext';
 import { formatPEN } from '../utils/formatters';
-import { CashCounter } from './CashCounter';
+import { CashCounter, CashCounterToggle } from './CashCounter';
 import { CheckCircle2, AlertTriangle, AlertCircle, Calculator } from 'lucide-react';
 
 export function CloseShiftModal({ isOpen, onClose, onShiftClosed = () => {} }) {
@@ -11,6 +11,7 @@ export function CloseShiftModal({ isOpen, onClose, onShiftClosed = () => {} }) {
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showCounter, setShowCounter] = useState(false);
 
   if (!activeShift) return null;
 
@@ -58,7 +59,9 @@ export function CloseShiftModal({ isOpen, onClose, onShiftClosed = () => {} }) {
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Cierre y Arqueo de Turno (Perú)" maxWidth="max-w-xl">
+    <Modal isOpen={isOpen} onClose={onClose} title="Cierre y Arqueo de Turno (Perú)" maxWidth={showCounter ? 'max-w-4xl' : 'max-w-xl'}>
+      <div className={showCounter ? 'grid grid-cols-1 md:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] gap-4 items-start' : ''}>
+        {showCounter && <CashCounter onTotalChange={setActualCash} onClose={() => setShowCounter(false)} />}
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
           <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs flex items-center gap-2">
@@ -109,7 +112,7 @@ export function CloseShiftModal({ isOpen, onClose, onShiftClosed = () => {} }) {
             />
           </div>
 
-          <CashCounter onTotalChange={setActualCash} />
+          <CashCounterToggle isOpen={showCounter} onToggle={() => setShowCounter(!showCounter)} />
 
           {/* Comparación y Diferencia en Vivo */}
           {actualCash !== '' && (
@@ -173,6 +176,7 @@ export function CloseShiftModal({ isOpen, onClose, onShiftClosed = () => {} }) {
           </button>
         </div>
       </form>
+      </div>
     </Modal>
   );
 }
