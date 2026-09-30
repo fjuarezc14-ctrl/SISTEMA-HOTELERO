@@ -297,14 +297,14 @@ export function StorePage() {
             className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-md shadow-indigo-600/20 transition-all flex items-center gap-2"
           >
             <Plus className="w-4 h-4" />
-            <span>+ Ingreso Almacén / Kardex</span>
+            <span>Ingreso Almacén / Kardex</span>
           </button>
           <button
             onClick={handleOpenCreateProduct}
             className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-md shadow-emerald-600/20 transition-all flex items-center gap-2"
           >
             <Plus className="w-4 h-4" />
-            <span>+ Nuevo Producto</span>
+            <span>Nuevo Producto</span>
           </button>
         </div>
       </div>

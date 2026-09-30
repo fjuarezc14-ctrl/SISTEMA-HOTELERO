@@ -175,14 +175,14 @@ export function ReceptionPage() {
             className="px-4 py-2.5 bg-slate-800 hover:bg-slate-900 text-white font-extrabold text-xs rounded-2xl shadow-sm transition-all flex items-center justify-center gap-1.5 shrink-0"
           >
             <Plus className="w-4 h-4 text-emerald-400" />
-            <span>+ Habitación</span>
+            <span>Habitación</span>
           </button>
           <button
             onClick={() => setIsReservationModalOpen(true)}
             className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-xs rounded-2xl shadow-sm transition-all flex items-center justify-center gap-2 shrink-0"
           >
             <PhoneCall className="w-4 h-4" />
-            <span>+ Nueva Reserva</span>
+            <span>Nueva Reserva</span>
           </button>
         </div>
       </div>

@@ -536,7 +536,7 @@ export function ReportsPage() {
                               className="px-2 py-0.5 rounded text-[10px] font-extrabold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1 transition-colors"
                             >
                               <FileText className="w-3 h-3 text-emerald-600" />
-                              <span>+ Emitir Comprobante</span>
+                              <span>Emitir Comprobante</span>
                             </button>
                           ) : (
                             <span className="text-[10px] text-slate-400 font-mono">Ticket Interno</span>

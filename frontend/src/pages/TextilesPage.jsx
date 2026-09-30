@@ -99,7 +99,7 @@ export function TextilesPage() {
             className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-md shadow-emerald-600/20 transition-all flex items-center gap-2"
           >
             <Plus className="w-4 h-4" />
-            <span>+ Registrar Ingreso</span>
+            <span>Registrar Ingreso</span>
           </button>
         </div>
       </div>
@@ -164,7 +164,7 @@ export function TextilesPage() {
             }`}
           >
             <Bed className="w-4 h-4" />
-            <span>🛌 Ropa de Cama</span>
+            <span>Ropa de Cama</span>
           </button>
 
           <button
@@ -174,7 +174,7 @@ export function TextilesPage() {
             }`}
           >
             <Bath className="w-4 h-4" />
-            <span>🚿 Ropa de Baño</span>
+            <span>Ropa de Baño</span>
           </button>
 
           <button
@@ -184,7 +184,7 @@ export function TextilesPage() {
             }`}
           >
             <WashingMachine className="w-4 h-4" />
-            <span>🧺 Control Lavandería</span>
+            <span>Control Lavandería</span>
           </button>
         </div>
       </div>

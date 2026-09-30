@@ -212,7 +212,7 @@ export function UsersPage() {
           className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-md shadow-emerald-600/20 transition-all flex items-center gap-2"
         >
           <Plus className="w-4 h-4" />
-          <span>+ Nuevo Usuario</span>
+          <span>Nuevo Usuario</span>
         </button>
       </div>
 

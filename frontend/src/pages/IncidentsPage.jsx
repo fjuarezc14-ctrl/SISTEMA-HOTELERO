@@ -269,7 +269,7 @@ export function IncidentsPage() {
             className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold rounded-xl shadow-md shadow-rose-600/20 transition-all flex items-center gap-1.5"
           >
             <Plus className="w-4 h-4" />
-            <span>+ Registrar Incidente</span>
+            <span>Registrar Incidente</span>
           </button>
         </div>
       </div>
@@ -372,7 +372,7 @@ export function IncidentsPage() {
           ))}
         </div>
       )}
-
+  
       {/* PUNTO 1: Modal + Registrar Incidente Manual */}
       <Modal
         isOpen={isCreateModalOpen}
