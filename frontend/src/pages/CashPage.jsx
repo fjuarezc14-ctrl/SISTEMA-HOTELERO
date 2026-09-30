@@ -14,7 +14,9 @@ import {
   Lock,
   Unlock,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  ChevronDown,
+  BedDouble
 } from 'lucide-react';
 
 const PAGE_SIZE = 15;
@@ -39,6 +41,7 @@ export function CashPage({ onOpenShiftModal = () => {}, onCloseShiftModal = () =
   const [dateFrom, setDateFrom] = useState(todayLima());
   const [dateTo, setDateTo] = useState(todayLima());
   const [page, setPage] = useState(1);
+  const [expandedGroups, setExpandedGroups] = useState({});
 
   const fetchTransactions = async () => {
     if (scope === 'shift' && !activeShift?.id) {
@@ -94,9 +97,110 @@ export function CashPage({ onOpenShiftModal = () => {}, onCloseShiftModal = () =
     .filter((t) => t.transaction_type === 'expense' && !t.is_cancelled)
     .reduce((sum, t) => sum + Number(t.amount_pen || 0), 0);
 
-  const totalPages = Math.max(1, Math.ceil(transactions.length / PAGE_SIZE));
+  // Agrupar movimientos de una misma estadía (habitación + cliente) en un solo registro
+  const groups = groupByStay(transactions);
+  const totalPages = Math.max(1, Math.ceil(groups.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
-  const pagedTransactions = transactions.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const pagedGroups = groups.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  const toggleGroup = (key) => setExpandedGroups((prev) => ({ ...prev, [key]: !prev[key] }));
+
+  const renderTxRow = (t, nested = false) => (
+    <tr key={t.id} className={`hover:bg-slate-50 transition-colors ${t.is_cancelled ? 'bg-rose-50/30' : nested ? 'bg-slate-50/60' : ''}`}>
+      <td className={`py-3 px-3 text-slate-600 font-mono ${nested ? 'pl-8' : ''}`}>{formatDatePeru(t.created_at)}</td>
+      <td className="py-3 px-3">
+        {t.is_cancelled ? (
+          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-200 text-slate-700 line-through border border-slate-300">
+            Anulado
+          </span>
+        ) : t.transaction_type === 'income' ? (
+          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+            Ingreso
+          </span>
+        ) : (
+          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+            Egreso
+          </span>
+        )}
+      </td>
+
+      <td className="py-3 px-3 font-semibold text-slate-900">
+        <span className={t.is_cancelled ? 'line-through text-slate-400' : ''}>
+          {t.concept}
+        </span>
+        {t.is_cancelled && t.cancellation_reason && (
+          <span className="block text-[10px] text-rose-600 font-normal">
+            Motivo: {t.cancellation_reason}
+          </span>
+        )}
+      </td>
+
+      <td className="py-3 px-3 text-slate-600">
+        {PAYMENT_METHOD_LABELS[t.payment_method] || t.payment_method}
+      </td>
+
+      {/* Columna Comprobante SUNAT */}
+      <td className="py-3 px-3">
+        {t.voucher_type && t.voucher_type !== 'NONE' ? (
+          <button
+            type="button"
+            onClick={() => {
+              const isFactura = t.voucher_type === 'FACTURA';
+              printElectronicVoucherTicket({
+                voucherType: t.voucher_type,
+                voucherSeries: (t.voucher_number || '').split('-')[0] || (isFactura ? 'F001' : 'B001'),
+                voucherNumber: (t.voucher_number || '').split('-')[1] || '000001',
+                customerDocType: isFactura ? 'RUC' : 'DNI',
+                customerDocNumber: isFactura ? t.customer_ruc : '',
+                customerName: isFactura ? t.customer_business_name : t.concept,
+                paymentMethod: t.payment_method,
+                totalAmount: t.amount_pen,
+                items: [{ qty: 1, description: t.concept, price: t.amount_pen }]
+              });
+            }}
+            className="px-2.5 py-1 rounded-lg text-[10px] font-extrabold bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 flex items-center gap-1 transition-colors"
+            title="Re-imprimir comprobante electrónico 80mm"
+          >
+            <Printer className="w-3 h-3 text-indigo-600" />
+            <span>{t.voucher_type === 'FACTURA' ? '🏢 FACTURA' : '📄 BOLETA'} {t.voucher_number || 'E-001'}</span>
+          </button>
+        ) : t.transaction_type === 'income' && !t.is_cancelled ? (
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedVoucherTx(t);
+              setIsVoucherModalOpen(true);
+            }}
+            className="px-2.5 py-1 rounded-lg text-[10px] font-extrabold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1 transition-colors shadow-2xs"
+          >
+            <FileText className="w-3 h-3 text-emerald-600" />
+            <span>Emitir Comprobante</span>
+          </button>
+        ) : (
+          <span className="text-[10px] text-slate-400 font-mono">Ticket Interno</span>
+        )}
+      </td>
+
+      <td className={`py-3 px-3 text-right font-mono font-bold ${t.is_cancelled ? 'line-through text-slate-400' : 'text-slate-900'}`}>
+        {formatPEN(t.amount_pen)}
+      </td>
+
+      <td className="py-3 px-3 text-center">
+        {!t.is_cancelled ? (
+          <button
+            onClick={() => handleCancelTransaction(t)}
+            className="px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-lg text-[10px] border border-rose-200 transition-colors inline-flex items-center gap-1"
+            title="Anular movimiento y revertir de caja/hospedaje"
+          >
+            <Ban className="w-3 h-3 text-rose-600" />
+            <span>Anular</span>
+          </button>
+        ) : (
+          <span className="text-[10px] text-slate-400 font-medium">Anulado</span>
+        )}
+      </td>
+    </tr>
+  );
 
   return (
     <div className="space-y-6">
@@ -232,105 +336,54 @@ export function CashPage({ onOpenShiftModal = () => {}, onCloseShiftModal = () =
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {pagedTransactions.map((t) => (
-                    <tr key={t.id} className={`hover:bg-slate-50 transition-colors ${t.is_cancelled ? 'bg-rose-50/30' : ''}`}>
-                      <td className="py-3 px-3 text-slate-600 font-mono">{formatDatePeru(t.created_at)}</td>
-                      <td className="py-3 px-3">
-                        {t.is_cancelled ? (
-                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-200 text-slate-700 line-through border border-slate-300">
-                            Anulado
-                          </span>
-                        ) : t.transaction_type === 'income' ? (
-                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                            Ingreso
-                          </span>
-                        ) : (
-                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
-                            Egreso
-                          </span>
-                        )}
-                      </td>
-
-                      <td className="py-3 px-3 font-semibold text-slate-900">
-                        <span className={t.is_cancelled ? 'line-through text-slate-400' : ''}>
-                          {t.concept}
-                        </span>
-                        {t.is_cancelled && t.cancellation_reason && (
-                          <span className="block text-[10px] text-rose-600 font-normal">
-                            Motivo: {t.cancellation_reason}
-                          </span>
-                        )}
-                      </td>
-
-                      <td className="py-3 px-3 text-slate-600">
-                        {PAYMENT_METHOD_LABELS[t.payment_method] || t.payment_method}
-                      </td>
-
-                      {/* Columna Comprobante SUNAT */}
-                      <td className="py-3 px-3">
-                        {t.voucher_type && t.voucher_type !== 'NONE' ? (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const isFactura = t.voucher_type === 'FACTURA';
-                              printElectronicVoucherTicket({
-                                voucherType: t.voucher_type,
-                                voucherSeries: (t.voucher_number || '').split('-')[0] || (isFactura ? 'F001' : 'B001'),
-                                voucherNumber: (t.voucher_number || '').split('-')[1] || '000001',
-                                customerDocType: isFactura ? 'RUC' : 'DNI',
-                                customerDocNumber: isFactura ? t.customer_ruc : '',
-                                customerName: isFactura ? t.customer_business_name : t.concept,
-                                paymentMethod: t.payment_method,
-                                totalAmount: t.amount_pen,
-                                items: [{ qty: 1, description: t.concept, price: t.amount_pen }]
-                              });
-                            }}
-                            className="px-2.5 py-1 rounded-lg text-[10px] font-extrabold bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 flex items-center gap-1 transition-colors"
-                            title="Re-imprimir comprobante electrónico 80mm"
-                          >
-                            <Printer className="w-3 h-3 text-indigo-600" />
-                            <span>{t.voucher_type === 'FACTURA' ? '🏢 FACTURA' : '📄 BOLETA'} {t.voucher_number || 'E-001'}</span>
-                          </button>
-                        ) : t.transaction_type === 'income' && !t.is_cancelled ? (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedVoucherTx(t);
-                              setIsVoucherModalOpen(true);
-                            }}
-                            className="px-2.5 py-1 rounded-lg text-[10px] font-extrabold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1 transition-colors shadow-2xs"
-                          >
-                            <FileText className="w-3 h-3 text-emerald-600" />
-                            <span>Emitir Comprobante</span>
-                          </button>
-                        ) : (
-                          <span className="text-[10px] text-slate-400 font-mono">Ticket Interno</span>
-                        )}
-                      </td>
-
-                      <td className={`py-3 px-3 text-right font-mono font-bold ${t.is_cancelled ? 'line-through text-slate-400' : 'text-slate-900'}`}>
-                        {formatPEN(t.amount_pen)}
-                      </td>
-
-                      <td className="py-3 px-3 text-center">
-                        {!t.is_cancelled ? (
-                          <button
-                            onClick={() => handleCancelTransaction(t)}
-                            className="px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-lg text-[10px] border border-rose-200 transition-colors inline-flex items-center gap-1"
-                            title="Anular movimiento y revertir de caja/hospedaje"
-                          >
-                            <Ban className="w-3 h-3 text-rose-600" />
-                            <span>Anular</span>
-                          </button>
-                        ) : (
-                          <span className="text-[10px] text-slate-400 font-medium">Anulado</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                  {pagedGroups.map((g) =>
+                    g.type === 'single' ? (
+                      renderTxRow(g.tx)
+                    ) : (
+                      <React.Fragment key={g.key}>
+                        <tr
+                          onClick={() => toggleGroup(g.key)}
+                          className="cursor-pointer bg-white hover:bg-emerald-50/40 transition-colors"
+                        >
+                          <td className="py-3 px-3 text-slate-600 font-mono">
+                            <span className="inline-flex items-center gap-1">
+                              {expandedGroups[g.key] ? (
+                                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                              ) : (
+                                <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                              )}
+                              {formatDatePeru(g.lastAt)}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                              Estadía
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 font-semibold text-slate-900">
+                            <span className="inline-flex items-center gap-1.5">
+                              <BedDouble className="w-3.5 h-3.5 text-emerald-600" />
+                              Hab. {g.roomNumber || '—'}
+                              {g.customerName && <span className="font-normal text-slate-500">· {g.customerName}</span>}
+                            </span>
+                            <span className="block text-[10px] text-slate-400 font-normal">
+                              {g.items.length} movimientos{g.cancelledCount > 0 ? ` · ${g.cancelledCount} anulado(s)` : ''}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 text-slate-600">
+                            {g.methods.map((m) => PAYMENT_METHOD_LABELS[m] || m).join(' + ')}
+                          </td>
+                          <td className="py-3 px-3 text-[10px] text-slate-400">Ver detalle</td>
+                          <td className="py-3 px-3 text-right font-mono font-bold text-slate-900">{formatPEN(g.total)}</td>
+                          <td className="py-3 px-3" />
+                        </tr>
+                        {expandedGroups[g.key] && g.items.map((t) => renderTxRow(t, true))}
+                      </React.Fragment>
+                    )
+                  )}
                 </tbody>
               </table>
-              <Pagination page={currentPage} totalPages={totalPages} totalItems={transactions.length} onChange={setPage} />
+              <Pagination page={currentPage} totalPages={totalPages} totalItems={groups.length} onChange={setPage} />
             </div>
           )}
         </div>
@@ -354,6 +407,42 @@ export function CashPage({ onOpenShiftModal = () => {}, onCloseShiftModal = () =
       />
     </div>
   );
+}
+
+function groupByStay(transactions) {
+  const groups = [];
+  const byStay = {};
+  for (const t of transactions) {
+    if (!t.stay_id) {
+      groups.push({ type: 'single', key: t.id, tx: t });
+      continue;
+    }
+    let g = byStay[t.stay_id];
+    if (!g) {
+      g = {
+        type: 'stay',
+        key: `stay-${t.stay_id}`,
+        roomNumber: t.room_number,
+        customerName: t.customer_name,
+        lastAt: t.created_at,
+        items: [],
+        methods: [],
+        total: 0,
+        cancelledCount: 0
+      };
+      byStay[t.stay_id] = g;
+      groups.push(g);
+    }
+    g.items.push(t);
+    if (t.is_cancelled) {
+      g.cancelledCount += 1;
+    } else {
+      g.total += (t.transaction_type === 'expense' ? -1 : 1) * Number(t.amount_pen || 0);
+      if (!g.methods.includes(t.payment_method)) g.methods.push(t.payment_method);
+    }
+  }
+  // Una estadía con un solo movimiento se muestra como fila normal
+  return groups.map((g) => (g.type === 'stay' && g.items.length === 1 ? { type: 'single', key: g.items[0].id, tx: g.items[0] } : g));
 }
 
 function Pagination({ page, totalPages, totalItems, onChange }) {
