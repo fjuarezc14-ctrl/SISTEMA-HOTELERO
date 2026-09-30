@@ -18,10 +18,11 @@ export const authController = {
 
   async getProfile(req, res, next) {
     try {
+      const user = await authService.getProfile(req.user.id);
       res.json({
         success: true,
         data: {
-          user: req.user
+          user
         }
       });
     } catch (error) {

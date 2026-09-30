@@ -26,6 +26,21 @@ export function AuthProvider({ children }) {
     }
   };
 
+  // Refrescar perfil y permisos vigentes al abrir la app
+  useEffect(() => {
+    if (!token) return;
+    api
+      .get('/auth/me')
+      .then((res) => {
+        const freshUser = res.data?.user;
+        if (freshUser) {
+          localStorage.setItem('valetec_hotel_user', JSON.stringify(freshUser));
+          setUser(freshUser);
+        }
+      })
+      .catch(() => {});
+  }, [token]);
+
   const logout = () => {
     localStorage.removeItem('valetec_hotel_token');
     localStorage.removeItem('valetec_hotel_user');

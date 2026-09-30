@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { ModulePermissions } from '../components/ModulePermissions';
+import { isAdminRole } from '../utils/modules';
 import { api } from '../api/apiClient';
 import { formatDatePeru } from '../utils/formatters';
 import { validateUsername, validatePassword, validateFullName } from '../utils/validators';
@@ -16,6 +18,7 @@ export function UsersPage() {
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [role, setRole] = useState('receptionist');
+  const [modules, setModules] = useState(null);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState('');
 
@@ -25,6 +28,7 @@ export function UsersPage() {
   const [editUsername, setEditUsername] = useState('');
   const [editFullName, setEditFullName] = useState('');
   const [editRole, setEditRole] = useState('receptionist');
+  const [editModules, setEditModules] = useState(null);
   const [updating, setUpdating] = useState(false);
   const [editError, setEditError] = useState('');
 
@@ -87,12 +91,14 @@ export function UsersPage() {
         username: username.trim(),
         password,
         full_name: fullName.trim(),
-        role
+        role,
+        allowed_modules: isAdminRole(role) ? null : modules
       });
       setIsCreateModalOpen(false);
       setUsername('');
       setPassword('');
       setFullName('');
+      setModules(null);
       await fetchUsers();
     } catch (err) {
       setCreateError(err.message || 'Error creando usuario.');
@@ -106,6 +112,7 @@ export function UsersPage() {
     setEditUsername(u.username || '');
     setEditFullName(u.full_name || '');
     setEditRole(u.role || 'receptionist');
+    setEditModules(u.allowed_modules ?? null);
     setEditError('');
     setIsEditModalOpen(true);
   };
@@ -127,7 +134,8 @@ export function UsersPage() {
       await api.put(`/users/${editingUser.id}`, {
         username: editUsername.trim(),
         full_name: editFullName.trim(),
-        role: editRole
+        role: editRole,
+        allowed_modules: isAdminRole(editRole) ? null : editModules
       });
       setIsEditModalOpen(false);
       await fetchUsers();
@@ -439,6 +447,8 @@ export function UsersPage() {
             </div>
           </div>
 
+          <ModulePermissions role={role} value={modules} onChange={setModules} />
+
           <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
             <button
               type="button"
@@ -506,6 +516,8 @@ export function UsersPage() {
               <option value="housekeeper">Personal Limpieza</option>
             </select>
           </div>
+
+          <ModulePermissions role={editRole} value={editModules} onChange={setEditModules} />
 
           <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
             <button

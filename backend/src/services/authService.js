@@ -65,8 +65,27 @@ export const authService = {
         id: user.id,
         username: user.username,
         full_name: user.full_name,
-        role: user.role
+        role: user.role,
+        allowed_modules: user.allowed_modules ?? null
       }
+    };
+  },
+
+  // Perfil actualizado desde la base de datos (permisos vigentes)
+  async getProfile(userId) {
+    const user = await userRepository.findById(userId);
+    if (!user || !user.is_active) {
+      const error = new Error('Usuario no encontrado o desactivado.');
+      error.statusCode = 401;
+      error.isOperational = true;
+      throw error;
+    }
+    return {
+      id: user.id,
+      username: user.username,
+      full_name: user.full_name,
+      role: user.role,
+      allowed_modules: user.allowed_modules ?? null
     };
   }
 };

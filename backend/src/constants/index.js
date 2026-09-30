@@ -18,6 +18,9 @@ export const ROLES = {
   HOUSEKEEPER: 'housekeeper'
 };
 
+// Módulos del sistema que se pueden asignar al personal (los de administración dependen del rol)
+export const ASSIGNABLE_MODULES = ['reception', 'reservations', 'store', 'cash', 'customers', 'incidents', 'textiles'];
+
 // Estados de habitación
 export const ROOM_STATUS = {
   AVAILABLE: 'available',

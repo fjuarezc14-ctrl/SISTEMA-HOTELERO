@@ -16,10 +16,10 @@ import {
   X
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { canAccessModule } from '../utils/modules';
 
 export function Sidebar({ currentTab, setCurrentTab, isMobileOpen = false, setIsMobileOpen = () => {} }) {
   const { user, logout } = useAuth();
-  const isAdmin = user?.role === 'super_admin' || user?.role === 'admin';
   const [reportedIncidentsCount, setReportedIncidentsCount] = useState(0);
 
   useEffect(() => {
@@ -43,16 +43,12 @@ export function Sidebar({ currentTab, setCurrentTab, isMobileOpen = false, setIs
     { id: 'store', label: 'Tienda & Consumos', icon: ShoppingBag },
     { id: 'cash', label: 'Caja & Movimientos', icon: Wallet },
     { id: 'customers', label: 'Clientes / DNI', icon: Users },
-    ...(isAdmin
-      ? [
-          { id: 'settings', label: 'Tarifas & Hotel', icon: Sliders },
-          { id: 'users', label: 'Usuarios', icon: UserCog },
-          { id: 'reports', label: 'Reportes & KPIs', icon: BarChart3 }
-        ]
-      : []),
+    { id: 'settings', label: 'Tarifas & Hotel', icon: Sliders },
+    { id: 'users', label: 'Usuarios', icon: UserCog },
+    { id: 'reports', label: 'Reportes & KPIs', icon: BarChart3 },
     { id: 'incidents', label: 'Incidentes', icon: ShieldAlert },
     { id: 'textiles', label: 'Gestión Textiles', isTest: true }
-  ];
+  ].filter((item) => canAccessModule(user, item.id));
 
   return (
     <>

@@ -36,6 +36,9 @@ CREATE TABLE IF NOT EXISTS users (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Módulos permitidos por usuario (NULL = todos los módulos operativos). Los administradores siempre tienen todos.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS allowed_modules TEXT[];
+
 -- 3. Clientes / Huéspedes (Perú)
 CREATE TABLE IF NOT EXISTS customers (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

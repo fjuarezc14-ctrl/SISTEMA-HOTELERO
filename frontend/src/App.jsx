@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { canAccessModule, ASSIGNABLE_MODULES } from './utils/modules';
 import { ShiftProvider } from './context/ShiftContext';
 import { GlobalStoreProvider } from './context/GlobalStoreContext';
 import { Sidebar } from './components/Sidebar';
@@ -30,14 +31,23 @@ function MainLayout() {
   const [isClosureTicketOpen, setIsClosureTicketOpen] = useState(false);
   const [closureTicketData, setClosureTicketData] = useState(null);
 
-  const isAdmin = user?.role === 'super_admin' || user?.role === 'admin';
-
   if (!isAuthenticated) {
     return <LoginPage />;
   }
 
+  // Si el módulo actual no está permitido, ir al primero disponible
+  const firstAllowed = ASSIGNABLE_MODULES.find((m) => canAccessModule(user, m.id))?.id;
+  const activeTab = canAccessModule(user, currentTab) ? currentTab : firstAllowed;
+
   const renderContent = () => {
-    switch (currentTab) {
+    if (!activeTab) {
+      return (
+        <div className="p-8 bg-amber-50 border border-amber-200 rounded-3xl text-center text-sm text-amber-800 font-semibold">
+          Tu usuario no tiene módulos asignados. Contacta al administrador.
+        </div>
+      );
+    }
+    switch (activeTab) {
       case 'reception':
         return <ReceptionPage />;
       case 'reservations':
@@ -58,11 +68,11 @@ function MainLayout() {
       case 'textiles':
         return <TextilesPage />;
       case 'settings':
-        return isAdmin ? <SettingsPage /> : <ReceptionPage />;
+        return <SettingsPage />;
       case 'users':
-        return isAdmin ? <UsersPage /> : <ReceptionPage />;
+        return <UsersPage />;
       case 'reports':
-        return isAdmin ? <ReportsPage /> : <ReceptionPage />;
+        return <ReportsPage />;
       default:
         return <ReceptionPage />;
     }
@@ -72,7 +82,7 @@ function MainLayout() {
     <div className="flex h-screen bg-slate-100 text-slate-900 overflow-hidden font-sans">
       {/* Sidebar Navigation */}
       <Sidebar
-        currentTab={currentTab}
+        currentTab={activeTab}
         setCurrentTab={setCurrentTab}
         isMobileOpen={isMobileSidebarOpen}
         setIsMobileOpen={setIsMobileSidebarOpen}
