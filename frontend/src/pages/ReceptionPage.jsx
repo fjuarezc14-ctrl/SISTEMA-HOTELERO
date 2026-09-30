@@ -171,13 +171,6 @@ export function ReceptionPage() {
 
         <div className="flex items-center gap-2">
           <button
-            onClick={handleOpenCreateRoom}
-            className="px-4 py-2.5 bg-slate-800 hover:bg-slate-900 text-white font-extrabold text-xs rounded-2xl shadow-sm transition-all flex items-center justify-center gap-1.5 shrink-0"
-          >
-            <Plus className="w-4 h-4 text-emerald-400" />
-            <span>Habitación</span>
-          </button>
-          <button
             onClick={() => setIsReservationModalOpen(true)}
             className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-xs rounded-2xl shadow-sm transition-all flex items-center justify-center gap-2 shrink-0"
           >
@@ -418,11 +411,33 @@ export function ReceptionPage() {
                               </span>
                             </div>
 
-                            {/* Live Remaining Time Badge */}
-                            <div className="bg-emerald-600 text-white text-[11px] font-black py-1 px-2.5 rounded-full flex items-center justify-center gap-1 shadow-xs">
-                              <Clock className="w-3 h-3" />
-                              <span>QUEDAN: {remaining?.text?.toUpperCase()}</span>
-                            </div>
+                            {/* Live Remaining Time Badge con alertas de 30m y 15m */}
+                            {(() => {
+                              const diffMins = room.expected_end_time
+                                ? Math.round((new Date(room.expected_end_time).getTime() - new Date().getTime()) / 60000)
+                                : 999;
+                              const is30min = diffMins > 15 && diffMins <= 30;
+                              const is15min = diffMins > 0 && diffMins <= 15;
+
+                              return (
+                                <div className={`text-[11px] font-black py-1 px-2.5 rounded-full flex items-center justify-center gap-1 shadow-xs transition-all ${
+                                  is15min
+                                    ? 'bg-rose-600 text-white animate-bounce ring-4 ring-rose-400/50 font-mono tracking-wider'
+                                    : is30min
+                                    ? 'bg-amber-500 text-amber-950 animate-pulse ring-2 ring-amber-400/50 font-mono'
+                                    : 'bg-emerald-600 text-white font-mono'
+                                }`}>
+                                  <Clock className="w-3.5 h-3.5" />
+                                  <span>
+                                    {is15min
+                                      ? `🚨 15 MIN PARA SALIR (${diffMins}m)`
+                                      : is30min
+                                      ? `⚠️ 30 MIN PARA SALIR (${diffMins}m)`
+                                      : `QUEDAN: ${remaining?.text?.toUpperCase() || ''}`}
+                                  </span>
+                                </div>
+                              );
+                            })()}
 
                             {/* + AGREGAR HORAS Button (Blue) */}
                             <button

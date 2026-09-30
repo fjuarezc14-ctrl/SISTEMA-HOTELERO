@@ -80,13 +80,15 @@ export function CreateReservationModal({ isOpen, onClose, preselectedRoom = null
       setError('');
       const res = await api.get(`/customers/lookup/${docNumber.trim()}`);
       if (res.data && res.data.found) {
+        setSelectedCustomer(res.data);
         setFullName(res.data.full_name || '');
         if (res.data.phone) setPhone(res.data.phone);
         if (res.data.document_type) setDocType(res.data.document_type);
         if (res.data.is_blacklisted) {
-          setError(`⚠️ ALERTA DE VETO: Este cliente está en LISTA NEGRA. Motivo: ${res.data.blacklist_reason || 'No especificado'}`);
+          setError(`⛔ ALERTA DE VETO EN LISTA NEGRA: ${res.data.blacklist_reason || 'Sin motivo especificado'}. No se puede agendar reserva.`);
         }
       } else {
+        setSelectedCustomer(null);
         setError('Documento no registrado en base local. Ingresa el nombre del huésped.');
       }
     } catch (err) {
@@ -96,9 +98,16 @@ export function CreateReservationModal({ isOpen, onClose, preselectedRoom = null
     }
   };
 
+  const isBlacklisted = Boolean(selectedCustomer?.is_blacklisted);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+
+    if (isBlacklisted) {
+      setError(`⛔ CLIENTE VETADO: ${selectedCustomer?.full_name || 'Este cliente'} se encuentra en Lista Negra (${selectedCustomer?.blacklist_reason || 'Sin motivo'}). No se puede agendar la reserva.`);
+      return;
+    }
 
     if (!roomId) {
       setError('Debes seleccionar una habitación.');
@@ -173,9 +182,33 @@ export function CreateReservationModal({ isOpen, onClose, preselectedRoom = null
 
         {/* 1. Habitación y Fechas */}
         <div className="p-4 bg-white border border-slate-200 rounded-2xl space-y-3 shadow-sm">
-          <div className="text-xs font-bold text-emerald-700 uppercase tracking-wider flex items-center gap-1.5">
-            <Calendar className="w-4 h-4" />
-            <span>Habitación y Horarios Agendados</span>
+          <div className="flex items-center justify-between pb-1">
+            <div className="text-xs font-bold text-emerald-700 uppercase tracking-wider flex items-center gap-1.5">
+              <Calendar className="w-4 h-4" />
+              <span>Habitación y Horarios Agendados</span>
+            </div>
+            {/* A9: Botón Reserva Rápida 1 Día (Salida a las 12:00 PM del día siguiente de la fecha de inicio seleccionada) */}
+            <button
+              type="button"
+              onClick={() => {
+                const baseDate = startDate ? new Date(startDate) : new Date();
+                const nextDay = new Date(baseDate);
+                nextDay.setDate(nextDay.getDate() + 1);
+                nextDay.setHours(12, 0, 0, 0);
+
+                const pad = (n) => (n < 10 ? '0' + n : n);
+                const toISO = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+
+                if (!startDate) {
+                  setStartDate(toISO(baseDate));
+                }
+                setEndDate(toISO(nextDay));
+              }}
+              className="px-3 py-1 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-extrabold text-[11px] rounded-xl transition-all shadow-2xs flex items-center gap-1"
+              title="Calcular salida automática al día siguiente a las 12:00 PM"
+            >
+              <span>⚡ Reserva 1 Día (Salida 12 PM día siguiente)</span>
+            </button>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -200,13 +233,26 @@ export function CreateReservationModal({ isOpen, onClose, preselectedRoom = null
                 type="datetime-local"
                 required
                 value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
+                onChange={(e) => {
+                  const newStart = e.target.value;
+                  setStartDate(newStart);
+                  if (newStart) {
+                    const startD = new Date(newStart);
+                    const nextD = new Date(startD);
+                    nextD.setDate(nextD.getDate() + 1);
+                    nextD.setHours(12, 0, 0, 0);
+
+                    const pad = (n) => (n < 10 ? '0' + n : n);
+                    const toISO = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+                    setEndDate(toISO(nextD));
+                  }
+                }}
                 className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 text-xs text-slate-900 focus:outline-none focus:border-emerald-600"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Fecha / Hora Salida</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Fecha / Hora Salida (12 PM)</label>
               <input
                 type="datetime-local"
                 required
@@ -285,8 +331,11 @@ export function CreateReservationModal({ isOpen, onClose, preselectedRoom = null
           </div>
         </div>
 
-        {/* 3. Seña / Abono Previo con Pago Mixto */}
+        {/* 3. Pago inicial / Abono Previo (S/) */}
         <div className="p-4 bg-white border border-slate-200 rounded-2xl space-y-3 shadow-sm">
+          <div className="text-xs font-extrabold text-emerald-800 uppercase tracking-wider mb-1">
+            Pago inicial / Abono Registrado (S/)
+          </div>
           <PaymentSelector
             totalAmount={parseFloat(depositAmount) || 0}
             paymentMethod={paymentMethod}
@@ -323,11 +372,21 @@ export function CreateReservationModal({ isOpen, onClose, preselectedRoom = null
           </button>
           <button
             type="submit"
-            disabled={saving}
-            className="px-6 py-2.5 text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white rounded-xl shadow-md transition-all flex items-center gap-2"
+            disabled={saving || isBlacklisted}
+            className={`px-6 py-2.5 text-xs font-bold rounded-xl shadow-md transition-all flex items-center gap-2 ${
+              isBlacklisted
+                ? 'bg-rose-700 text-white cursor-not-allowed opacity-90'
+                : 'bg-amber-500 hover:bg-amber-600 text-white'
+            }`}
           >
             <Calendar className="w-4 h-4" />
-            <span>{saving ? 'Agendando...' : 'Confirmar Reserva'}</span>
+            <span>
+              {saving
+                ? 'Agendando...'
+                : isBlacklisted
+                ? '⛔ Cliente Vetado (Reserva Bloqueada)'
+                : 'Confirmar Reserva'}
+            </span>
           </button>
         </div>
       </form>

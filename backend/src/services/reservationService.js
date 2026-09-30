@@ -39,7 +39,14 @@ export const reservationService = {
 
     // Registrar o actualizar cliente
     let customer = await customerRepository.findByDocument(customer_data.document_number.trim());
-    if (!customer) {
+    if (customer) {
+      if (customer.is_blacklisted) {
+        const error = new Error(`El cliente ${customer.full_name} se encuentra VETADO del hotel (Lista Negra). Motivo: ${customer.blacklist_reason || 'Sin especificar'}. No se pueden realizar reservas.`);
+        error.statusCode = 403;
+        error.isOperational = true;
+        throw error;
+      }
+    } else {
       customer = await customerRepository.create({
         document_type: customer_data.document_type || 'DNI',
         document_number: customer_data.document_number.trim(),
