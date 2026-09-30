@@ -16,7 +16,11 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronDown,
-  BedDouble
+  ChevronUp,
+  BedDouble,
+  QrCode,
+  CreditCard,
+  Banknote
 } from 'lucide-react';
 
 const PAGE_SIZE = 15;
@@ -42,6 +46,7 @@ export function CashPage({ onOpenShiftModal = () => {}, onCloseShiftModal = () =
   const [dateTo, setDateTo] = useState(todayLima());
   const [page, setPage] = useState(1);
   const [expandedGroups, setExpandedGroups] = useState({});
+  const [showBreakdown, setShowBreakdown] = useState(false);
 
   const fetchTransactions = async () => {
     if (scope === 'shift' && !activeShift?.id) {
@@ -260,16 +265,23 @@ export function CashPage({ onOpenShiftModal = () => {}, onCloseShiftModal = () =
 
       {/* Historial y Tabla */}
       <div className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
-          <div className="p-4 bg-white border border-slate-200 rounded-2xl shadow-sm space-y-1">
-            <span className="text-xs font-semibold text-emerald-700 uppercase">Total Ingresos</span>
-            <p className="text-2xl font-black text-emerald-700 font-mono">{formatPEN(totalIncome)}</p>
-          </div>
-
-          <div className="p-4 bg-white border border-slate-200 rounded-2xl shadow-sm space-y-1">
-            <span className="text-xs font-semibold text-rose-700 uppercase">Total Egresos</span>
-            <p className="text-2xl font-black text-rose-700 font-mono">{formatPEN(totalExpense)}</p>
-          </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
+          <TotalCard
+            label="Total Ingresos"
+            tone="emerald"
+            total={totalIncome}
+            byMethod={sumByMethod(transactions, 'income')}
+            expanded={showBreakdown}
+            onToggle={() => setShowBreakdown(!showBreakdown)}
+          />
+          <TotalCard
+            label="Total Egresos"
+            tone="rose"
+            total={totalExpense}
+            byMethod={sumByMethod(transactions, 'expense')}
+            expanded={showBreakdown}
+            onToggle={() => setShowBreakdown(!showBreakdown)}
+          />
         </div>
 
         <div className="p-6 bg-white border border-slate-200 rounded-3xl shadow-sm space-y-4">
@@ -405,6 +417,61 @@ export function CashPage({ onOpenShiftModal = () => {}, onCloseShiftModal = () =
         onClose={() => setIsMovementModalOpen(false)}
         onSuccess={fetchTransactions}
       />
+    </div>
+  );
+}
+
+const PAYMENT_METHODS = [
+  { id: 'YAPE_PLIN', icon: QrCode, color: 'text-violet-600' },
+  { id: 'CASH', icon: Banknote, color: 'text-emerald-600' },
+  { id: 'CARD', icon: CreditCard, color: 'text-blue-600' }
+];
+
+function sumByMethod(transactions, type) {
+  const totals = { YAPE_PLIN: 0, CASH: 0, CARD: 0 };
+  for (const t of transactions) {
+    if (t.transaction_type !== type || t.is_cancelled) continue;
+    totals[t.payment_method] = (totals[t.payment_method] || 0) + Number(t.amount_pen || 0);
+  }
+  return totals;
+}
+
+const TONES = {
+  emerald: { text: 'text-emerald-700', hover: 'hover:bg-emerald-50' },
+  rose: { text: 'text-rose-700', hover: 'hover:bg-rose-50' }
+};
+
+function TotalCard({ label, tone, total, byMethod, expanded, onToggle }) {
+  const c = TONES[tone];
+  return (
+    <div className="p-4 bg-white border border-slate-200 rounded-2xl shadow-sm">
+      <div className="flex items-start justify-between gap-2">
+        <div className="space-y-1">
+          <span className={`text-xs font-semibold uppercase ${c.text}`}>{label}</span>
+          <p className={`text-2xl font-black font-mono ${c.text}`}>{formatPEN(total)}</p>
+        </div>
+        <button
+          onClick={onToggle}
+          title={expanded ? 'Ocultar desglose' : 'Ver por medio de pago'}
+          className={`p-1.5 rounded-lg text-slate-500 border border-slate-200 transition-colors ${c.hover}`}
+        >
+          {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+        </button>
+      </div>
+
+      {expanded && (
+        <div className="mt-3 pt-3 border-t border-slate-100 space-y-1.5">
+          {PAYMENT_METHODS.map(({ id, icon: Icon, color }) => (
+            <div key={id} className="flex items-center justify-between text-xs">
+              <span className="flex items-center gap-1.5 text-slate-600 font-medium">
+                <Icon className={`w-3.5 h-3.5 ${color}`} />
+                {PAYMENT_METHOD_LABELS[id]}
+              </span>
+              <span className="font-mono font-bold text-slate-900">{formatPEN(byMethod[id] || 0)}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
