@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Modal } from './Modal';
 import { useShift } from '../context/ShiftContext';
+import { CashCounter } from './CashCounter';
 import { Wallet, AlertCircle } from 'lucide-react';
 
 export function OpenShiftModal({ isOpen, onClose }) {
@@ -62,6 +63,7 @@ export function OpenShiftModal({ isOpen, onClose }) {
           <p className="text-[11px] text-slate-500">
             Monto de cambio/sencillo disponible físicamente en gaveta al iniciar el turno.
           </p>
+          <CashCounter onTotalChange={setInitialCash} />
         </div>
 
         <div>

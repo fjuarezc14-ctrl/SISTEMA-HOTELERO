@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Modal } from './Modal';
 import { useShift } from '../context/ShiftContext';
 import { formatPEN } from '../utils/formatters';
+import { CashCounter } from './CashCounter';
 import { CheckCircle2, AlertTriangle, AlertCircle, Calculator } from 'lucide-react';
 
 export function CloseShiftModal({ isOpen, onClose, onShiftClosed = () => {} }) {
@@ -57,7 +58,7 @@ export function CloseShiftModal({ isOpen, onClose, onShiftClosed = () => {} }) {
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Cierre y Arqueo de Turno (Perú)" maxWidth="max-w-lg">
+    <Modal isOpen={isOpen} onClose={onClose} title="Cierre y Arqueo de Turno (Perú)" maxWidth="max-w-xl">
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
           <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs flex items-center gap-2">
@@ -107,6 +108,8 @@ export function CloseShiftModal({ isOpen, onClose, onShiftClosed = () => {} }) {
               autoFocus
             />
           </div>
+
+          <CashCounter onTotalChange={setActualCash} />
 
           {/* Comparación y Diferencia en Vivo */}
           {actualCash !== '' && (
