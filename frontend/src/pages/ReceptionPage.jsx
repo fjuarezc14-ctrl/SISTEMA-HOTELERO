@@ -40,6 +40,7 @@ export function ReceptionPage() {
 
   // Modales
   const [selectedRoom, setSelectedRoom] = useState(null);
+  const [reservationToConvert, setReservationToConvert] = useState(null);
   const [isCheckInOpen, setIsCheckInOpen] = useState(false);
   const [isCheckOutOpen, setIsCheckOutOpen] = useState(false);
   const [isConsumptionOpen, setIsConsumptionOpen] = useState(false);
@@ -78,8 +79,9 @@ export function ReceptionPage() {
     }
   };
 
-  const handleOpenCheckIn = (room) => {
+  const handleOpenCheckIn = (room, reservation = null) => {
     setSelectedRoom(room);
+    setReservationToConvert(reservation);
     setIsCheckInOpen(true);
   };
 
@@ -98,15 +100,15 @@ export function ReceptionPage() {
     setIsExtraHoursOpen(true);
   };
 
-  const handleDirectCheckInReservation = async (reservationId) => {
-    if (!window.confirm('¿Deseas realizar el Check-in directo de esta reserva?')) return;
-    try {
-      await api.post(`/reservations/${reservationId}/checkin`, { stay_type: 'hours', hours_count: 3 });
-      alert(' Check-in desde reserva procesado exitosamente.');
-      await fetchData();
-    } catch (err) {
-      alert(err.message || 'Error al procesar Check-in desde reserva.');
+  const handleDirectCheckInReservation = (reserva) => {
+    const targetRoom = rooms.find((r) => r.id === reserva.room_id);
+    if (!targetRoom) {
+      alert('La habitación correspondiente a la reserva no se encuentra registrada.');
+      return;
     }
+    setSelectedRoom(targetRoom);
+    setReservationToConvert(reserva);
+    setIsCheckInOpen(true);
   };
 
   // Filtrado de pisos y estados
@@ -585,7 +587,7 @@ export function ReceptionPage() {
                       </div>
 
                       <button
-                        onClick={() => handleDirectCheckInReservation(res.id)}
+                        onClick={() => handleDirectCheckInReservation(res)}
                         className="w-full mt-1 py-1.5 bg-violet-600 hover:bg-violet-500 text-white font-extrabold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-1"
                       >
                         <UserCheck className="w-3.5 h-3.5" />
@@ -609,8 +611,13 @@ export function ReceptionPage() {
       {/* Modales globales */}
       <CheckInModal
         isOpen={isCheckInOpen}
-        onClose={() => setIsCheckInOpen(false)}
+        onClose={() => {
+          setIsCheckInOpen(false);
+          setReservationToConvert(null);
+        }}
         room={selectedRoom}
+        reservationData={reservationToConvert}
+        upcomingReservation={selectedRoom ? reservationMapByRoom[selectedRoom.id] : null}
         onSuccess={fetchData}
       />
 

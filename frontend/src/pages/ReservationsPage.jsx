@@ -3,6 +3,7 @@ import { api } from '../api/apiClient';
 import { formatPEN, formatDatePeru } from '../utils/formatters';
 import { CreateReservationModal } from '../components/CreateReservationModal';
 import { EditReservationModal } from '../components/EditReservationModal';
+import { CheckInModal } from '../components/CheckInModal';
 import { ReservationTimeline } from '../components/ReservationTimeline';
 import {
   Calendar,
@@ -31,6 +32,8 @@ export function ReservationsPage() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [selectedReservationForEdit, setSelectedReservationForEdit] = useState(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [selectedReservationForCheckIn, setSelectedReservationForCheckIn] = useState(null);
+  const [isCheckInModalOpen, setIsCheckInModalOpen] = useState(false);
 
   const fetchReservations = async () => {
     try {
@@ -52,15 +55,9 @@ export function ReservationsPage() {
     fetchReservations();
   }, []);
 
-  const handleConvertToCheckIn = async (resId) => {
-    if (!window.confirm('¿Deseas convertir esta reserva en un Check-in de hospedaje activo?')) return;
-    try {
-      await api.post(`/reservations/${resId}/checkin`, { stay_type: 'hours', hours_count: 3 });
-      alert('✅ Reserva convertida a Check-in activo exitosamente.');
-      fetchReservations();
-    } catch (err) {
-      alert(err.message || 'Error convirtiendo reserva.');
-    }
+  const handleConvertToCheckIn = (res) => {
+    setSelectedReservationForCheckIn(res);
+    setIsCheckInModalOpen(true);
   };
 
   const handleCancelReservation = async (resId) => {
@@ -308,7 +305,7 @@ export function ReservationsPage() {
                         {r.status === 'confirmed' && (
                           <>
                             <button
-                              onClick={() => handleConvertToCheckIn(r.id)}
+                              onClick={() => handleConvertToCheckIn(r)}
                               className="px-3 py-1 bg-emerald-600 text-white font-bold rounded-lg hover:bg-emerald-500 transition-all text-[11px]"
                             >
                               Check-in
@@ -351,6 +348,17 @@ export function ReservationsPage() {
         onClose={() => setIsEditModalOpen(false)}
         reservation={selectedReservationForEdit}
         rooms={rooms}
+        onSuccess={fetchReservations}
+      />
+
+      <CheckInModal
+        isOpen={isCheckInModalOpen}
+        onClose={() => {
+          setIsCheckInModalOpen(false);
+          setSelectedReservationForCheckIn(null);
+        }}
+        room={selectedReservationForCheckIn ? rooms.find(r => r.id === selectedReservationForCheckIn.room_id) : null}
+        reservationData={selectedReservationForCheckIn}
         onSuccess={fetchReservations}
       />
     </div>

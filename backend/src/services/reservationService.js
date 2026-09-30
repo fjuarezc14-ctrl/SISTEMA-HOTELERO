@@ -149,7 +149,7 @@ export const reservationService = {
     });
   },
 
-  async convertToCheckIn(reservationId, { user_id, stay_type = 'hours', hours_count = 3 }) {
+  async convertToCheckIn(reservationId, { user_id, stay_type = 'hours', hours_count = 3, custom_price = null }) {
     const reservation = await reservationRepository.findById(reservationId);
     if (!reservation) {
       const error = new Error('Reserva no encontrada.');
@@ -176,6 +176,7 @@ export const reservationService = {
       },
       stay_type,
       hours_count,
+      custom_price,
       initial_payment: reservation.deposit_amount_pen > 0 ? {
         amount: Number(reservation.deposit_amount_pen),
         payment_method: reservation.payment_method,

@@ -8,7 +8,7 @@ import { CustomerSearchAutocomplete } from './CustomerSearchAutocomplete';
 import { Search, UserCheck, AlertCircle, Clock, Moon, Sun, Lock, Edit2, ShieldAlert } from 'lucide-react';
 import { validateDocument, validateFullName, validatePhone, validateAmount, getDocumentConstraints } from '../utils/validators';
 
-export function CheckInModal({ isOpen, onClose, room, onSuccess }) {
+export function CheckInModal({ isOpen, onClose, room, reservationData = null, upcomingReservation = null, onSuccess }) {
   const [documentType, setDocumentType] = useState('DNI');
   const [documentNumber, setDocumentNumber] = useState('');
   const [fullName, setFullName] = useState('');
@@ -39,6 +39,35 @@ export function CheckInModal({ isOpen, onClose, room, onSuccess }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // Pre-cargar datos si viene de una Reserva (Opción A)
+  useEffect(() => {
+    if (isOpen && reservationData) {
+      const custData = {
+        id: reservationData.customer_id,
+        document_type: reservationData.document_type || 'DNI',
+        document_number: reservationData.customer_document || '',
+        full_name: reservationData.customer_name || '',
+        phone: reservationData.customer_phone || '',
+        is_blacklisted: reservationData.is_blacklisted
+      };
+      setSelectedCustomer(custData);
+      setDocumentType(custData.document_type);
+      setDocumentNumber(custData.document_number);
+      setFullName(custData.full_name);
+      setPhone(custData.phone);
+      setIsExistingCustomer(true);
+      setIsEditingExisting(false);
+
+      const deposit = Number(reservationData.deposit_amount_pen || 0);
+      if (deposit > 0) {
+        setHasPayment(true);
+        setPaymentAmount(deposit.toFixed(2));
+        setPaymentMethod(reservationData.payment_method || 'YAPE_PLIN');
+        setReferenceNumber(reservationData.reference_number || 'ABONO_RESERVA');
+      }
+    }
+  }, [isOpen, reservationData]);
+
   // A4 & A5: Seleccionar cliente desde autocomplete o búsqueda
   const handleSelectCustomerFromSearch = (customer) => {
     setSelectedCustomer(customer);
@@ -57,6 +86,7 @@ export function CheckInModal({ isOpen, onClose, room, onSuccess }) {
   };
 
   const handleClearCustomerSearch = () => {
+    if (reservationData) return; // Bloqueado si viene de reserva
     setSelectedCustomer(null);
     setIsExistingCustomer(false);
     setIsEditingExisting(false);
@@ -83,17 +113,17 @@ export function CheckInModal({ isOpen, onClose, room, onSuccess }) {
 
       const formattedPrice = calcPrice.toFixed(2);
       setPrice(formattedPrice);
-      setPaymentAmount(formattedPrice);
+      if (!reservationData) setPaymentAmount(formattedPrice);
     } else if (stayType === 'overnight') {
       const defaultRate = (parseFloat(room.price_overnight_default) || 60.00).toFixed(2);
       setPrice(defaultRate);
-      setPaymentAmount(defaultRate);
+      if (!reservationData) setPaymentAmount(defaultRate);
     } else if (stayType === 'full_day') {
       const defaultRate = (parseFloat(room.price_full_day_default) || 90.00).toFixed(2);
       setPrice(defaultRate);
-      setPaymentAmount(defaultRate);
+      if (!reservationData) setPaymentAmount(defaultRate);
     }
-  }, [room, stayType, hoursCount]);
+  }, [room, stayType, hoursCount, reservationData]);
 
   // Buscar cliente existente por DNI/RUC
   const handleSearchCustomer = async () => {
@@ -154,28 +184,39 @@ export function CheckInModal({ isOpen, onClose, room, onSuccess }) {
 
     try {
       setLoading(true);
-      await api.post('/stays/checkin', {
-        room_id: room.id,
-        customer_data: {
-          document_type: documentType,
-          document_number: documentNumber.trim(),
-          full_name: fullName.trim(),
-          phone: phone.trim()
-        },
-        stay_type: stayType,
-        hours_count: Number(hoursCount),
-        companion_name: companionName.trim(),
-        custom_price: parseFloat(price) || 0,
-        initial_payment: hasPayment ? {
-          amount: parseFloat(paymentAmount) || 0,
-          payment_method: paymentMethod,
-          reference_number: referenceNumber.trim(),
-          split_payments: paymentMethod === 'MIXED' ? splitPayments : null,
-          voucher_type: voucherType,
-          customer_ruc: customerRuc.trim(),
-          customer_business_name: customerBusinessName.trim()
-        } : null
-      });
+
+      if (reservationData) {
+        // Convertir reserva existente con modalidad y precio seleccionados
+        await api.post(`/reservations/${reservationData.id}/checkin`, {
+          stay_type: stayType,
+          hours_count: Number(hoursCount),
+          custom_price: parseFloat(price) || 0
+        });
+      } else {
+        // Check-in walk-in estándar
+        await api.post('/stays/checkin', {
+          room_id: room.id,
+          customer_data: {
+            document_type: documentType,
+            document_number: documentNumber.trim(),
+            full_name: fullName.trim(),
+            phone: phone.trim()
+          },
+          stay_type: stayType,
+          hours_count: Number(hoursCount),
+          companion_name: companionName.trim(),
+          custom_price: parseFloat(price) || 0,
+          initial_payment: hasPayment ? {
+            amount: parseFloat(paymentAmount) || 0,
+            payment_method: paymentMethod,
+            reference_number: referenceNumber.trim(),
+            split_payments: paymentMethod === 'MIXED' ? splitPayments : null,
+            voucher_type: voucherType,
+            customer_ruc: customerRuc.trim(),
+            customer_business_name: customerBusinessName.trim()
+          } : null
+        });
+      }
 
       onSuccess();
       onClose();
@@ -192,10 +233,31 @@ export function CheckInModal({ isOpen, onClose, room, onSuccess }) {
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={`Check-in: Habitación ${room.room_number} (${room.room_type_name || 'Estándar'})`}
+      title={reservationData ? `Check-in de Reserva: Habitación ${room.room_number}` : `Check-in: Habitación ${room.room_number} (${room.room_type_name || 'Estándar'})`}
       maxWidth="max-w-2xl"
     >
       <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Banner de Reserva Asociada o Advertencia de Reserva Próxima */}
+        {reservationData && (
+          <div className="p-3 bg-violet-100 border border-violet-300 rounded-2xl text-violet-950 text-xs flex items-center justify-between font-extrabold shadow-2xs">
+            <div className="flex items-center gap-2">
+              <Clock className="w-4 h-4 text-violet-700 shrink-0" />
+              <span>VINCULADO A RESERVA DE: {reservationData.customer_name}</span>
+            </div>
+            <span className="px-2.5 py-1 bg-violet-700 text-white rounded-xl text-[10px] uppercase tracking-wider font-mono">
+              Abono Registrado: {formatPEN(reservationData.deposit_amount_pen)}
+            </span>
+          </div>
+        )}
+
+        {upcomingReservation && !reservationData && (
+          <div className="p-3 bg-amber-50 border border-amber-300 rounded-2xl text-amber-900 text-xs flex items-center gap-2 font-bold shadow-2xs">
+            <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+            <span>
+              ⚠️ ATENCIÓN: Esta habitación tiene una reserva agendada para hoy de <strong>{upcomingReservation.customer_name}</strong>. Verifica antes de asignar este espacio a un walk-in.
+            </span>
+          </div>
+        )}
         {error && (
           <div className={`p-3.5 rounded-xl text-xs flex items-center gap-2 border font-semibold ${
             isBlacklisted

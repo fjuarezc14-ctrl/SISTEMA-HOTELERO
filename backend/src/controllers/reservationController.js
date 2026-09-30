@@ -30,11 +30,12 @@ export const reservationController = {
   async convertToCheckIn(req, res, next) {
     try {
       const { id } = req.params;
-      const { stay_type, hours_count } = req.body;
+      const { stay_type, hours_count, custom_price } = req.body;
       const stay = await reservationService.convertToCheckIn(id, {
         user_id: req.user.id,
         stay_type,
-        hours_count
+        hours_count,
+        custom_price
       });
       res.json({
         success: true,
