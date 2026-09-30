@@ -93,6 +93,7 @@ export async function initDatabase() {
       if (fs.existsSync(schemaPath)) {
         const schemaSql = fs.readFileSync(schemaPath, 'utf8');
         await client.query(schemaSql);
+        await client.query("ALTER TABLE hotel_info ADD COLUMN IF NOT EXISTS logo_url TEXT DEFAULT '';");
         console.log('✅ Esquema de base de datos PostgreSQL verificado / creado con éxito.');
       }
 
