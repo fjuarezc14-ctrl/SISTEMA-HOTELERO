@@ -1,16 +1,16 @@
 import { Router } from 'express';
 import { reservationController } from '../controllers/reservationController.js';
-import { authenticateToken } from '../middlewares/authMiddleware.js';
+import { authenticateToken, requireModule } from '../middlewares/authMiddleware.js';
 
 const router = Router();
 
 router.use(authenticateToken);
 
-router.get('/', reservationController.getAll);
-router.post('/', reservationController.create);
-router.put('/:id', reservationController.update);
-router.post('/:id/checkin', reservationController.convertToCheckIn);
-router.patch('/:id/cancel', reservationController.cancel);
-router.patch('/:id/no-show', reservationController.noShow);
+router.get('/', requireModule('reception', 'reservations'), reservationController.getAll);
+router.post('/', requireModule('reception', 'reservations'), reservationController.create);
+router.put('/:id', requireModule('reception', 'reservations'), reservationController.update);
+router.post('/:id/checkin', requireModule('reception', 'reservations'), reservationController.convertToCheckIn);
+router.patch('/:id/cancel', requireModule('reception', 'reservations'), reservationController.cancel);
+router.patch('/:id/no-show', requireModule('reception', 'reservations'), reservationController.noShow);
 
 export default router;

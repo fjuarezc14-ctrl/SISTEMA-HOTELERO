@@ -1,16 +1,16 @@
 import { Router } from 'express';
 import { customerController } from '../controllers/customerController.js';
-import { authenticateToken } from '../middlewares/authMiddleware.js';
+import { authenticateToken, requireModule } from '../middlewares/authMiddleware.js';
 
 const router = Router();
 
 router.use(authenticateToken);
 
-router.get('/', customerController.getAll);
-router.get('/doc/:documentNumber', customerController.getByDocument);
-router.get('/lookup/:documentNumber', customerController.lookup);
-router.post('/', customerController.createOrUpdate);
-router.patch('/:id/blacklist', customerController.updateBlacklist);
-router.patch('/:id/toggle-blacklist', customerController.toggleBlacklist);
+router.get('/', requireModule('reception', 'reservations', 'customers', 'incidents'), customerController.getAll);
+router.get('/doc/:documentNumber', requireModule('reception', 'reservations', 'customers', 'incidents'), customerController.getByDocument);
+router.get('/lookup/:documentNumber', requireModule('reception', 'reservations', 'customers', 'incidents'), customerController.lookup);
+router.post('/', requireModule('reception', 'reservations', 'customers'), customerController.createOrUpdate);
+router.patch('/:id/blacklist', requireModule('customers', 'incidents'), customerController.updateBlacklist);
+router.patch('/:id/toggle-blacklist', requireModule('customers', 'incidents'), customerController.toggleBlacklist);
 
 export default router;

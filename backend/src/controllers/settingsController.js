@@ -46,7 +46,7 @@ export const userController = {
 
   async create(req, res, next) {
     try {
-      const user = await userService.createUser(req.body);
+      const user = await userService.createUser(req.body, req.user);
       res.status(201).json({
         success: true,
         message: 'Usuario creado exitosamente.',
@@ -59,7 +59,7 @@ export const userController = {
 
   async update(req, res, next) {
     try {
-      const user = await userService.updateUser(req.params.id, req.body);
+      const user = await userService.updateUser(req.params.id, req.body, req.user);
       res.json({
         success: true,
         message: 'Usuario actualizado.',
@@ -73,7 +73,7 @@ export const userController = {
   async resetPassword(req, res, next) {
     try {
       const { password } = req.body;
-      await userService.resetPassword(req.params.id, password);
+      await userService.resetPassword(req.params.id, password, req.user);
       res.json({
         success: true,
         message: 'Contraseña actualizada correctamente.'

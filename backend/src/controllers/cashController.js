@@ -33,8 +33,14 @@ export const cashController = {
   async cancelTransaction(req, res, next) {
     try {
       const { id } = req.params;
-      const { reason } = req.body;
-      const transaction = await cashService.cancelTransaction(id, { reason });
+      const { reason, admin_username, admin_password } = req.body;
+      const transaction = await cashService.cancelTransaction(id, {
+        reason,
+        requester: req.user,
+        admin_username,
+        admin_password,
+        ipAddress: req.ip
+      });
       res.json({
         success: true,
         message: '🛑 Transacción de caja anulada correctamente.',

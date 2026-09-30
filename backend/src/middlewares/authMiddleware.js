@@ -1,11 +1,17 @@
 import jwt from 'jsonwebtoken';
+import { query } from '../config/db.js';
+import { ROLES, ASSIGNABLE_MODULES } from '../constants/index.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'valetec_hotel_peru_jwt_secret_key_2026_secure';
 
+export const isAdminRole = (role) => role === ROLES.SUPER_ADMIN || role === ROLES.ADMIN;
+
 /**
- * Middleware para validar el token JWT en las solicitudes protegidas
+ * Middleware para validar el token JWT en las solicitudes protegidas.
+ * Carga el usuario desde la base de datos en cada solicitud para que la desactivación
+ * o el cambio de rol/permisos surtan efecto de inmediato (sin esperar a que expire el token).
  */
-export function authenticateToken(req, res, next) {
+export async function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
 
@@ -16,15 +22,32 @@ export function authenticateToken(req, res, next) {
     });
   }
 
+  let decoded;
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    req.user = decoded;
-    next();
+    decoded = jwt.verify(token, JWT_SECRET);
   } catch (error) {
     return res.status(401).json({
       success: false,
       message: 'Acceso denegado: Token inválido o expirado.'
     });
+  }
+
+  try {
+    const result = await query(
+      'SELECT id, username, full_name, role, is_active, allowed_modules FROM users WHERE id = $1',
+      [decoded.id]
+    );
+    const user = result.rows[0];
+    if (!user || !user.is_active) {
+      return res.status(401).json({
+        success: false,
+        message: 'Acceso denegado: Usuario desactivado o inexistente.'
+      });
+    }
+    req.user = user;
+    next();
+  } catch (error) {
+    next(error);
   }
 }
 
@@ -51,3 +74,30 @@ export function authorizeRoles(...allowedRoles) {
     next();
   };
 }
+
+/** ¿El usuario tiene acceso a alguno de los módulos? (allowed_modules NULL = todos los operativos) */
+export function hasModuleAccess(user, modules) {
+  if (!user) return false;
+  if (isAdminRole(user.role)) return true;
+  const allowed = Array.isArray(user.allowed_modules) ? user.allowed_modules : ASSIGNABLE_MODULES;
+  return modules.some((m) => allowed.includes(m));
+}
+
+/**
+ * Middleware para exigir acceso a al menos uno de los módulos indicados.
+ * Los administradores siempre tienen acceso.
+ */
+export function requireModule(...modules) {
+  return (req, res, next) => {
+    if (!hasModuleAccess(req.user, modules)) {
+      return res.status(403).json({
+        success: false,
+        message: 'No tienes acceso a este módulo. Solicita el permiso al administrador.'
+      });
+    }
+    next();
+  };
+}
+
+/** Atajo: solo administradores */
+export const requireAdmin = authorizeRoles(ROLES.SUPER_ADMIN, ROLES.ADMIN);

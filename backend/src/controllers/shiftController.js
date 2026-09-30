@@ -31,11 +31,14 @@ export const shiftController = {
 
   async openShift(req, res, next) {
     try {
-      const { initial_cash_pen, shift_notes } = req.body;
+      const { initial_cash_pen, shift_notes, admin_username, admin_password } = req.body;
       const shift = await shiftService.openShift({
-        user_id: req.user.id,
+        requester: req.user,
         initial_cash_pen,
-        shift_notes
+        shift_notes,
+        admin_username,
+        admin_password,
+        ipAddress: req.ip
       });
       res.status(201).json({
         success: true,
@@ -52,6 +55,7 @@ export const shiftController = {
       const { id } = req.params;
       const { actual_cash_pen, shift_notes } = req.body;
       const closedShift = await shiftService.closeShift(id, {
+        requester: req.user,
         actual_cash_pen,
         shift_notes
       });

@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { userRepository } from '../repositories/userRepository.js';
 import { settingsRepository } from '../repositories/settingsRepository.js';
+import { loginGuard } from '../utils/loginGuard.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'valetec_hotel_peru_jwt_secret_key_2026_secure';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '24h';
@@ -15,25 +16,32 @@ export const authService = {
       throw error;
     }
 
+    const guardKey = loginGuard.key(ipAddress, username);
+    loginGuard.assertNotLocked(guardKey);
+
     const user = await userRepository.findByUsername(username.trim());
     if (!user) {
+      loginGuard.registerFailure(guardKey);
       const error = new Error('Credenciales incorrectas.');
       error.statusCode = 401;
-      error.isOperational = true;
-      throw error;
-    }
-
-    if (!user.is_active) {
-      const error = new Error('Este usuario se encuentra desactivado. Contacta al administrador.');
-      error.statusCode = 403;
       error.isOperational = true;
       throw error;
     }
 
     const passwordMatch = await bcrypt.compare(password, user.password_hash);
     if (!passwordMatch) {
+      loginGuard.registerFailure(guardKey);
       const error = new Error('Credenciales incorrectas.');
       error.statusCode = 401;
+      error.isOperational = true;
+      throw error;
+    }
+
+    loginGuard.registerSuccess(guardKey);
+
+    if (!user.is_active) {
+      const error = new Error('Este usuario se encuentra desactivado. Contacta al administrador.');
+      error.statusCode = 403;
       error.isOperational = true;
       throw error;
     }

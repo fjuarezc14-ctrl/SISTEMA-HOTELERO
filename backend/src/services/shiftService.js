@@ -1,5 +1,7 @@
 import { shiftRepository } from '../repositories/shiftRepository.js';
 import { cashRepository } from '../repositories/cashRepository.js';
+import { requireAdminAuthorization } from './adminAuthorizationService.js';
+import { isAdminRole } from '../middlewares/authMiddleware.js';
 
 export const shiftService = {
   async getActiveShift(userId = null) {
@@ -38,27 +40,54 @@ export const shiftService = {
     return await shiftRepository.findShiftTransactions(shiftId);
   },
 
-  async openShift({ user_id, initial_cash_pen = 0, shift_notes = '' }) {
-    const existing = await shiftRepository.findActiveShiftByUserId(user_id);
+  async openShift({ requester, initial_cash_pen = 0, shift_notes = '', admin_username, admin_password, ipAddress = '' }) {
+    // Una sola caja: no se permite abrir otro turno mientras haya uno abierto
+    const existing = await shiftRepository.findAnyActiveShift();
     if (existing) {
-      const error = new Error('Ya tienes un turno activo abierto. Debes cerrarlo antes de abrir uno nuevo.');
+      const error = new Error('Ya hay un turno de caja abierto. Debe cerrarse antes de abrir uno nuevo.');
       error.statusCode = 400;
       error.isOperational = true;
       throw error;
     }
 
+    const initialCash = Number(initial_cash_pen || 0);
+    if (!Number.isFinite(initialCash) || initialCash < 0) {
+      const error = new Error('El fondo inicial debe ser un monto válido.');
+      error.statusCode = 400;
+      error.isOperational = true;
+      throw error;
+    }
+
+    // Solo un administrador puede abrir caja (o autorizarlo con sus credenciales)
+    await requireAdminAuthorization({
+      requester,
+      adminUsername: admin_username,
+      adminPassword: admin_password,
+      action: 'SHIFT_OPEN_AUTHORIZED',
+      details: `Apertura de turno de ${requester.full_name} con fondo S/ ${initialCash.toFixed(2)}.`,
+      ipAddress
+    });
+
     return await shiftRepository.openShift({
-      user_id,
-      initial_cash_pen: Number(initial_cash_pen || 0),
-      shift_notes: shift_notes.trim()
+      user_id: requester.id,
+      initial_cash_pen: initialCash,
+      shift_notes: String(shift_notes || '').trim()
     });
   },
 
-  async closeShift(shiftId, { actual_cash_pen, shift_notes = '' }) {
+  async closeShift(shiftId, { requester, actual_cash_pen, shift_notes = '' }) {
     const shift = await shiftRepository.findById(shiftId);
     if (!shift) {
       const error = new Error('Turno de trabajo no encontrado.');
       error.statusCode = 404;
+      error.isOperational = true;
+      throw error;
+    }
+
+    // Solo quien abrió el turno o un administrador puede cerrarlo
+    if (shift.user_id !== requester.id && !isAdminRole(requester.role)) {
+      const error = new Error('Solo el cajero que abrió el turno o un administrador puede cerrarlo.');
+      error.statusCode = 403;
       error.isOperational = true;
       throw error;
     }
@@ -84,7 +113,7 @@ export const shiftService = {
       total_yape_plin_pen: Number(totals.total_yape_plin || 0),
       total_card_pen: Number(totals.total_card || 0),
       total_revenue_pen: Number(totals.total_income || 0),
-      shift_notes: shift_notes.trim()
+      shift_notes: String(shift_notes || '').trim()
     });
   },
 
