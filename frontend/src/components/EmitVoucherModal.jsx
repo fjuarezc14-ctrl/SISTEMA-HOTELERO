@@ -5,6 +5,8 @@ import { api } from '../api/apiClient';
 import { formatPEN, printElectronicVoucherTicket } from '../utils/formatters';
 import { Printer, CheckCircle2, AlertCircle } from 'lucide-react';
 
+import { getNextSequenceNumber } from '../utils/ticketCounter';
+
 export function EmitVoucherModal({ isOpen, onClose, transaction, onSuccess }) {
   const [voucherType, setVoucherType] = useState('BOLETA'); // BOLETA | FACTURA
   const [rucNumber, setRucNumber] = useState(transaction?.customer_ruc || '');
@@ -33,9 +35,22 @@ export function EmitVoucherModal({ isOpen, onClose, transaction, onSuccess }) {
       setLoading(true);
       setError('');
 
-      const generatedSeries = isFactura ? 'F001' : 'B001';
-      const generatedNum = transaction.voucher_number || String(Math.floor(Math.random() * 899999 + 100000));
-      const fullVoucherNum = `${generatedSeries}-${generatedNum}`;
+      let generatedSeries = isFactura ? 'F001' : 'B001';
+      let generatedNum = '';
+      let fullVoucherNum = transaction.voucher_number || '';
+
+      if (!fullVoucherNum) {
+        const seq = getNextSequenceNumber(voucherType);
+        generatedSeries = seq.series;
+        generatedNum = seq.number;
+        fullVoucherNum = seq.full;
+      } else {
+        const parts = fullVoucherNum.split('-');
+        if (parts.length === 2) {
+          generatedSeries = parts[0];
+          generatedNum = parts[1];
+        }
+      }
 
       // Actualizar transacción en el backend
       await api.patch(`/cash/transactions/${transaction.id}/voucher`, {

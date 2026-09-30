@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useShift } from '../context/ShiftContext';
 import { api } from '../api/apiClient';
 import { formatPEN, formatDatePeru } from '../utils/formatters';
+import { getCurrentSequenceNumber } from '../utils/ticketCounter';
 import { TicketPrintModal } from '../components/TicketPrintModal';
 import {
   Clock,
@@ -64,7 +65,7 @@ export function ShiftsPage() {
 
   const handlePrintShiftTicket = (shiftInfo) => {
     const data = {
-      ticket_number: `ARQ-${shiftInfo.id?.substring(0, 6) || Date.now().toString().slice(-6)}`,
+      ticket_number: shiftInfo.ticket_number || `ARQ-${String(shiftInfo.id || 1).padStart(6, '0')}`,
       date: shiftInfo.closed_at || new Date(),
       customer_name: `Cajero: ${shiftInfo.user_full_name}`,
       room_number: `RELEVO CAJA`,

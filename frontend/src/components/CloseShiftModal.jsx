@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Modal } from './Modal';
 import { useShift } from '../context/ShiftContext';
 import { formatPEN } from '../utils/formatters';
+import { getNextSequenceNumber } from '../utils/ticketCounter';
 import { CashCounter, CashCounterToggle } from './CashCounter';
 import { CheckCircle2, AlertTriangle, AlertCircle, Calculator } from 'lucide-react';
 
@@ -32,8 +33,9 @@ export function CloseShiftModal({ isOpen, onClose, onShiftClosed = () => {} }) {
       setLoading(true);
       const result = await closeShift(activeShift.id, actualCashNum, notes);
       
+      const seq = getNextSequenceNumber('ARQUEO');
       const closureTicketData = {
-        ticket_number: `ARQ-${Date.now().toString().slice(-6)}`,
+        ticket_number: seq.full,
         date: new Date(),
         customer_name: `Recepcionista: ${activeShift.user_full_name}`,
         room_number: `RELEVO GUARDIAS`,

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Modal } from './Modal';
 import { api } from '../api/apiClient';
-import { formatPEN } from '../utils/formatters';
+import { formatPEN, printElectronicVoucherTicket } from '../utils/formatters';
 import { PaymentSelector } from './PaymentSelector';
 import { VoucherSelector } from './VoucherSelector';
 import { CustomerSearchAutocomplete } from './CustomerSearchAutocomplete';
@@ -215,6 +215,25 @@ export function CheckInModal({ isOpen, onClose, room, reservationData = null, up
             customer_ruc: customerRuc.trim(),
             customer_business_name: customerBusinessName.trim()
           } : null
+        });
+      }
+
+      if (hasPayment && voucherType !== 'NONE') {
+        const isFactura = voucherType === 'FACTURA';
+        printElectronicVoucherTicket({
+          voucherType,
+          customerDocType: isFactura ? 'RUC' : documentType,
+          customerDocNumber: isFactura ? customerRuc.trim() : documentNumber.trim(),
+          customerName: isFactura ? customerBusinessName.trim() : fullName.trim(),
+          paymentMethod: paymentMethod === 'MIXED' ? 'PAGO MIXTO' : paymentMethod,
+          totalAmount: parseFloat(paymentAmount) || 0,
+          items: [
+            {
+              qty: 1,
+              description: `Abono/Cobro Check-in Hab. ${room.room_number} (${stayType === 'HOURS' ? `${hoursCount}h` : stayType})`,
+              price: parseFloat(paymentAmount) || 0
+            }
+          ]
         });
       }
 

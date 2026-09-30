@@ -7,7 +7,7 @@ import { Sliders, Bed, Hotel, Edit2, Plus, Check, AlertCircle, Trash2, Upload, I
 import { Modal } from '../components/Modal';
 
 export function SettingsPage() {
-  const { getRoomTypes, getHotelInfo, invalidateCache } = useGlobalStore();
+  const { getRoomTypes, getHotelInfo, updateHotelInfo, invalidateCache } = useGlobalStore();
   const [activeTab, setActiveTab] = useState('rates'); // rates, rooms, hotel
   const [roomTypes, setRoomTypes] = useState([]);
   const [rooms, setRooms] = useState([]);
@@ -261,7 +261,7 @@ export function SettingsPage() {
 
     try {
       setSavingHotel(true);
-      await api.put('/settings/hotel-info', {
+      const payload = {
         business_name: businessName.trim(),
         trade_name: tradeName.trim(),
         logo_url: logoUrl.trim(),
@@ -271,8 +271,9 @@ export function SettingsPage() {
         overnight_checkout_time: overnightCheckoutTime,
         grace_period_minutes: parseInt(gracePeriodMinutes, 10) || 0,
         ticket_footer_legend: ticketFooterLegend.trim()
-      });
-      invalidateCache('hotel_info');
+      };
+      const res = await api.put('/settings/hotel-info', payload);
+      updateHotelInfo(res.data || payload);
       setHotelSuccess('Información fiscal, logo, parámetros de tolerancia y leyenda de ticket actualizados.');
     } catch (err) {
       setHotelError(err.message || 'Error guardando datos del hotel.');

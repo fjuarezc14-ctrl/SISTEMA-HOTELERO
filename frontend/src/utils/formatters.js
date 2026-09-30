@@ -99,13 +99,15 @@ export const ROOM_STATUS_CONFIG = {
   }
 };
 
+import { getNextSequenceNumber } from './ticketCounter';
+
 /**
  * Impresión de Representación Impresa 80mm de Comprobante Electrónico (Boleta / Factura SUNAT)
  */
 export function printElectronicVoucherTicket({
-  hotelName = 'HOTEL ZAFIRO',
-  hotelRuc = '20600000001',
-  hotelAddress = 'AV. PRINCIPAL 123 - LIMA, PERÚ',
+  hotelName = '',
+  hotelRuc = '',
+  hotelAddress = '',
   voucherType = 'BOLETA', // BOLETA | FACTURA
   voucherSeries = '',
   voucherNumber = '',
@@ -117,10 +119,30 @@ export function printElectronicVoucherTicket({
   paymentMethod = 'EFECTIVO',
   totalAmount = 0
 }) {
+  // Cargar datos dinámicos del hotel desde localStorage si no se pasaron explícitamente
+  let cachedInfo = {};
+  try {
+    cachedInfo = JSON.parse(localStorage.getItem('hotel_info') || '{}');
+  } catch (e) {}
+
+  const displayName = hotelName || cachedInfo.trade_name || cachedInfo.business_name || 'MI HOTEL';
+  const displayRuc = hotelRuc || cachedInfo.ruc || '';
+  const displayAddress = hotelAddress || cachedInfo.address || '';
+  const displayPhone = cachedInfo.phone ? `Tel: ${cachedInfo.phone}` : '';
+  const logoUrl = cachedInfo.logo_url || '';
+  const legendText = cachedInfo.ticket_footer_legend || '¡Gracias por su preferencia! Conserve sus objetos de valor.';
+
   const isFactura = voucherType === 'FACTURA';
   const title = isFactura ? 'FACTURA ELECTRÓNICA' : 'BOLETA DE VENTA ELECTRÓNICA';
-  const series = voucherSeries || (isFactura ? 'F001' : 'B001');
-  const number = voucherNumber || String(Math.floor(Math.random() * 899999 + 100000));
+
+  // Obtener o incrementar correlativo secuencial
+  let series = voucherSeries;
+  let number = voucherNumber;
+  if (!series || !number) {
+    const seq = getNextSequenceNumber(voucherType);
+    series = series || seq.series;
+    number = number || seq.number;
+  }
   const fullVoucherNum = `${series}-${number}`;
 
   // Desglose IGV 18%
@@ -160,6 +182,7 @@ export function printElectronicVoucherTicket({
           .bold { font-weight: bold; }
           .divider { border-bottom: 1px dashed #000; margin: 6px 0; }
           table { width: 100%; border-collapse: collapse; font-size: 11px; }
+          .logo-img { max-height: 50px; max-width: 140px; margin: 0 auto 4px auto; display: block; object-fit: contain; }
           .qr-box {
             width: 100px;
             height: 100px;
@@ -175,9 +198,12 @@ export function printElectronicVoucherTicket({
       </head>
       <body>
         <div class="text-center">
-          <div class="bold" style="font-size: 14px;">${hotelName.toUpperCase()}</div>
-          <div>RUC: ${hotelRuc}</div>
-          <div>${hotelAddress}</div>
+          ${logoUrl ? `<img src="${logoUrl}" alt="Logo" class="logo-img" />` : ''}
+          <div class="bold" style="font-size: 13px; text-transform: uppercase;">${displayName}</div>
+          ${cachedInfo.business_name && cachedInfo.business_name !== displayName ? `<div style="font-size: 10px;">${cachedInfo.business_name}</div>` : ''}
+          ${displayRuc ? `<div style="font-size: 10px;">RUC: ${displayRuc}</div>` : ''}
+          ${displayAddress ? `<div style="font-size: 10px;">${displayAddress}</div>` : ''}
+          ${displayPhone ? `<div style="font-size: 10px;">${displayPhone}</div>` : ''}
           <div class="divider"></div>
           <div class="bold" style="font-size: 12px;">${title}</div>
           <div class="bold" style="font-size: 13px; margin: 3px 0;">${fullVoucherNum}</div>
@@ -229,7 +255,8 @@ export function printElectronicVoucherTicket({
           [ QR SUNAT ]<br/>${fullVoucherNum}
         </div>
 
-        <div class="text-center" style="font-size: 9px; margin-top: 4px;">
+        <div class="text-center" style="font-size: 9px; margin-top: 6px;">
+          <p style="font-weight: bold; margin-bottom: 4px; white-space: pre-line;">${legendText}</p>
           Representación Impresa de la ${title}<br/>
           Consulte su comprobante en SUNAT<br/>
           *** MODO DEMO / SIMULACIÓN ***

@@ -11,7 +11,12 @@ export function TicketPrintModal({ isOpen, onClose, ticketData }) {
 
   if (!ticketData) return null;
 
-  const legendText = hotelInfo?.ticket_footer_legend || '¡Gracias por su preferencia en Hotel Zafiro! Conserve sus objetos de valor.';
+  const hotelName = hotelInfo?.trade_name || hotelInfo?.business_name || 'Hotel';
+  const businessName = hotelInfo?.business_name || 'Empresa Hotelera S.A.C.';
+  const ruc = hotelInfo?.ruc ? `RUC: ${hotelInfo.ruc}` : '';
+  const address = hotelInfo?.address || 'Dirección Principal';
+  const phoneNum = hotelInfo?.phone ? `Tel: ${hotelInfo.phone}` : '';
+  const legendText = hotelInfo?.ticket_footer_legend || '¡Gracias por su preferencia! Conserve sus objetos de valor.';
 
   const handlePrint = () => {
     window.print();
@@ -24,8 +29,8 @@ export function TicketPrintModal({ isOpen, onClose, ticketData }) {
     const roomInfo = ticketData.room_number ? `Hab. ${ticketData.room_number}` : 'Hospedaje';
     const total = formatPEN(ticketData.total_amount || ticketData.amount || 0);
 
-    const message = `*Hotel Zafiro - Comprobante de Servicio*%0A` +
-      `Estimado(a) *${clientName}*, gracias por alojarte en Hotel Zafiro.%0A%0A` +
+    const message = `*${hotelName} - Comprobante de Servicio*%0A` +
+      `Estimado(a) *${clientName}*, gracias por alojarte en ${hotelName}.%0A%0A` +
       `📌 *Detalle:* ${roomInfo}%0A` +
       `💰 *Total:* ${total}%0A` +
       `💳 *Pago:* ${ticketData.payment_method || 'Efectivo S/'}%0A%0A` +
@@ -44,10 +49,16 @@ export function TicketPrintModal({ isOpen, onClose, ticketData }) {
         {/* Printable Ticket Area */}
         <div id="thermal-ticket-area" className="p-4 bg-white text-black font-mono text-xs rounded-xl space-y-2 border border-slate-300 shadow-inner">
           <div className="text-center border-b border-dashed border-black pb-2 space-y-0.5">
-            <p className="font-bold text-sm uppercase">Hotel Zafiro</p>
-            <p className="text-[10px]">HOTEL ZAFIRO S.A.C. - RUC: 20123456789</p>
-            <p className="text-[10px]">Av. Principal 123, Miraflores, Lima</p>
-            <p className="text-[10px]">Tel: 01-2345678</p>
+            {hotelInfo?.logo_url && (
+              <div className="flex justify-center mb-1">
+                <img src={hotelInfo.logo_url} alt="Logo" className="max-h-12 max-w-[140px] object-contain" />
+              </div>
+            )}
+            <p className="font-bold text-sm uppercase">{hotelName}</p>
+            {businessName && businessName !== hotelName && <p className="text-[10px]">{businessName}</p>}
+            {ruc && <p className="text-[10px]">{ruc}</p>}
+            {address && <p className="text-[10px]">{address}</p>}
+            {phoneNum && <p className="text-[10px]">{phoneNum}</p>}
           </div>
 
           <div className="text-[10px] space-y-0.5 py-1 border-b border-dashed border-black">

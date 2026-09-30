@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { api } from '../api/apiClient';
 import { formatPEN, printElectronicVoucherTicket } from '../utils/formatters';
+import { getNextSequenceNumber } from '../utils/ticketCounter';
 import { useShift } from '../context/ShiftContext';
 import { useGlobalStore } from '../context/GlobalStoreContext';
 import { validateText, validatePrice, validateQuantity, validateSupplierName } from '../utils/validators';
@@ -190,8 +191,9 @@ export function StorePage() {
         });
       } else {
         // Generar ticket de venta interno estándar
+        const seq = getNextSequenceNumber('TICKET');
         const newTicketData = {
-          ticket_number: `TND-${Date.now().toString().slice(-6)}`,
+          ticket_number: seq.full,
           date: new Date(),
           customer_name: linkedStay ? linkedStay.customer_name : 'Cliente Mostrador',
           room_number: linkedStay ? linkedStay.room_number : null,

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useRef, useCallback } from 'react';
+import React, { createContext, useContext, useRef, useState, useCallback, useEffect } from 'react';
 import { api } from '../api/apiClient';
 
 const GlobalStoreContext = createContext();
@@ -14,14 +14,11 @@ export const TTL = {
 export function GlobalStoreProvider({ children }) {
   // Caché en memoria: { [key]: { data, timestamp } }
   const cacheRef = useRef({});
+  const [hotelInfo, setHotelInfoState] = useState(null);
 
   /**
    * Consulta datos con Caché TTL.
    * Si los datos existen en memoria y no han expirado, los retorna en 0ms.
-   * @param {string} key Identificador único de la consulta
-   * @param {Function} fetcherFn Función asíncrona que hace la llamada a la API
-   * @param {number} ttlMs Tiempo de vida en milisegundos
-   * @param {boolean} forceRefresh Si es true, ignora la caché y hace la petición HTTP
    */
   const fetchWithTTL = useCallback(async (key, fetcherFn, ttlMs = TTL.PRODUCTS, forceRefresh = false) => {
     const now = Date.now();
@@ -41,8 +38,6 @@ export function GlobalStoreProvider({ children }) {
 
   /**
    * Invalida una clave de caché o toda la caché si no se proporciona clave.
-   * Usado cuando se crea, edita o elimina un registro.
-   * @param {string} [key]
    */
   const invalidateCache = useCallback((key) => {
     if (key) {
@@ -51,8 +46,6 @@ export function GlobalStoreProvider({ children }) {
       cacheRef.current = {};
     }
   }, []);
-
-  // Helpers específicos con TTL optimizados por módulo
 
   /** Obtiene productos con Caché TTL (2 min) */
   const getProducts = useCallback(async (forceRefresh = false) => {
@@ -70,13 +63,39 @@ export function GlobalStoreProvider({ children }) {
     }, TTL.ROOM_TYPES, forceRefresh);
   }, [fetchWithTTL]);
 
-  /** Obtiene información del hotel con Caché TTL (10 min) */
+  /** Obtiene información del hotel con Caché TTL (10 min) y actualiza el estado reactivo */
   const getHotelInfo = useCallback(async (forceRefresh = false) => {
-    return fetchWithTTL('hotel_info', async () => {
+    const data = await fetchWithTTL('hotel_info', async () => {
       const res = await api.get('/settings/hotel-info');
       return res.data || null;
     }, TTL.HOTEL_INFO, forceRefresh);
+    setHotelInfoState(data);
+    if (data) {
+      try {
+        localStorage.setItem('hotel_info', JSON.stringify(data));
+      } catch (e) {}
+    }
+    return data;
   }, [fetchWithTTL]);
+
+  /** Actualiza directamente la información del hotel de forma reactiva */
+  const updateHotelInfo = useCallback((newInfo) => {
+    cacheRef.current['hotel_info'] = {
+      data: newInfo,
+      timestamp: Date.now()
+    };
+    setHotelInfoState(newInfo);
+    if (newInfo) {
+      try {
+        localStorage.setItem('hotel_info', JSON.stringify(newInfo));
+      } catch (e) {}
+    }
+  }, []);
+
+  // Cargar hotelInfo al iniciar
+  useEffect(() => {
+    getHotelInfo().catch(() => {});
+  }, [getHotelInfo]);
 
   return (
     <GlobalStoreContext.Provider
@@ -85,7 +104,9 @@ export function GlobalStoreProvider({ children }) {
         invalidateCache,
         getProducts,
         getRoomTypes,
-        getHotelInfo
+        getHotelInfo,
+        updateHotelInfo,
+        hotelInfo
       }}
     >
       {children}

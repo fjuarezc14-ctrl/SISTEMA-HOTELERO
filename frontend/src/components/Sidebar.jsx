@@ -21,15 +21,16 @@ import { canAccessModule } from '../utils/modules';
 
 export function Sidebar({ currentTab, setCurrentTab, isMobileOpen = false, setIsMobileOpen = () => {} }) {
   const { user, logout } = useAuth();
-  const { getHotelInfo } = useGlobalStore();
-  const [hotelInfo, setHotelInfo] = useState(null);
+  const { hotelInfo } = useGlobalStore();
   const [reportedIncidentsCount, setReportedIncidentsCount] = useState(0);
+  const [imgError, setImgError] = useState(false);
 
   const canSeeIncidents = canAccessModule(user, 'incidents');
 
+  // Resetear error de imagen cuando cambie el logo
   useEffect(() => {
-    getHotelInfo().then(setHotelInfo).catch(() => {});
-  }, [getHotelInfo]);
+    setImgError(false);
+  }, [hotelInfo?.logo_url]);
 
   useEffect(() => {
     if (!canSeeIncidents) return;
@@ -61,8 +62,6 @@ export function Sidebar({ currentTab, setCurrentTab, isMobileOpen = false, setIs
   ].filter((item) => canAccessModule(user, item.id));
 
   const hotelName = hotelInfo?.trade_name || hotelInfo?.business_name || 'Hotel Zafiro';
-
-  const [imgError, setImgError] = useState(false);
 
   return (
     <>
