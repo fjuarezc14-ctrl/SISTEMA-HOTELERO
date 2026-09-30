@@ -9,6 +9,7 @@ export function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [hotelInfo, setHotelInfo] = useState(null);
+  const [imgError, setImgError] = useState(false);
 
   useEffect(() => {
     api.get('/settings/hotel-info')
@@ -33,10 +34,11 @@ export function LoginPage() {
       <div className="w-full max-w-md bg-white border border-slate-200 rounded-3xl p-8 shadow-xl space-y-6">
         {/* Logo & Header */}
         <div className="text-center space-y-2">
-          {hotelInfo?.logo_url ? (
+          {hotelInfo?.logo_url && !imgError ? (
             <img
               src={hotelInfo.logo_url}
               alt="Logo Hotel"
+              onError={() => setImgError(true)}
               className="w-16 h-16 object-contain rounded-2xl border border-slate-200 mx-auto shadow-sm"
             />
           ) : (

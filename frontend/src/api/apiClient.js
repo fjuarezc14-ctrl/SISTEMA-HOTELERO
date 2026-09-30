@@ -23,10 +23,13 @@ export async function apiRequest(endpoint, options = {}) {
 
     if (!res.ok) {
       if (res.status === 401 || (data.message && data.message.toLowerCase().includes('token'))) {
-        // Token expirado o inválido -> Limpiar sesión y redirigir
+        const hadToken = Boolean(localStorage.getItem('valetec_hotel_token'));
         localStorage.removeItem('valetec_hotel_token');
         localStorage.removeItem('valetec_hotel_user');
-        window.location.reload();
+        // Redirigir/Recargar solo si había una sesión activa y no es una llamada pública de hotel-info
+        if (hadToken && !endpoint.includes('/settings/hotel-info')) {
+          window.location.reload();
+        }
       }
       throw new Error(data.message || 'Error en la solicitud al servidor.');
     }

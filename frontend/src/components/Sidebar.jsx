@@ -62,6 +62,8 @@ export function Sidebar({ currentTab, setCurrentTab, isMobileOpen = false, setIs
 
   const hotelName = hotelInfo?.trade_name || hotelInfo?.business_name || 'Hotel Zafiro';
 
+  const [imgError, setImgError] = useState(false);
+
   return (
     <>
       {/* Backdrop para móvil */}
@@ -80,10 +82,11 @@ export function Sidebar({ currentTab, setCurrentTab, isMobileOpen = false, setIs
         {/* Header Logo */}
         <div className="p-4 border-b border-slate-100 flex items-center justify-between">
           <div className="flex items-center gap-3 min-w-0">
-            {hotelInfo?.logo_url ? (
+            {hotelInfo?.logo_url && !imgError ? (
               <img
                 src={hotelInfo.logo_url}
                 alt="Logo Hotel"
+                onError={() => setImgError(true)}
                 className="w-10 h-10 rounded-xl object-contain border border-slate-200 shrink-0"
               />
             ) : (
