@@ -8,7 +8,6 @@ import { LoginPage } from './pages/LoginPage';
 import { ReceptionPage } from './pages/ReceptionPage';
 import { ReservationsPage } from './pages/ReservationsPage';
 import { IncidentsPage } from './pages/IncidentsPage';
-import { ShiftsPage } from './pages/ShiftsPage';
 import { CashPage } from './pages/CashPage';
 import { CustomersPage } from './pages/CustomersPage';
 import { StorePage } from './pages/StorePage';
@@ -45,13 +44,6 @@ function MainLayout() {
         return <ReservationsPage />;
       case 'incidents':
         return <IncidentsPage />;
-      case 'shifts':
-        return (
-          <ShiftsPage
-            onOpenShiftModal={() => setIsOpenShiftModalOpen(true)}
-            onCloseShiftModal={() => setIsCloseShiftModalOpen(true)}
-          />
-        );
       case 'cash':
         return (
           <CashPage

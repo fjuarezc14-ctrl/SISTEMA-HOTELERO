@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../api/apiClient';
 import {
   BedDouble,
-  Clock,
   Wallet,
   Users,
   ShoppingBag,
@@ -43,7 +42,6 @@ export function Sidebar({ currentTab, setCurrentTab, isMobileOpen = false, setIs
     { id: 'reservations', label: 'Reservaciones', icon: Calendar },
     { id: 'store', label: 'Tienda & Consumos', icon: ShoppingBag },
     { id: 'cash', label: 'Caja & Movimientos', icon: Wallet },
-    { id: 'shifts', label: 'Turnos de Caja', icon: Clock },
     { id: 'customers', label: 'Clientes / DNI', icon: Users },
     ...(isAdmin
       ? [

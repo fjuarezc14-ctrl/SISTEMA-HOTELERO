@@ -8,7 +8,6 @@ import {
   Wallet,
   QrCode,
   CreditCard,
-  CheckCircle2,
   AlertTriangle,
   History,
   TrendingUp,
@@ -20,7 +19,7 @@ import {
   Receipt
 } from 'lucide-react';
 
-export function ShiftsPage({ onOpenShiftModal = () => {}, onCloseShiftModal = () => {} }) {
+export function ShiftsPage() {
   const { activeShift, hasActiveShift } = useShift();
   const [history, setHistory] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
@@ -91,32 +90,11 @@ export function ShiftsPage({ onOpenShiftModal = () => {}, onCloseShiftModal = ()
         <div>
           <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
             <Clock className="w-5 h-5 text-emerald-600" />
-            <span>Módulo de Turnos y Arqueo de Caja (Perú)</span>
+            <span>Turnos y Arqueo de Caja</span>
           </h2>
           <p className="text-xs text-slate-500">
-            Control de aperturas, cierres de guardia, arqueo físico en Soles (S/) y cuadre de caja.
+            Historial de aperturas, cierres de guardia, arqueo físico en Soles (S/) y cuadre de caja.
           </p>
-        </div>
-
-        {/* Action Button */}
-        <div>
-          {hasActiveShift ? (
-            <button
-              onClick={onCloseShiftModal}
-              className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold rounded-xl shadow-md shadow-rose-600/20 transition-all flex items-center gap-2"
-            >
-              <CheckCircle2 className="w-4 h-4" />
-              <span>Realizar Cierre y Arqueo</span>
-            </button>
-          ) : (
-            <button
-              onClick={onOpenShiftModal}
-              className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-md shadow-emerald-600/20 transition-all flex items-center gap-2"
-            >
-              <Wallet className="w-4 h-4" />
-              <span>Abrir Nuevo Turno</span>
-            </button>
-          )}
         </div>
       </div>
 
@@ -295,16 +273,12 @@ export function ShiftsPage({ onOpenShiftModal = () => {}, onCloseShiftModal = ()
           <div>
             <h3 className="text-base font-bold text-slate-900">No hay ningún turno de caja abierto en este momento</h3>
             <p className="text-xs text-slate-600 max-w-md mx-auto mt-1">
-              Para registrar cobros de habitaciones o ventas en mostrador, debes iniciar un turno con tu fondo base inicial en Soles.
+              Para registrar cobros de habitaciones o ventas en mostrador, se debe iniciar un turno con el fondo base inicial en Soles.
             </p>
           </div>
-          <button
-            onClick={onOpenShiftModal}
-            className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-md transition-all inline-flex items-center gap-2 mt-2"
-          >
-            <Wallet className="w-4 h-4" />
-            <span>Abrir Turno Ahora</span>
-          </button>
+          <p className="text-xs font-semibold text-amber-800">
+            El turno se abre desde el módulo <span className="font-bold">Caja & Movimientos</span>.
+          </p>
         </div>
       )}
 

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../api/apiClient';
 import { formatPEN, formatDatePeru, PAYMENT_METHOD_LABELS, printElectronicVoucherTicket } from '../utils/formatters';
 import { EmitVoucherModal } from '../components/EmitVoucherModal';
+import { ShiftsPage } from './ShiftsPage';
 import {
   BarChart3,
   Wallet,
@@ -22,10 +23,42 @@ import {
   ArrowDownCircle,
   Building2,
   Printer,
-  FileText
+  FileText,
+  Clock
 } from 'lucide-react';
 
+const REPORT_SECTIONS = [
+  { id: 'kpis', label: 'KPIs y Movimientos', icon: BarChart3 },
+  { id: 'shifts', label: 'Turnos de Caja', icon: Clock }
+];
+
 export function ReportsPage() {
+  const [section, setSection] = useState('kpis');
+
+  return (
+    <div className="space-y-6">
+      {/* Selector de sección */}
+      <div className="inline-flex p-1 bg-white border border-slate-200 rounded-2xl shadow-sm gap-1">
+        {REPORT_SECTIONS.map(({ id, label, icon: Icon }) => (
+          <button
+            key={id}
+            onClick={() => setSection(id)}
+            className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors ${
+              section === id ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            <Icon className="w-3.5 h-3.5" />
+            <span>{label}</span>
+          </button>
+        ))}
+      </div>
+
+      {section === 'shifts' ? <ShiftsPage /> : <KpiReports />}
+    </div>
+  );
+}
+
+function KpiReports() {
   const [period, setPeriod] = useState('today'); // 'today' | 'yesterday' | 'week' | 'month' | 'custom'
   const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10));
   const [endDate, setEndDate] = useState(new Date().toISOString().slice(0, 10));
