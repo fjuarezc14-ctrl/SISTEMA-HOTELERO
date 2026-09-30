@@ -4,6 +4,7 @@ import { formatPEN, formatDatePeru, PAYMENT_METHOD_LABELS, printElectronicVouche
 import { useShift } from '../context/ShiftContext';
 import { EmitVoucherModal } from '../components/EmitVoucherModal';
 import { CashMovementModal } from '../components/CashMovementModal';
+import { CancelTransactionModal } from '../components/CancelTransactionModal';
 import {
   Wallet,
   Plus,
@@ -79,19 +80,9 @@ export function CashPage({ onOpenShiftModal = () => {}, onCloseShiftModal = () =
     fetchTransactions();
   }, [scope, dateFrom, dateTo, activeShift?.id]);
 
-  const handleCancelTransaction = async (t) => {
-    const reason = window.prompt(`Motivo de anulación para "${t.concept}":`, 'Error de marcado o devolución');
-    if (reason === null) return; // Cancelado
-
-    const cleanReason = reason.trim() || 'Anulación por el usuario';
-
-    try {
-      await api.patch(`/cash/transactions/${t.id}/cancel`, { reason: cleanReason });
-      await fetchTransactions();
-    } catch (err) {
-      alert(err.message || 'Error al anular transacción.');
-    }
-  };
+  // Modal de anulación (requiere autorización de administrador)
+  const [cancelingTx, setCancelingTx] = useState(null);
+  const handleCancelTransaction = (t) => setCancelingTx(t);
 
   // Totales financieros del turno (Excluyendo movimientos anulados)
   const totalIncome = transactions
@@ -409,6 +400,13 @@ export function CashPage({ onOpenShiftModal = () => {}, onCloseShiftModal = () =
           setSelectedVoucherTx(null);
         }}
         transaction={selectedVoucherTx}
+        onSuccess={fetchTransactions}
+      />
+
+      <CancelTransactionModal
+        isOpen={!!cancelingTx}
+        onClose={() => setCancelingTx(null)}
+        transaction={cancelingTx}
         onSuccess={fetchTransactions}
       />
 

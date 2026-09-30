@@ -30,10 +30,12 @@ export function ShiftProvider({ children }) {
     return () => clearInterval(interval);
   }, [fetchActiveShift]);
 
-  const openShift = async (initialCash, shiftNotes = '') => {
+  const openShift = async (initialCash, shiftNotes = '', adminAuth = null) => {
     const res = await api.post('/shifts/open', {
       initial_cash_pen: initialCash,
-      shift_notes: shiftNotes
+      shift_notes: shiftNotes,
+      admin_username: adminAuth?.username || undefined,
+      admin_password: adminAuth?.password || undefined
     });
     await fetchActiveShift();
     return res.data;

@@ -2,10 +2,16 @@ import React, { useState } from 'react';
 import { Modal } from './Modal';
 import { useShift } from '../context/ShiftContext';
 import { CashCounter, CashCounterToggle } from './CashCounter';
+import { AdminAuthFields } from './AdminAuthFields';
+import { useAuth } from '../context/AuthContext';
+import { isAdminRole } from '../utils/modules';
 import { Wallet, AlertCircle } from 'lucide-react';
 
 export function OpenShiftModal({ isOpen, onClose }) {
   const { openShift } = useShift();
+  const { user } = useAuth();
+  const needsAdminAuth = !isAdminRole(user?.role);
+  const [adminAuth, setAdminAuth] = useState({ username: '', password: '' });
   const [initialCash, setInitialCash] = useState('50.00');
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
@@ -23,7 +29,8 @@ export function OpenShiftModal({ isOpen, onClose }) {
 
     try {
       setLoading(true);
-      await openShift(cashNum, notes);
+      await openShift(cashNum, notes, needsAdminAuth ? adminAuth : null);
+      setAdminAuth({ username: '', password: '' });
       onClose();
     } catch (err) {
       setError(err.message || 'Error abriendo turno de caja.');
@@ -81,6 +88,14 @@ export function OpenShiftModal({ isOpen, onClose }) {
             placeholder="Ej: Recepción del turno mañana sin novedades, llaves completas..."
           />
         </div>
+
+        {needsAdminAuth && (
+          <AdminAuthFields
+            value={adminAuth}
+            onChange={setAdminAuth}
+            message="Solo un administrador puede abrir caja. Ingresa sus credenciales para autorizar."
+          />
+        )}
 
         <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
           <button

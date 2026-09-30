@@ -22,7 +22,10 @@ export function Sidebar({ currentTab, setCurrentTab, isMobileOpen = false, setIs
   const { user, logout } = useAuth();
   const [reportedIncidentsCount, setReportedIncidentsCount] = useState(0);
 
+  const canSeeIncidents = canAccessModule(user, 'incidents');
+
   useEffect(() => {
+    if (!canSeeIncidents) return;
     const checkIncidents = async () => {
       try {
         const res = await api.get('/incidents?status=reported&limit=100');
@@ -35,7 +38,7 @@ export function Sidebar({ currentTab, setCurrentTab, isMobileOpen = false, setIs
     checkIncidents();
     const interval = setInterval(checkIncidents, 60000); // Actualiza cada 60 segundos
     return () => clearInterval(interval);
-  }, []);
+  }, [canSeeIncidents]);
 
   const navItems = [
     { id: 'reception', label: 'Recepción', icon: BedDouble },
