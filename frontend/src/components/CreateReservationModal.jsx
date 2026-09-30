@@ -80,13 +80,15 @@ export function CreateReservationModal({ isOpen, onClose, preselectedRoom = null
       setError('');
       const res = await api.get(`/customers/lookup/${docNumber.trim()}`);
       if (res.data && res.data.found) {
+        setSelectedCustomer(res.data);
         setFullName(res.data.full_name || '');
         if (res.data.phone) setPhone(res.data.phone);
         if (res.data.document_type) setDocType(res.data.document_type);
         if (res.data.is_blacklisted) {
-          setError(`⚠️ ALERTA DE VETO: Este cliente está en LISTA NEGRA. Motivo: ${res.data.blacklist_reason || 'No especificado'}`);
+          setError(`⛔ ALERTA DE VETO EN LISTA NEGRA: ${res.data.blacklist_reason || 'Sin motivo especificado'}. No se puede agendar reserva.`);
         }
       } else {
+        setSelectedCustomer(null);
         setError('Documento no registrado en base local. Ingresa el nombre del huésped.');
       }
     } catch (err) {
@@ -96,9 +98,16 @@ export function CreateReservationModal({ isOpen, onClose, preselectedRoom = null
     }
   };
 
+  const isBlacklisted = Boolean(selectedCustomer?.is_blacklisted);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+
+    if (isBlacklisted) {
+      setError(`⛔ CLIENTE VETADO: ${selectedCustomer?.full_name || 'Este cliente'} se encuentra en Lista Negra (${selectedCustomer?.blacklist_reason || 'Sin motivo'}). No se puede agendar la reserva.`);
+      return;
+    }
 
     if (!roomId) {
       setError('Debes seleccionar una habitación.');
@@ -363,11 +372,21 @@ export function CreateReservationModal({ isOpen, onClose, preselectedRoom = null
           </button>
           <button
             type="submit"
-            disabled={saving}
-            className="px-6 py-2.5 text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white rounded-xl shadow-md transition-all flex items-center gap-2"
+            disabled={saving || isBlacklisted}
+            className={`px-6 py-2.5 text-xs font-bold rounded-xl shadow-md transition-all flex items-center gap-2 ${
+              isBlacklisted
+                ? 'bg-rose-700 text-white cursor-not-allowed opacity-90'
+                : 'bg-amber-500 hover:bg-amber-600 text-white'
+            }`}
           >
             <Calendar className="w-4 h-4" />
-            <span>{saving ? 'Agendando...' : 'Confirmar Reserva'}</span>
+            <span>
+              {saving
+                ? 'Agendando...'
+                : isBlacklisted
+                ? '⛔ Cliente Vetado (Reserva Bloqueada)'
+                : 'Confirmar Reserva'}
+            </span>
           </button>
         </div>
       </form>
