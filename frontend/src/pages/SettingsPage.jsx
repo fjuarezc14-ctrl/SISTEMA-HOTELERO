@@ -3,7 +3,7 @@ import { api } from '../api/apiClient';
 import { formatPEN } from '../utils/formatters';
 import { useGlobalStore } from '../context/GlobalStoreContext';
 import { validateDocument, validateAmount, validateQuantity, validatePhone, validateFullName, validateText } from '../utils/validators';
-import { Sliders, Bed, Hotel, Edit2, Plus, Check, AlertCircle, Trash2 } from 'lucide-react';
+import { Sliders, Bed, Hotel, Edit2, Plus, Check, AlertCircle, Trash2, Upload, Image } from 'lucide-react';
 import { Modal } from '../components/Modal';
 
 export function SettingsPage() {
@@ -508,15 +508,72 @@ export function SettingsPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">URL del Logo de la Empresa (Opcional)</label>
-              <input
-                type="text"
-                placeholder="Ej: https://miservidor.com/logo-hotel.png"
-                value={logoUrl}
-                onChange={(e) => setLogoUrl(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs font-mono text-slate-900 focus:outline-none focus:border-emerald-600"
-              />
-              <span className="text-[10px] text-slate-500">Enlace de imagen (PNG, JPG o SVG) que se mostrará en la barra lateral y en el login.</span>
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                Logo de la Empresa / Hotel
+              </label>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 bg-slate-50 border border-slate-200 rounded-2xl">
+                {logoUrl ? (
+                  <div className="relative group shrink-0">
+                    <img
+                      src={logoUrl}
+                      alt="Vista Previa Logo"
+                      className="w-16 h-16 object-contain rounded-xl border border-slate-200 bg-white p-1 shadow-2xs"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setLogoUrl('')}
+                      className="absolute -top-2 -right-2 p-1 bg-rose-600 text-white rounded-full hover:bg-rose-700 shadow-md transition-all"
+                      title="Quitar Logo"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="w-16 h-16 rounded-xl bg-emerald-50 border-2 border-dashed border-emerald-300 flex items-center justify-center text-emerald-600 shrink-0">
+                    <Image className="w-7 h-7 text-emerald-500" />
+                  </div>
+                )}
+
+                <div className="space-y-2 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-xs cursor-pointer transition-all inline-flex items-center gap-1.5">
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>Subir Imagen de Logo</span>
+                      <input
+                        type="file"
+                        accept="image/png, image/jpeg, image/webp, image/svg+xml"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            if (file.size > 2 * 1024 * 1024) {
+                              alert('La imagen seleccionada no debe superar los 2 MB.');
+                              return;
+                            }
+                            const reader = new FileReader();
+                            reader.onload = (evt) => {
+                              setLogoUrl(evt.target?.result || '');
+                            };
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                        className="hidden"
+                      />
+                    </label>
+                    {logoUrl && (
+                      <button
+                        type="button"
+                        onClick={() => setLogoUrl('')}
+                        className="px-3 py-2 bg-rose-50 text-rose-600 hover:bg-rose-100 text-xs font-bold rounded-xl transition-all"
+                      >
+                        Quitar Logo
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-500">
+                    Formatos aceptados: PNG, JPG, WEBP, SVG (Máx. 2 MB. Se recomienda fondo transparente).
+                  </p>
+                </div>
+              </div>
             </div>
 
             <div>
