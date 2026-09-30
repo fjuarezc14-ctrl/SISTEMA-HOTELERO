@@ -39,8 +39,8 @@ export const productController = {
 
   async chargeToRoom(req, res, next) {
     try {
-      const { stay_id, product_id, quantity } = req.body;
-      const consumption = await productService.chargeToRoom({ stay_id, product_id, quantity });
+      const { stay_id, items, product_id, quantity } = req.body;
+      const consumption = await productService.chargeToRoom({ stay_id, items, product_id, quantity });
       res.status(201).json({
         success: true,
         message: 'Consumo cargado a la habitación correctamente.',

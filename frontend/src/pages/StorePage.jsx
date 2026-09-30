@@ -8,7 +8,7 @@ import { ProductCardGrid } from '../components/ProductCardGrid';
 import { PaymentSelector } from '../components/PaymentSelector';
 import { VoucherSelector } from '../components/VoucherSelector';
 import { TicketPrintModal } from '../components/TicketPrintModal';
-import { ShoppingBag, Plus, QrCode, Wallet, CreditCard, AlertCircle, Check, Bed, Printer } from 'lucide-react';
+import { ShoppingBag, ShoppingCart, Plus, Minus, Trash2, QrCode, Wallet, CreditCard, AlertCircle, Check, Bed, Printer } from 'lucide-react';
 import { Modal } from '../components/Modal';
 
 export function StorePage() {
@@ -19,8 +19,7 @@ export function StorePage() {
   const [loading, setLoading] = useState(true);
 
   // Venta Rápida de Mostrador
-  const [selectedProduct, setSelectedProduct] = useState(null);
-  const [quantity, setQuantity] = useState(1);
+  const [cart, setCart] = useState([]); // [{ product, qty }]
   const [selectedStayId, setSelectedStayId] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('CASH');
   const [singleAmount, setSingleAmount] = useState('');
@@ -112,25 +111,41 @@ export function StorePage() {
     }
   };
 
+  // Carrito
+  const cartQuantities = Object.fromEntries(cart.map((c) => [c.product.id, c.qty]));
+  const cartTotal = cart.reduce((sum, c) => sum + Number(c.product.sale_price_pen || 0) * c.qty, 0);
+
+  const addToCart = (product) => {
+    setSellSuccess('');
+    setCart((prev) => {
+      const existing = prev.find((c) => c.product.id === product.id);
+      if (existing) {
+        if (existing.qty >= product.stock) return prev;
+        return prev.map((c) => (c.product.id === product.id ? { ...c, qty: c.qty + 1 } : c));
+      }
+      return [...prev, { product, qty: 1 }];
+    });
+  };
+
+  const updateCartQty = (productId, qty) => {
+    setCart((prev) =>
+      prev
+        .map((c) => (c.product.id === productId ? { ...c, qty: Math.min(Math.max(0, qty), c.product.stock) } : c))
+        .filter((c) => c.qty > 0)
+    );
+  };
+
   const handleDirectSale = async (e) => {
     e.preventDefault();
     setSellError('');
     setSellSuccess('');
 
-    if (!selectedProduct) {
-      setSellError('Debes seleccionar un producto del catálogo.');
+    if (cart.length === 0) {
+      setSellError('Agrega al menos un producto al carrito.');
       return;
     }
 
-    const qtyErr = validateQuantity(quantity, 'Cantidad a vender', 1, selectedProduct.stock || 999);
-    if (qtyErr) {
-      setSellError(qtyErr);
-      return;
-    }
-
-    const unitPrice = Number(selectedProduct.sale_price_pen || 0);
-    const qtyNum = Number(quantity || 1);
-    const totalSaleCost = unitPrice * qtyNum;
+    const totalSaleCost = cartTotal;
 
     if (paymentMethod === 'MIXED') {
       const splitSum = splitPayments.reduce((acc, curr) => acc + (parseFloat(curr.amount) || 0), 0);
@@ -142,9 +157,8 @@ export function StorePage() {
 
     try {
       setSelling(true);
-      const res = await api.post('/products/direct-sale', {
-        product_id: selectedProduct.id,
-        quantity: qtyNum,
+      await api.post('/products/direct-sale', {
+        items: cart.map((c) => ({ product_id: c.product.id, quantity: c.qty })),
         payment_method: paymentMethod,
         reference_number: referenceNumber.trim(),
         split_payments: paymentMethod === 'MIXED' ? splitPayments : null,
@@ -168,13 +182,11 @@ export function StorePage() {
           customerAddress: isFactura ? businessAddress.trim() : '',
           paymentMethod: paymentMethod === 'MIXED' ? 'PAGO MIXTO' : paymentMethod,
           totalAmount: totalSaleCost,
-          items: [
-            {
-              qty: qtyNum,
-              description: selectedProduct.name,
-              price: totalSaleCost
-            }
-          ]
+          items: cart.map((c) => ({
+            qty: c.qty,
+            description: c.product.name,
+            price: Number(c.product.sale_price_pen || 0) * c.qty
+          }))
         });
       } else {
         // Generar ticket de venta interno estándar
@@ -185,26 +197,25 @@ export function StorePage() {
           room_number: linkedStay ? linkedStay.room_number : null,
           total_amount: totalSaleCost,
           payment_method: paymentMethod === 'MIXED' ? 'Pago Mixto' : paymentMethod,
-          items: [
-            {
-              name: selectedProduct.name,
-              quantity: qtyNum,
-              unit_price: unitPrice,
-              total_price: totalSaleCost
-            }
-          ]
+          items: cart.map((c) => ({
+            name: c.product.name,
+            quantity: c.qty,
+            unit_price: Number(c.product.sale_price_pen || 0),
+            total_price: Number(c.product.sale_price_pen || 0) * c.qty
+          }))
         };
 
         setTicketData(newTicketData);
         setIsTicketModalOpen(true);
       }
 
-      setSellSuccess(`¡Venta procesada con éxito! (${selectedProduct.name} x${qtyNum})${linkedText}`);
+      const itemCount = cart.reduce((sum, c) => sum + c.qty, 0);
+      setSellSuccess(`¡Venta procesada con éxito! (${itemCount} producto(s) · ${formatPEN(totalSaleCost)})${linkedText}`);
 
       // Resetear estado del formulario
-      setQuantity(1);
-      setSelectedProduct(null);
+      setCart([]);
       setSelectedStayId('');
+      setSingleAmount('');
       setReferenceNumber('');
       setSplitPayments([]);
       setVoucherType('NONE');
@@ -309,12 +320,30 @@ export function StorePage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
-        {/* Panel de Venta Rápida (Ampliación Principal) */}
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+        {/* Catálogo de productos (arriba izquierda) */}
         <div className="xl:col-span-7 p-6 bg-white border border-slate-200 rounded-3xl space-y-4 shadow-sm">
           <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
             <ShoppingBag className="w-4 h-4 text-emerald-600" />
-            <span>Venta Rápida Mostrador</span>
+            <span>Catálogo · toca un producto para agregarlo</span>
+          </h3>
+          <ProductCardGrid products={products} cartQuantities={cartQuantities} onSelectProduct={addToCart} />
+        </div>
+
+        {/* Carrito y cobro (arriba derecha) */}
+        <div className="xl:col-span-5 p-6 bg-white border border-slate-200 rounded-3xl space-y-4 shadow-sm xl:sticky xl:top-0">
+          <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+            <ShoppingCart className="w-4 h-4 text-emerald-600" />
+            <span>Carrito de Venta</span>
+            {cart.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setCart([])}
+                className="ml-auto text-[11px] font-semibold text-slate-400 hover:text-rose-600"
+              >
+                Vaciar
+              </button>
+            )}
           </h3>
 
           {!hasActiveShift && (
@@ -339,39 +368,63 @@ export function StorePage() {
           )}
 
           <form onSubmit={handleDirectSale} className="space-y-3">
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-700 mb-1.5">
-                Seleccionar Producto del Catálogo
-              </label>
-              <ProductCardGrid
-                products={products}
-                selectedProductId={selectedProduct?.id}
-                onSelectProduct={(p) => {
-                  setSelectedProduct(p);
-                  setQuantity(1);
-                }}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-700 mb-1">Cantidad</label>
-                <input
-                  type="number"
-                  min="1"
-                  max={selectedProduct?.stock || 99}
-                  value={quantity}
-                  onChange={(e) => setQuantity(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs font-bold text-slate-900 focus:outline-none focus:border-emerald-600"
-                />
+            {/* Productos en el carrito */}
+            {cart.length === 0 ? (
+              <div className="p-6 bg-slate-50 border border-dashed border-slate-200 rounded-2xl text-center text-xs text-slate-400">
+                El carrito está vacío.
               </div>
-
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-700 mb-1">Total (S/)</label>
-                <div className="p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-emerald-700 font-bold text-sm text-right">
-                  {formatPEN((Number(selectedProduct?.sale_price_pen || 0) * Number(quantity || 1)).toFixed(2))}
-                </div>
+            ) : (
+              <div className="divide-y divide-slate-100 border border-slate-200 rounded-2xl max-h-64 overflow-y-auto">
+                {cart.map(({ product, qty }) => (
+                  <div key={product.id} className="flex items-center gap-2 p-2.5">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold text-slate-900 truncate">{product.name}</p>
+                      <p className="text-[10px] text-slate-400 font-mono">{formatPEN(product.sale_price_pen)} c/u</p>
+                    </div>
+                    <div className="flex items-center">
+                      <button
+                        type="button"
+                        onClick={() => updateCartQty(product.id, qty - 1)}
+                        className="p-1 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-l-lg text-slate-600"
+                      >
+                        <Minus className="w-3 h-3" />
+                      </button>
+                      <input
+                        type="number"
+                        min="1"
+                        max={product.stock}
+                        value={qty}
+                        onChange={(e) => updateCartQty(product.id, parseInt(e.target.value, 10) || 1)}
+                        className="w-10 py-0.5 bg-white border-y border-slate-300 text-center text-xs font-mono font-bold text-slate-900 focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => updateCartQty(product.id, qty + 1)}
+                        disabled={qty >= product.stock}
+                        className="p-1 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-r-lg text-slate-600 disabled:opacity-40"
+                      >
+                        <Plus className="w-3 h-3" />
+                      </button>
+                    </div>
+                    <span className="w-16 text-right text-xs font-mono font-bold text-slate-900">
+                      {formatPEN(Number(product.sale_price_pen || 0) * qty)}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => updateCartQty(product.id, 0)}
+                      className="p-1 text-slate-400 hover:text-rose-600"
+                      title="Quitar"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
               </div>
+            )}
+
+            <div className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-xl">
+              <span className="text-xs font-bold text-slate-700">Total</span>
+              <span className="text-lg font-black font-mono text-emerald-700">{formatPEN(cartTotal)}</span>
             </div>
 
             {/* Vincular a Habitación (Opcional) */}
@@ -398,10 +451,10 @@ export function StorePage() {
             <div>
               <label className="block text-[11px] font-semibold text-slate-700 mb-1">Medio de Pago</label>
               <PaymentSelector
-                totalAmount={Number(selectedProduct?.sale_price_pen || 0) * Number(quantity || 1)}
+                totalAmount={cartTotal}
                 paymentMethod={paymentMethod}
                 setPaymentMethod={setPaymentMethod}
-                singleAmount={singleAmount || String(Number(selectedProduct?.sale_price_pen || 0) * Number(quantity || 1))}
+                singleAmount={singleAmount || String(cartTotal)}
                 setSingleAmount={setSingleAmount}
                 referenceNumber={referenceNumber}
                 setReferenceNumber={setReferenceNumber}
@@ -426,72 +479,72 @@ export function StorePage() {
 
             <button
               type="submit"
-              disabled={selling || !selectedProduct || !hasActiveShift || selectedProduct.stock <= 0}
+              disabled={selling || cart.length === 0 || !hasActiveShift}
               className="w-full mt-2 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold rounded-xl shadow-md transition-all text-xs flex items-center justify-center gap-2"
             >
-              <span>{selling ? 'Procesando...' : 'Cobrar Venta'}</span>
+              <span>{selling ? 'Procesando...' : `Cobrar ${formatPEN(cartTotal)}`}</span>
             </button>
           </form>
         </div>
+      </div>
 
-        {/* Catálogo e Inventario de Productos (Columna Secundaria 5/12) */}
-        <div className="xl:col-span-5 p-6 bg-white border border-slate-200 rounded-3xl space-y-4 shadow-sm">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-slate-900">Inventario de Productos & Precios</h3>
-            <button
-              onClick={fetchProducts}
-              className="text-xs font-semibold text-slate-500 hover:text-slate-900 transition-colors"
-            >
-              Refrescar
-            </button>
-          </div>
-
-          {loading ? (
-            <div className="py-8 text-center text-xs text-slate-400">Cargando inventario...</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="border-b border-slate-200 text-slate-500 uppercase text-[10px] tracking-wider">
-                  <tr>
-                    <th className="py-3 px-3">Producto</th>
-                    <th className="py-3 px-3 text-right">Precio Venta</th>
-                    <th className="py-3 px-3 text-center">Stock Actual</th>
-                    <th className="py-3 px-3 text-right">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {products.map((p) => (
-                    <tr key={p.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="py-3 px-3 font-semibold text-slate-900">{p.name}</td>
-                      <td className="py-3 px-3 text-right font-mono font-bold text-emerald-700">
-                        {formatPEN(p.sale_price_pen)}
-                      </td>
-                      <td className="py-3 px-3 text-center">
-                        <span
-                          className={`px-2.5 py-1 rounded-lg text-xs font-bold ${
-                            p.stock <= 5
-                              ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                              : 'bg-slate-100 text-slate-700'
-                          }`}
-                        >
-                          {p.stock} unid.
-                        </span>
-                      </td>
-                      <td className="py-3 px-3 text-right">
-                        <button
-                          onClick={() => handleOpenEditProduct(p)}
-                          className="text-xs text-slate-600 hover:text-slate-900 font-medium"
-                        >
-                          Editar / Stock
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+      {/* Inventario de Productos (lista inferior) */}
+      <div className="p-6 bg-white border border-slate-200 rounded-3xl space-y-4 shadow-sm">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-bold text-slate-900">Inventario de Productos & Precios</h3>
+          <button
+            onClick={() => fetchProducts(true)}
+            className="text-xs font-semibold text-slate-500 hover:text-slate-900 transition-colors"
+          >
+            Refrescar
+          </button>
         </div>
+
+        {loading ? (
+          <div className="py-8 text-center text-xs text-slate-400">Cargando inventario...</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="border-b border-slate-200 text-slate-500 uppercase text-[10px] tracking-wider">
+                <tr>
+                  <th className="py-3 px-3">Producto</th>
+                  <th className="py-3 px-3 text-right">Precio Venta</th>
+                  <th className="py-3 px-3 text-center">Stock Actual</th>
+                  <th className="py-3 px-3 text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {products.map((p) => (
+                  <tr key={p.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="py-3 px-3 font-semibold text-slate-900">{p.name}</td>
+                    <td className="py-3 px-3 text-right font-mono font-bold text-emerald-700">
+                      {formatPEN(p.sale_price_pen)}
+                    </td>
+                    <td className="py-3 px-3 text-center">
+                      <span
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold ${
+                          p.stock <= 5
+                            ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                            : 'bg-slate-100 text-slate-700'
+                        }`}
+                      >
+                        {p.stock} unid.
+                      </span>
+                    </td>
+                    <td className="py-3 px-3 text-right">
+                      <button
+                        onClick={() => handleOpenEditProduct(p)}
+                        className="text-xs text-slate-600 hover:text-slate-900 font-medium"
+                      >
+                        Editar / Stock
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Modal Crear / Editar Producto */}

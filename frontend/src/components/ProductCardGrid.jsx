@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { formatPEN } from '../utils/formatters';
 import { Search, ShoppingBag, Coffee, Wine, Sparkles, Check, PackageX, PackageCheck, AlertTriangle } from 'lucide-react';
 
-export function ProductCardGrid({ products = [], selectedProductId, onSelectProduct, disabled = false }) {
+export function ProductCardGrid({ products = [], selectedProductId, onSelectProduct, disabled = false, cartQuantities = null }) {
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('ALL');
 
@@ -78,8 +78,10 @@ export function ProductCardGrid({ products = [], selectedProductId, onSelectProd
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 gap-2.5 max-h-72 overflow-y-auto pr-1">
           {filteredProducts.map((p) => {
-            const isSelected = selectedProductId === p.id;
-            const isOutOfStock = p.stock <= 0;
+            // Con carrito: marcar productos agregados y bloquear si ya se agregó todo el stock
+            const inCart = cartQuantities ? cartQuantities[p.id] || 0 : 0;
+            const isSelected = cartQuantities ? inCart > 0 : selectedProductId === p.id;
+            const isOutOfStock = p.stock <= 0 || (cartQuantities && inCart >= p.stock);
             const isLowStock = p.stock > 0 && p.stock <= 3;
 
             return (
@@ -103,7 +105,11 @@ export function ProductCardGrid({ products = [], selectedProductId, onSelectProd
                   <div className="p-1.5 rounded-xl bg-slate-100/80 shrink-0">
                     {getProductIcon(p.name)}
                   </div>
-                  {isSelected ? (
+                  {isSelected && cartQuantities ? (
+                    <span className="px-1.5 py-0.5 bg-emerald-600 text-white font-black text-[10px] rounded-md">
+                      x{inCart}
+                    </span>
+                  ) : isSelected ? (
                     <span className="p-1 bg-emerald-600 text-white rounded-full">
                       <Check className="w-3 h-3" />
                     </span>
