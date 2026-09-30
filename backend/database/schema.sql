@@ -253,5 +253,10 @@ CREATE INDEX IF NOT EXISTS idx_reservations_status ON reservations(status);
 CREATE INDEX IF NOT EXISTS idx_reservations_dates ON reservations(start_date, end_date);
 CREATE INDEX IF NOT EXISTS idx_stay_incidents_room ON stay_incidents(room_id);
 CREATE INDEX IF NOT EXISTS idx_stay_incidents_type ON stay_incidents(incident_type);
+CREATE INDEX IF NOT EXISTS idx_cash_transactions_stay ON cash_transactions(stay_id);
+CREATE INDEX IF NOT EXISTS idx_room_consumptions_stay ON room_consumptions(stay_id);
+CREATE INDEX IF NOT EXISTS idx_stays_customer ON stays(customer_id);
+CREATE INDEX IF NOT EXISTS idx_stays_work_shift ON stays(work_shift_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_user ON audit_logs(user_id);
 
 
