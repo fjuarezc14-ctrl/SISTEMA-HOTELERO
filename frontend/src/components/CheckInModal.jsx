@@ -265,45 +265,70 @@ export function CheckInModal({ isOpen, onClose, room, onSuccess }) {
             </button>
           </div>
 
-          {/* A1: Horas dinámicas recalculables */}
-          {stayType === 'hours' && (
-            <div className="mt-3 p-3 bg-emerald-50/70 border border-emerald-200 rounded-2xl space-y-2">
-              <label className="block text-xs font-semibold text-slate-700">Cantidad de Horas a Alquilar</label>
-              <div className="flex items-center gap-2">
-                {[1, 2, 3, 4, 5, 6].map((h) => (
-                  <button
-                    key={h}
-                    type="button"
-                    onClick={() => setHoursCount(h)}
-                    className={`flex-1 py-1.5 rounded-xl text-xs font-bold border transition-colors ${
-                      hoursCount === h
-                        ? 'bg-emerald-600 border-emerald-600 text-white shadow-xs'
-                        : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50'
-                    }`}
-                  >
-                    {h}h
-                  </button>
-                ))}
-              </div>
-              <div className="flex items-center justify-between gap-2 pt-1">
-                <div className="flex items-center gap-2">
-                  <label className="text-[11px] text-slate-500 font-medium shrink-0">Otra cantidad (1–24h):</label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="24"
-                    value={hoursCount}
-                    onChange={(e) => setHoursCount(Math.max(1, Math.min(24, Number(e.target.value) || 1)))}
-                    className="w-20 bg-white border border-slate-300 rounded-xl p-1.5 text-xs font-mono font-bold text-slate-900 text-center focus:outline-none focus:border-emerald-600"
-                  />
-                  <span className="text-[11px] text-slate-400">horas</span>
+          {/* A1: Horas adicionales extras recalculables */}
+          {stayType === 'hours' && (() => {
+            const baseHours = Number(room.hours_quantity_default) || 3;
+            const basePrice = parseFloat(room.price_hours_default) || 30.00;
+            const extraRate = parseFloat(room.price_extra_hour) || 10.00;
+            const extraHours = Math.max(0, hoursCount - baseHours);
+
+            return (
+              <div className="mt-3 p-3.5 bg-emerald-50/80 border border-emerald-200 rounded-2xl space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-extrabold text-slate-800">
+                    Horas Adicionales / Extras a la Estadía Base ({baseHours}h)
+                  </label>
+                  <span className="text-[11px] font-extrabold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-lg border border-emerald-200">
+                    Base {baseHours}h = {formatPEN(basePrice)} (+{formatPEN(extraRate)}/h extra)
+                  </span>
                 </div>
-                <span className="text-[11px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-lg border border-emerald-200">
-                  Tarifa recalculada: {formatPEN(price)}
-                </span>
+
+                {/* Botones de +0h, +1h, +2h, +3h, +4h, +5h, +6h extra */}
+                <div className="grid grid-cols-7 gap-1.5">
+                  {[0, 1, 2, 3, 4, 5, 6].map((ex) => {
+                    const totalH = baseHours + ex;
+                    const isSelected = hoursCount === totalH;
+
+                    return (
+                      <button
+                        key={ex}
+                        type="button"
+                        onClick={() => setHoursCount(totalH)}
+                        className={`py-2 px-1 rounded-xl text-xs font-extrabold border transition-all flex flex-col items-center justify-center ${
+                          isSelected
+                            ? 'bg-emerald-600 border-emerald-600 text-white shadow-sm ring-2 ring-emerald-400/40'
+                            : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100'
+                        }`}
+                      >
+                        <span>{ex === 0 ? 'Base' : `+${ex}h`}</span>
+                        <span className="text-[9px] font-mono opacity-80">{totalH}h total</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="flex items-center justify-between gap-2 pt-1 border-t border-emerald-200/60">
+                  <div className="flex items-center gap-2">
+                    <label className="text-[11px] text-slate-600 font-semibold shrink-0">Total Horas:</label>
+                    <input
+                      type="number"
+                      min={baseHours}
+                      max="24"
+                      value={hoursCount}
+                      onChange={(e) => setHoursCount(Math.max(baseHours, Math.min(24, Number(e.target.value) || baseHours)))}
+                      className="w-20 bg-white border border-slate-300 rounded-xl p-1 text-xs font-mono font-bold text-slate-900 text-center focus:outline-none focus:border-emerald-600"
+                    />
+                    <span className="text-[11px] text-slate-500 font-medium">({extraHours} hora(s) extra(s))</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-xs font-black text-emerald-900 font-mono">
+                      Total Tarifa: {formatPEN(price)}
+                    </span>
+                  </div>
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
         </div>
 
         {/* 2. Datos del Huésped (A4 & A5) */}

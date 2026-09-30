@@ -178,25 +178,27 @@ export function CreateReservationModal({ isOpen, onClose, preselectedRoom = null
               <Calendar className="w-4 h-4" />
               <span>Habitación y Horarios Agendados</span>
             </div>
-            {/* A9: Botón Reserva Rápida 1 Día (Salida 12:00 PM mañana) */}
+            {/* A9: Botón Reserva Rápida 1 Día (Salida a las 12:00 PM del día siguiente de la fecha de inicio seleccionada) */}
             <button
               type="button"
               onClick={() => {
-                const now = new Date();
-                const tomorrow = new Date(now);
-                tomorrow.setDate(tomorrow.getDate() + 1);
-                tomorrow.setHours(12, 0, 0, 0);
+                const baseDate = startDate ? new Date(startDate) : new Date();
+                const nextDay = new Date(baseDate);
+                nextDay.setDate(nextDay.getDate() + 1);
+                nextDay.setHours(12, 0, 0, 0);
 
                 const pad = (n) => (n < 10 ? '0' + n : n);
                 const toISO = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 
-                setStartDate(toISO(now));
-                setEndDate(toISO(tomorrow));
+                if (!startDate) {
+                  setStartDate(toISO(baseDate));
+                }
+                setEndDate(toISO(nextDay));
               }}
               className="px-3 py-1 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-extrabold text-[11px] rounded-xl transition-all shadow-2xs flex items-center gap-1"
-              title="Autocompletar reserva de 1 día con salida a las 12:00 PM de mañana"
+              title="Calcular salida automática al día siguiente a las 12:00 PM"
             >
-              <span>⚡ Reserva Rápida (1 Día - Salida 12 PM)</span>
+              <span>⚡ Reserva 1 Día (Salida 12 PM día siguiente)</span>
             </button>
           </div>
 
@@ -222,13 +224,26 @@ export function CreateReservationModal({ isOpen, onClose, preselectedRoom = null
                 type="datetime-local"
                 required
                 value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
+                onChange={(e) => {
+                  const newStart = e.target.value;
+                  setStartDate(newStart);
+                  if (newStart) {
+                    const startD = new Date(newStart);
+                    const nextD = new Date(startD);
+                    nextD.setDate(nextD.getDate() + 1);
+                    nextD.setHours(12, 0, 0, 0);
+
+                    const pad = (n) => (n < 10 ? '0' + n : n);
+                    const toISO = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+                    setEndDate(toISO(nextD));
+                  }
+                }}
                 className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 text-xs text-slate-900 focus:outline-none focus:border-emerald-600"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Fecha / Hora Salida</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Fecha / Hora Salida (12 PM)</label>
               <input
                 type="datetime-local"
                 required
@@ -307,8 +322,11 @@ export function CreateReservationModal({ isOpen, onClose, preselectedRoom = null
           </div>
         </div>
 
-        {/* 3. Seña / Abono Previo con Pago Mixto */}
+        {/* 3. Pago inicial / Abono Previo (S/) */}
         <div className="p-4 bg-white border border-slate-200 rounded-2xl space-y-3 shadow-sm">
+          <div className="text-xs font-extrabold text-emerald-800 uppercase tracking-wider mb-1">
+            Pago inicial / Abono Registrado (S/)
+          </div>
           <PaymentSelector
             totalAmount={parseFloat(depositAmount) || 0}
             paymentMethod={paymentMethod}
