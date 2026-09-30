@@ -234,14 +234,22 @@ export function CheckOutModal({ isOpen, onClose, room, onSuccess }) {
               <span>Consumos Tienda / Minibar:</span>
               <span className="font-bold font-mono text-slate-900">{formatPEN(consumptionsPrice)}</span>
             </div>
+            {hasIncident && (parseFloat(incidentPenalty) || 0) > 0 && (
+              <div className="flex justify-between text-rose-700 font-bold bg-rose-50 px-2 py-1 rounded-lg border border-rose-200">
+                <span>Penalidad / Daño registrado:</span>
+                <span className="font-mono text-rose-800">+{formatPEN(parseFloat(incidentPenalty) || 0)}</span>
+              </div>
+            )}
             <div className="flex justify-between text-emerald-700 font-bold pt-1.5 border-t border-slate-100">
               <span>Total Abonado Previamente:</span>
               <span className="font-mono text-sm">{formatPEN(totalPaid)}</span>
             </div>
             <div className="flex justify-between items-center pt-2 border-t border-slate-200 text-sm">
-              <span className="font-black text-slate-900">Saldo Pendiente de Cobro:</span>
-              <span className={`font-mono text-base font-black ${pendingBalance > 0 ? 'text-amber-600' : 'text-emerald-700'}`}>
-                {formatPEN(pendingBalance)}
+              <span className="font-black text-slate-900">Total Saldo a Cobrar:</span>
+              <span className={`font-mono text-base font-black ${
+                (Math.max(0, totalAmount + (hasIncident ? (parseFloat(incidentPenalty) || 0) : 0) - totalPaid)) > 0 ? 'text-rose-700' : 'text-emerald-700'
+              }`}>
+                {formatPEN(Math.max(0, totalAmount + (hasIncident ? (parseFloat(incidentPenalty) || 0) : 0) - totalPaid))}
               </span>
             </div>
           </div>

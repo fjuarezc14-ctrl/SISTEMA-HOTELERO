@@ -173,9 +173,31 @@ export function CreateReservationModal({ isOpen, onClose, preselectedRoom = null
 
         {/* 1. Habitación y Fechas */}
         <div className="p-4 bg-white border border-slate-200 rounded-2xl space-y-3 shadow-sm">
-          <div className="text-xs font-bold text-emerald-700 uppercase tracking-wider flex items-center gap-1.5">
-            <Calendar className="w-4 h-4" />
-            <span>Habitación y Horarios Agendados</span>
+          <div className="flex items-center justify-between pb-1">
+            <div className="text-xs font-bold text-emerald-700 uppercase tracking-wider flex items-center gap-1.5">
+              <Calendar className="w-4 h-4" />
+              <span>Habitación y Horarios Agendados</span>
+            </div>
+            {/* A9: Botón Reserva Rápida 1 Día (Salida 12:00 PM mañana) */}
+            <button
+              type="button"
+              onClick={() => {
+                const now = new Date();
+                const tomorrow = new Date(now);
+                tomorrow.setDate(tomorrow.getDate() + 1);
+                tomorrow.setHours(12, 0, 0, 0);
+
+                const pad = (n) => (n < 10 ? '0' + n : n);
+                const toISO = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+
+                setStartDate(toISO(now));
+                setEndDate(toISO(tomorrow));
+              }}
+              className="px-3 py-1 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-extrabold text-[11px] rounded-xl transition-all shadow-2xs flex items-center gap-1"
+              title="Autocompletar reserva de 1 día con salida a las 12:00 PM de mañana"
+            >
+              <span>⚡ Reserva Rápida (1 Día - Salida 12 PM)</span>
+            </button>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">

@@ -134,38 +134,48 @@ export const stayService = {
       const { amount, payment_method, reference_number, split_payments, skip_cash_transaction } = initial_payment;
 
       if (!skip_cash_transaction && activeShift) {
-        if (payment_method === 'MIXED' && Array.isArray(split_payments) && split_payments.length > 0) {
-          for (const item of split_payments) {
-            const itemAmt = Number(item.amount || 0);
-            if (itemAmt > 0) {
-              const methodLabel = item.payment_method === 'YAPE_PLIN' ? 'Yape/Plin' : item.payment_method === 'CARD' ? 'Tarjeta' : 'Efectivo';
-              await cashRepository.create({
-                work_shift_id: activeShift.id,
-                stay_id: stay.id,
-                user_id,
-                transaction_type: 'income',
-                concept: `Hospedaje Hab. ${room.room_number} - ${customer.full_name} (${methodLabel})`,
-                category: 'stay',
-                amount_pen: itemAmt,
-                payment_method: item.payment_method,
-                reference_number: item.reference_number || reference_number || ''
-              });
+          const voucher_type = initial_payment.voucher_type || 'TICKET';
+          const customer_ruc = initial_payment.customer_ruc || '';
+          const customer_business_name = initial_payment.customer_business_name || '';
+
+          if (payment_method === 'MIXED' && Array.isArray(split_payments) && split_payments.length > 0) {
+            for (const item of split_payments) {
+              const itemAmt = Number(item.amount || 0);
+              if (itemAmt > 0) {
+                const methodLabel = item.payment_method === 'YAPE_PLIN' ? 'Yape/Plin' : item.payment_method === 'CARD' ? 'Tarjeta' : 'Efectivo';
+                await cashRepository.create({
+                  work_shift_id: activeShift.id,
+                  stay_id: stay.id,
+                  user_id,
+                  transaction_type: 'income',
+                  concept: `Hospedaje Hab. ${room.room_number} - ${customer.full_name} (${methodLabel})`,
+                  category: 'stay',
+                  amount_pen: itemAmt,
+                  payment_method: item.payment_method,
+                  reference_number: item.reference_number || reference_number || '',
+                  voucher_type,
+                  customer_ruc,
+                  customer_business_name
+                });
+              }
             }
+          } else {
+            await cashRepository.create({
+              work_shift_id: activeShift.id,
+              stay_id: stay.id,
+              user_id,
+              transaction_type: 'income',
+              concept: `Hospedaje Hab. ${room.room_number} - ${customer.full_name}`,
+              category: 'stay',
+              amount_pen: Number(amount),
+              payment_method: payment_method || 'CASH',
+              reference_number: reference_number || '',
+              voucher_type,
+              customer_ruc,
+              customer_business_name
+            });
           }
-        } else {
-          await cashRepository.create({
-            work_shift_id: activeShift.id,
-            stay_id: stay.id,
-            user_id,
-            transaction_type: 'income',
-            concept: `Hospedaje Hab. ${room.room_number} - ${customer.full_name}`,
-            category: 'stay',
-            amount_pen: Number(amount),
-            payment_method: payment_method || 'CASH',
-            reference_number: reference_number || ''
-          });
         }
-      }
 
       await stayRepository.updateStayPrices(stay.id, {
         total_paid_pen: Number(amount)
