@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api/apiClient';
+import { useGlobalStore } from '../context/GlobalStoreContext';
 import {
   BedDouble,
   Wallet,
@@ -20,9 +21,15 @@ import { canAccessModule } from '../utils/modules';
 
 export function Sidebar({ currentTab, setCurrentTab, isMobileOpen = false, setIsMobileOpen = () => {} }) {
   const { user, logout } = useAuth();
+  const { getHotelInfo } = useGlobalStore();
+  const [hotelInfo, setHotelInfo] = useState(null);
   const [reportedIncidentsCount, setReportedIncidentsCount] = useState(0);
 
   const canSeeIncidents = canAccessModule(user, 'incidents');
+
+  useEffect(() => {
+    getHotelInfo().then(setHotelInfo).catch(() => {});
+  }, [getHotelInfo]);
 
   useEffect(() => {
     if (!canSeeIncidents) return;
@@ -53,6 +60,8 @@ export function Sidebar({ currentTab, setCurrentTab, isMobileOpen = false, setIs
     { id: 'textiles', label: 'Gestión Textiles', isTest: true }
   ].filter((item) => canAccessModule(user, item.id));
 
+  const hotelName = hotelInfo?.trade_name || hotelInfo?.business_name || 'Hotel Zafiro';
+
   return (
     <>
       {/* Backdrop para móvil */}
@@ -70,19 +79,29 @@ export function Sidebar({ currentTab, setCurrentTab, isMobileOpen = false, setIs
       >
         {/* Header Logo */}
         <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600">
-              <Hotel className="w-6 h-6" />
-            </div>
-            <div>
-              <h1 className="font-bold text-slate-900 text-base leading-tight">Hotel Prueba</h1>
-              <p className="text-xs text-emerald-600 font-semibold tracking-wide">VT VALETEC • S/ (PEN)</p>
+          <div className="flex items-center gap-3 min-w-0">
+            {hotelInfo?.logo_url ? (
+              <img
+                src={hotelInfo.logo_url}
+                alt="Logo Hotel"
+                className="w-10 h-10 rounded-xl object-contain border border-slate-200 shrink-0"
+              />
+            ) : (
+              <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 shrink-0">
+                <Hotel className="w-6 h-6" />
+              </div>
+            )}
+            <div className="min-w-0 flex-1">
+              <h1 className="font-bold text-slate-900 text-base leading-tight truncate" title={hotelName}>
+                {hotelName}
+              </h1>
+              <p className="text-xs text-emerald-600 font-semibold tracking-wide truncate">VT VALETEC • S/ (PEN)</p>
             </div>
           </div>
 
           <button
             onClick={() => setIsMobileOpen(false)}
-            className="md:hidden p-1.5 text-slate-400 hover:text-slate-700 rounded-lg"
+            className="md:hidden p-1.5 text-slate-400 hover:text-slate-700 rounded-lg shrink-0"
           >
             <X className="w-5 h-5" />
           </button>

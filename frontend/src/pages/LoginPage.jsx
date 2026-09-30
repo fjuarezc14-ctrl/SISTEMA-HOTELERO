@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { api } from '../api/apiClient';
 import { Hotel, Lock, User, AlertCircle } from 'lucide-react';
 
 export function LoginPage() {
@@ -7,6 +8,13 @@ export function LoginPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [hotelInfo, setHotelInfo] = useState(null);
+
+  useEffect(() => {
+    api.get('/settings/hotel-info')
+      .then((res) => setHotelInfo(res.data))
+      .catch(() => {});
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -18,15 +26,25 @@ export function LoginPage() {
     }
   };
 
+  const hotelName = hotelInfo?.trade_name || hotelInfo?.business_name || 'SISTEMA HOTELERO';
+
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-center p-4">
       <div className="w-full max-w-md bg-white border border-slate-200 rounded-3xl p-8 shadow-xl space-y-6">
         {/* Logo & Header */}
         <div className="text-center space-y-2">
-          <div className="w-14 h-14 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center justify-center text-emerald-600 mx-auto shadow-sm">
-            <Hotel className="w-8 h-8" />
-          </div>
-          <h2 className="text-2xl font-black text-slate-900 tracking-tight">Hotel Prueba</h2>
+          {hotelInfo?.logo_url ? (
+            <img
+              src={hotelInfo.logo_url}
+              alt="Logo Hotel"
+              className="w-16 h-16 object-contain rounded-2xl border border-slate-200 mx-auto shadow-sm"
+            />
+          ) : (
+            <div className="w-14 h-14 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center justify-center text-emerald-600 mx-auto shadow-sm">
+              <Hotel className="w-8 h-8" />
+            </div>
+          )}
+          <h2 className="text-2xl font-black text-slate-900 tracking-tight">{hotelName}</h2>
           <p className="text-xs text-emerald-600 font-semibold">VT VALETEC • Moneda Soles (PEN - S/)</p>
         </div>
 

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { api } from '../api/apiClient';
+import { useGlobalStore } from '../context/GlobalStoreContext';
 import { formatPEN, formatDatePeru, getRemainingTime, ROOM_STATUS_CONFIG } from '../utils/formatters';
 import { CheckInModal } from '../components/CheckInModal';
 import { CheckOutModal } from '../components/CheckOutModal';
@@ -32,11 +33,17 @@ import {
 } from 'lucide-react';
 
 export function ReceptionPage() {
+  const { getHotelInfo } = useGlobalStore();
+  const [hotelInfo, setHotelInfo] = useState(null);
   const [rooms, setRooms] = useState([]);
   const [reservations, setReservations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [floorFilter, setFloorFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
+
+  useEffect(() => {
+    getHotelInfo().then(setHotelInfo).catch(() => {});
+  }, [getHotelInfo]);
 
   // Modales
   const [selectedRoom, setSelectedRoom] = useState(null);
@@ -601,8 +608,8 @@ export function ReceptionPage() {
           </div>
 
           <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 text-center text-xs text-slate-500 space-y-1">
-            <span className="font-bold text-slate-800 block">SISTEMA HOTEL ZAFIRO</span>
-            <span>Estándar Perú (Mediodía Check-out)</span>
+            <span className="font-bold text-slate-800 block">{(hotelInfo?.trade_name || hotelInfo?.business_name || 'SISTEMA HOTEL ZAFIRO').toUpperCase()}</span>
+            <span>Estándar Perú ({hotelInfo?.overnight_checkout_time ? `${hotelInfo.overnight_checkout_time} Check-out` : 'Mediodía Check-out'})</span>
           </div>
         </div>
 
