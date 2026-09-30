@@ -53,7 +53,12 @@ function MainLayout() {
           />
         );
       case 'cash':
-        return <CashPage />;
+        return (
+          <CashPage
+            onOpenShiftModal={() => setIsOpenShiftModalOpen(true)}
+            onCloseShiftModal={() => setIsCloseShiftModalOpen(true)}
+          />
+        );
       case 'customers':
         return <CustomersPage />;
       case 'store':
@@ -85,8 +90,6 @@ function MainLayout() {
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Top Navbar with Lima Clock & Shift Indicator */}
         <Navbar
-          onOpenShiftModal={() => setIsOpenShiftModalOpen(true)}
-          onCloseShiftModal={() => setIsCloseShiftModalOpen(true)}
           onToggleMobileSidebar={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
         />
 

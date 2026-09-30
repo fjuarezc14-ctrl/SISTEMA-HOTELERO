@@ -15,11 +15,13 @@ import {
   Ban,
   ShieldAlert,
   FileText,
-  Printer
+  Printer,
+  Lock,
+  Unlock
 } from 'lucide-react';
 
-export function CashPage() {
-  const { hasActiveShift } = useShift();
+export function CashPage({ onOpenShiftModal = () => {}, onCloseShiftModal = () => {} }) {
+  const { activeShift, hasActiveShift } = useShift();
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -121,6 +123,33 @@ export function CashPage() {
             Registro de ingresos por alquileres/tienda, egresos autorizados y anulación de movimientos.
           </p>
         </div>
+
+        {/* Apertura / Cierre de Turno */}
+        {hasActiveShift ? (
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs">
+              <span className="font-semibold">Turno abierto · Fondo inicial:</span>
+              <span className="font-mono font-bold text-emerald-800">
+                {formatPEN(activeShift.initial_cash_pen || 0)}
+              </span>
+            </div>
+            <button
+              onClick={onCloseShiftModal}
+              className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs rounded-xl shadow-sm transition-colors flex items-center gap-1.5"
+            >
+              <Lock className="w-3.5 h-3.5" />
+              <span>Cerrar Turno</span>
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={onOpenShiftModal}
+            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-sm shadow-emerald-600/20 transition-colors flex items-center gap-1.5"
+          >
+            <Unlock className="w-3.5 h-3.5" />
+            <span>Abrir Turno</span>
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
