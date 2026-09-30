@@ -5,10 +5,12 @@ import { useShift } from '../context/ShiftContext';
 import { useGlobalStore } from '../context/GlobalStoreContext';
 import { validateText, validatePrice, validateQuantity, validateSupplierName } from '../utils/validators';
 import { ProductCardGrid } from '../components/ProductCardGrid';
+import { CartItemList } from '../components/CartItemList';
+import { useCart } from '../hooks/useCart';
 import { PaymentSelector } from '../components/PaymentSelector';
 import { VoucherSelector } from '../components/VoucherSelector';
 import { TicketPrintModal } from '../components/TicketPrintModal';
-import { ShoppingBag, ShoppingCart, Plus, Minus, Trash2, QrCode, Wallet, CreditCard, AlertCircle, Check, Bed, Printer } from 'lucide-react';
+import { ShoppingBag, ShoppingCart, Plus, QrCode, Wallet, CreditCard, AlertCircle, Check, Bed, Printer } from 'lucide-react';
 import { Modal } from '../components/Modal';
 
 export function StorePage() {
@@ -19,7 +21,7 @@ export function StorePage() {
   const [loading, setLoading] = useState(true);
 
   // Venta Rápida de Mostrador
-  const [cart, setCart] = useState([]); // [{ product, qty }]
+  const { cart, cartQuantities, cartTotal, itemCount, addToCart, updateCartQty, clearCart, toApiItems } = useCart();
   const [selectedStayId, setSelectedStayId] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('CASH');
   const [singleAmount, setSingleAmount] = useState('');
@@ -111,30 +113,6 @@ export function StorePage() {
     }
   };
 
-  // Carrito
-  const cartQuantities = Object.fromEntries(cart.map((c) => [c.product.id, c.qty]));
-  const cartTotal = cart.reduce((sum, c) => sum + Number(c.product.sale_price_pen || 0) * c.qty, 0);
-
-  const addToCart = (product) => {
-    setSellSuccess('');
-    setCart((prev) => {
-      const existing = prev.find((c) => c.product.id === product.id);
-      if (existing) {
-        if (existing.qty >= product.stock) return prev;
-        return prev.map((c) => (c.product.id === product.id ? { ...c, qty: c.qty + 1 } : c));
-      }
-      return [...prev, { product, qty: 1 }];
-    });
-  };
-
-  const updateCartQty = (productId, qty) => {
-    setCart((prev) =>
-      prev
-        .map((c) => (c.product.id === productId ? { ...c, qty: Math.min(Math.max(0, qty), c.product.stock) } : c))
-        .filter((c) => c.qty > 0)
-    );
-  };
-
   const handleDirectSale = async (e) => {
     e.preventDefault();
     setSellError('');
@@ -158,7 +136,7 @@ export function StorePage() {
     try {
       setSelling(true);
       await api.post('/products/direct-sale', {
-        items: cart.map((c) => ({ product_id: c.product.id, quantity: c.qty })),
+        items: toApiItems(),
         payment_method: paymentMethod,
         reference_number: referenceNumber.trim(),
         split_payments: paymentMethod === 'MIXED' ? splitPayments : null,
@@ -209,11 +187,10 @@ export function StorePage() {
         setIsTicketModalOpen(true);
       }
 
-      const itemCount = cart.reduce((sum, c) => sum + c.qty, 0);
       setSellSuccess(`¡Venta procesada con éxito! (${itemCount} producto(s) · ${formatPEN(totalSaleCost)})${linkedText}`);
 
       // Resetear estado del formulario
-      setCart([]);
+      clearCart();
       setSelectedStayId('');
       setSingleAmount('');
       setReferenceNumber('');
@@ -327,7 +304,10 @@ export function StorePage() {
             <ShoppingBag className="w-4 h-4 text-emerald-600" />
             <span>Catálogo · toca un producto para agregarlo</span>
           </h3>
-          <ProductCardGrid products={products} cartQuantities={cartQuantities} onSelectProduct={addToCart} />
+          <ProductCardGrid products={products} cartQuantities={cartQuantities} onSelectProduct={(p) => {
+              setSellSuccess('');
+              addToCart(p);
+            }} />
         </div>
 
         {/* Carrito y cobro (arriba derecha) */}
@@ -338,7 +318,7 @@ export function StorePage() {
             {cart.length > 0 && (
               <button
                 type="button"
-                onClick={() => setCart([])}
+                onClick={clearCart}
                 className="ml-auto text-[11px] font-semibold text-slate-400 hover:text-rose-600"
               >
                 Vaciar
@@ -368,59 +348,7 @@ export function StorePage() {
           )}
 
           <form onSubmit={handleDirectSale} className="space-y-3">
-            {/* Productos en el carrito */}
-            {cart.length === 0 ? (
-              <div className="p-6 bg-slate-50 border border-dashed border-slate-200 rounded-2xl text-center text-xs text-slate-400">
-                El carrito está vacío.
-              </div>
-            ) : (
-              <div className="divide-y divide-slate-100 border border-slate-200 rounded-2xl max-h-64 overflow-y-auto">
-                {cart.map(({ product, qty }) => (
-                  <div key={product.id} className="flex items-center gap-2 p-2.5">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-bold text-slate-900 truncate">{product.name}</p>
-                      <p className="text-[10px] text-slate-400 font-mono">{formatPEN(product.sale_price_pen)} c/u</p>
-                    </div>
-                    <div className="flex items-center">
-                      <button
-                        type="button"
-                        onClick={() => updateCartQty(product.id, qty - 1)}
-                        className="p-1 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-l-lg text-slate-600"
-                      >
-                        <Minus className="w-3 h-3" />
-                      </button>
-                      <input
-                        type="number"
-                        min="1"
-                        max={product.stock}
-                        value={qty}
-                        onChange={(e) => updateCartQty(product.id, parseInt(e.target.value, 10) || 1)}
-                        className="w-10 py-0.5 bg-white border-y border-slate-300 text-center text-xs font-mono font-bold text-slate-900 focus:outline-none"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => updateCartQty(product.id, qty + 1)}
-                        disabled={qty >= product.stock}
-                        className="p-1 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-r-lg text-slate-600 disabled:opacity-40"
-                      >
-                        <Plus className="w-3 h-3" />
-                      </button>
-                    </div>
-                    <span className="w-16 text-right text-xs font-mono font-bold text-slate-900">
-                      {formatPEN(Number(product.sale_price_pen || 0) * qty)}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => updateCartQty(product.id, 0)}
-                      className="p-1 text-slate-400 hover:text-rose-600"
-                      title="Quitar"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
+            <CartItemList cart={cart} updateCartQty={updateCartQty} />
 
             <div className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-xl">
               <span className="text-xs font-bold text-slate-700">Total</span>
