@@ -44,6 +44,19 @@ export const customerController = {
     }
   },
 
+  async update(req, res, next) {
+    try {
+      const customer = await customerService.updateCustomer(req.params.id, req.body);
+      res.json({
+        success: true,
+        message: 'Cliente actualizado correctamente.',
+        data: customer
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+
   async updateBlacklist(req, res, next) {
     try {
       const { id } = req.params;

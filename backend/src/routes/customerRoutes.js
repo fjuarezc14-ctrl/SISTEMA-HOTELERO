@@ -10,6 +10,7 @@ router.get('/', requireModule('reception', 'reservations', 'customers', 'inciden
 router.get('/doc/:documentNumber', requireModule('reception', 'reservations', 'customers', 'incidents'), customerController.getByDocument);
 router.get('/lookup/:documentNumber', requireModule('reception', 'reservations', 'customers', 'incidents'), customerController.lookup);
 router.post('/', requireModule('reception', 'reservations', 'customers'), customerController.createOrUpdate);
+router.put('/:id', requireModule('customers'), customerController.update);
 router.patch('/:id/blacklist', requireModule('customers', 'incidents'), customerController.updateBlacklist);
 router.patch('/:id/toggle-blacklist', requireModule('customers', 'incidents'), customerController.toggleBlacklist);
 

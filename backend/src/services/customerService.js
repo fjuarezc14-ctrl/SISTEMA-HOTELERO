@@ -104,6 +104,40 @@ export const customerService = {
     });
   },
 
+  async updateCustomer(id, { document_type, document_number, full_name, phone = '', email = '', is_blacklisted, blacklist_reason = '' }) {
+    const customer = await this.getCustomerById(id);
+
+    if (!document_number || !String(document_number).trim() || !full_name || !String(full_name).trim()) {
+      const error = new Error('El número de documento y el nombre completo son obligatorios.');
+      error.statusCode = 400;
+      error.isOperational = true;
+      throw error;
+    }
+
+    const cleanDoc = String(document_number).trim();
+
+    // El documento no puede pertenecer a otro cliente
+    const sameDoc = await customerRepository.findByDocument(cleanDoc);
+    if (sameDoc && sameDoc.id !== customer.id) {
+      const error = new Error(`El documento ${cleanDoc} ya está registrado a nombre de ${sameDoc.full_name}.`);
+      error.statusCode = 409;
+      error.isOperational = true;
+      throw error;
+    }
+
+    const blacklisted = is_blacklisted === undefined ? customer.is_blacklisted : Boolean(is_blacklisted);
+
+    return await customerRepository.update(customer.id, {
+      document_type: document_type || customer.document_type,
+      document_number: cleanDoc,
+      full_name: String(full_name).trim(),
+      phone: String(phone || '').trim(),
+      email: String(email || '').trim(),
+      is_blacklisted: blacklisted,
+      blacklist_reason: blacklisted ? String(blacklist_reason || '').trim() : ''
+    });
+  },
+
   async updateBlacklist(id, { is_blacklisted, blacklist_reason }) {
     const customer = await this.getCustomerById(id);
     return await customerRepository.update(customer.id, {
