@@ -3,6 +3,7 @@ import { api } from '../api/apiClient';
 import { formatPEN, formatDatePeru, PAYMENT_METHOD_LABELS, printElectronicVoucherTicket } from '../utils/formatters';
 import { EmitVoucherModal } from '../components/EmitVoucherModal';
 import { ShiftsPage } from './ShiftsPage';
+import { exportToExcel } from '../utils/exportExcel';
 import {
   BarChart3,
   Wallet,
@@ -121,33 +122,32 @@ function KpiReports() {
     fetchReportsData();
   }, [startDate, endDate]);
 
-  const exportToCSV = () => {
+  const exportToXlsx = async () => {
     if (!kpis || !kpis.transactions || kpis.transactions.length === 0) {
       alert('No hay transacciones en el periodo seleccionado para exportar.');
       return;
     }
-    const headers = ['Fecha', 'Tipo', 'Concepto', 'Categoria', 'Medio de Pago', 'Registrado Por', 'Monto PEN'];
-    const rows = kpis.transactions.map((t) => [
-      `"${formatDatePeru(t.created_at)}"`,
-      `"${t.transaction_type}"`,
-      `"${(t.concept || '').replace(/"/g, '""')}"`,
-      `"${t.category}"`,
-      `"${PAYMENT_METHOD_LABELS[t.payment_method] || t.payment_method}"`,
-      `"${t.user_full_name || 'Sistema'}"`,
-      t.amount_pen
-    ]);
-
-    const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `reporte_hotel_zafiro_${startDate}_al_${endDate}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    try {
+      await exportToExcel(
+        kpis.transactions,
+        [
+          { header: 'Fecha', value: (t) => formatDatePeru(t.created_at), width: 20 },
+          { header: 'Tipo', value: (t) => (t.transaction_type === 'expense' ? 'Egreso' : 'Ingreso'), width: 10 },
+          { header: 'Concepto', value: (t) => t.concept, width: 40 },
+          { header: 'Categoría', value: (t) => t.category, width: 16 },
+          { header: 'Medio de Pago', value: (t) => PAYMENT_METHOD_LABELS[t.payment_method] || t.payment_method, width: 18 },
+          { header: 'Registrado Por', value: (t) => t.user_full_name || 'Sistema', width: 22 },
+          { header: 'Monto', value: (t) => t.amount_pen, width: 14, money: true }
+        ],
+        `reporte_hotel_${startDate}_al_${endDate}`,
+        'Movimientos'
+      );
+    } catch (err) {
+      alert('Error al generar el archivo Excel.');
+      console.error(err);
+    }
   };
 
-  // Exportación Ficha PNP / MINCETUR con Datos Reales
   const exportMinceturPoliceReport = () => {
     const printWindow = window.open('', '_blank');
     const nowStr = new Date().toLocaleDateString('es-PE', { year: 'numeric', month: 'long', day: 'numeric' });
@@ -252,11 +252,11 @@ function KpiReports() {
           </button>
 
           <button
-            onClick={exportToCSV}
+            onClick={exportToXlsx}
             className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-md shadow-emerald-600/20 transition-all flex items-center gap-1.5"
           >
             <Download className="w-4 h-4" />
-            <span>Exportar Excel (CSV)</span>
+            <span>Exportar Excel</span>
           </button>
         </div>
       </div>
