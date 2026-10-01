@@ -79,7 +79,7 @@ export const roomRepository = {
     return res.rows;
   },
 
-  async findRoomById(id) {
+  async findRoomById(id, runQuery = query) {
     const sql = `
       SELECT 
         r.*,
@@ -93,7 +93,7 @@ export const roomRepository = {
       JOIN room_types rt ON r.room_type_id = rt.id
       WHERE r.id = $1
     `;
-    const res = await (runQuery || query)(sql, [id]);
+    const res = await runQuery(sql, [id]);
     return res.rows[0] || null;
   },
 
