@@ -4,6 +4,7 @@ import { roomRepository } from '../repositories/roomRepository.js';
 import { cashRepository } from '../repositories/cashRepository.js';
 import { shiftRepository } from '../repositories/shiftRepository.js';
 import { stayService } from './stayService.js';
+import { pricingService } from './pricingService.js';
 import { occupancyService } from './occupancyService.js';
 import { issueVoucher } from './voucherService.js';
 import { normalizePayment } from '../utils/payments.js';
@@ -33,7 +34,43 @@ function parseReservationRange(start_date, end_date, { allowPastStart = false } 
   return { start, end };
 }
 
+/**
+ * Cotiza una reserva con el mismo selector que el check-in (modalidad + cantidad + llegada).
+ * Compatibilidad: si no llega `stay_type`, se cotiza por rango de fechas (start_date → end_date).
+ */
+async function quoteFor(room, { start_date, stay_type, units, end_date }) {
+  if (!start_date || isNaN(new Date(start_date).getTime())) throw badRequest('La fecha de llegada no es válida.');
+  if (stay_type) {
+    const q = await pricingService.quoteStay(room, { stay_type, units, start: new Date(start_date) });
+    return { stay_type: q.stay_type, units: q.units, price: q.price, end_date: q.expected_end_time, breakdown: q.breakdown };
+  }
+  if (!end_date) throw badRequest('Indica la modalidad y la cantidad de noches u horas.');
+  const q = pricingService.quoteRange(room, start_date, end_date);
+  return { stay_type: null, units: null, price: q.price, end_date: new Date(end_date), breakdown: q.breakdown };
+}
+
 export const reservationService = {
+  /** Cotización para el modal de reserva: precio, salida, abono mínimo y conflictos */
+  async quoteReservation({ room_id, start_date, stay_type, units, end_date, exclude_reservation_id = null }) {
+    const room = await roomRepository.findRoomById(room_id);
+    if (!room) {
+      const error = new Error('Habitación no encontrada.');
+      error.statusCode = 404;
+      error.isOperational = true;
+      throw error;
+    }
+    const quote = await quoteFor(room, { start_date, stay_type, units, end_date });
+    const deposit = await pricingService.minDeposit(quote.price);
+    let conflict = null;
+    try {
+      await occupancyService.assertRoomFree({ roomId: room.id, start: start_date, end: quote.end_date, excludeReservationId: exclude_reservation_id });
+    } catch (err) {
+      if (err.statusCode !== 409) throw err;
+      conflict = err.message;
+    }
+    return { ...quote, ...deposit, conflict };
+  },
+
   async getAllReservations(status) {
     return await reservationRepository.findAll({ status });
   },
@@ -43,6 +80,8 @@ export const reservationService = {
     customer_data, // { document_type, document_number, full_name, phone }
     start_date,
     end_date,
+    stay_type,
+    units,
     deposit_amount_pen = 0,
     payment_method = 'YAPE_PLIN',
     reference_number = '',
@@ -53,11 +92,9 @@ export const reservationService = {
     customer_business_name,
     user_id
   }) {
-    if (!room_id || !customer_data?.document_number || !customer_data?.full_name || !start_date || !end_date) {
-      throw badRequest('Habitación, cliente, fecha de inicio y fin son obligatorios.');
+    if (!room_id || !customer_data?.document_number || !customer_data?.full_name || !start_date) {
+      throw badRequest('Habitación, cliente y fecha de llegada son obligatorios.');
     }
-
-    parseReservationRange(start_date, end_date);
 
     const deposit = Number(deposit_amount_pen || 0);
     if (!Number.isFinite(deposit) || deposit < 0) {
@@ -73,6 +110,20 @@ export const reservationService = {
     }
     if (room.status === 'maintenance') {
       throw badRequest('La habitación está en mantenimiento y no se puede reservar.');
+    }
+
+    // Salida y precio con el mismo selector que el check-in
+    const quote = await quoteFor(room, { start_date, stay_type, units, end_date });
+    end_date = quote.end_date;
+    parseReservationRange(start_date, end_date);
+
+    // Abono: entre el mínimo configurado y el total del alojamiento
+    const { min_deposit } = await pricingService.minDeposit(quote.price);
+    if (deposit + 0.001 < min_deposit) {
+      throw badRequest(`El abono mínimo para esta reserva es S/ ${min_deposit.toFixed(2)}.`);
+    }
+    if (deposit > quote.price + 0.01) {
+      throw badRequest(`El abono (S/ ${deposit.toFixed(2)}) no puede superar el total del alojamiento (S/ ${quote.price.toFixed(2)}).`);
     }
 
     // Anti-overbooking: rango ocupado + margen de limpieza (reservas y estadías activas)
@@ -117,7 +168,10 @@ export const reservationService = {
       end_date,
       deposit_amount_pen: deposit,
       payment_method,
-      notes: String(notes || '').trim().slice(0, 250)
+      notes: String(notes || '').trim().slice(0, 250),
+      quoted_price_pen: quote.price,
+      stay_type: quote.stay_type,
+      stay_units: quote.units
     });
 
     // Abono inicial en caja (un comprobante para todo el abono)
@@ -141,7 +195,7 @@ export const reservationService = {
 
   // Reprogramar: habitación, fechas y notas. El abono y el estado no se cambian por aquí
   // (el abono ya está registrado en caja; el estado tiene sus propias acciones).
-  async updateReservation(id, { room_id, start_date, end_date, notes }) {
+  async updateReservation(id, { room_id, start_date, stay_type, units, end_date, notes }) {
     const existing = await reservationRepository.findById(id);
     if (!existing) {
       const error = new Error('Reserva no encontrada.');
@@ -154,25 +208,42 @@ export const reservationService = {
     }
 
     const targetRoomId = room_id || existing.room_id;
-    const targetStartDate = start_date || existing.start_date;
-    const targetEndDate = end_date || existing.end_date;
+    const room = await roomRepository.findRoomById(targetRoomId);
+    if (!room) throw badRequest('Habitación no encontrada.');
+
+    const targetStart = start_date || existing.start_date;
+    const changesStay = Boolean(room_id || start_date || stay_type || units || end_date);
+
+    let quote = null;
+    if (changesStay) {
+      quote = await quoteFor(room, {
+        start_date: targetStart,
+        stay_type: stay_type || existing.stay_type || undefined,
+        units: units ?? existing.stay_units ?? undefined,
+        end_date: stay_type || existing.stay_type ? undefined : end_date || existing.end_date
+      });
+    }
+    const targetEnd = quote ? quote.end_date : existing.end_date;
 
     // Mantener la llegada original (aunque ya haya pasado) está permitido
-    const sameStart = new Date(targetStartDate).getTime() === new Date(existing.start_date).getTime();
-    parseReservationRange(targetStartDate, targetEndDate, { allowPastStart: sameStart });
+    const sameStart = new Date(targetStart).getTime() === new Date(existing.start_date).getTime();
+    parseReservationRange(targetStart, targetEnd, { allowPastStart: sameStart });
 
-    await occupancyService.assertRoomFree({
-      roomId: targetRoomId,
-      start: targetStartDate,
-      end: targetEndDate,
-      excludeReservationId: id
-    });
+    await occupancyService.assertRoomFree({ roomId: targetRoomId, start: targetStart, end: targetEnd, excludeReservationId: id });
+
+    // El abono ya pagado no cambia; el nuevo precio no puede quedar por debajo de él
+    if (quote && Number(existing.deposit_amount_pen) > quote.price + 0.01) {
+      throw badRequest(`El nuevo total (S/ ${quote.price.toFixed(2)}) es menor al abono ya pagado (S/ ${Number(existing.deposit_amount_pen).toFixed(2)}).`);
+    }
 
     return await reservationRepository.update(id, {
       room_id: targetRoomId,
-      start_date: targetStartDate,
-      end_date: targetEndDate,
-      notes: notes !== undefined ? String(notes).trim().slice(0, 250) : undefined
+      start_date: targetStart,
+      end_date: targetEnd,
+      notes: notes !== undefined ? String(notes).trim().slice(0, 250) : undefined,
+      quoted_price_pen: quote ? quote.price : undefined,
+      stay_type: quote?.stay_type || undefined,
+      stay_units: quote?.units || undefined
     });
   },
 

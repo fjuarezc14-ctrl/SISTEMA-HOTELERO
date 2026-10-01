@@ -2,9 +2,11 @@ import { test, before, after } from 'node:test';
 import {
   assert, login, expectOk, expectError, ensureOpenShift, getAvailableRoom,
   randomDni, randomFutureBase, addHours, addDays, iso, money
+, setDepositRule
 } from '../helpers.js';
 
 let token;
+let previousRule;
 let room;
 let buffer;
 const created = [];
@@ -23,6 +25,7 @@ async function createReservation(start, end, extra = {}) {
 
 before(async () => {
   token = await login();
+  previousRule = await setDepositRule(token, 'percent', 0); // estas pruebas reservan sin abono
   await ensureOpenShift(token);
   room = await getAvailableRoom(token);
   const info = await expectOk('GET', '/settings/hotel-info', { token });
@@ -30,6 +33,7 @@ before(async () => {
 });
 
 after(async () => {
+  if (previousRule) await setDepositRule(token, previousRule.type, previousRule.value);
   for (const id of created) {
     await expectOk('PATCH', `/reservations/${id}/cancel`, { token }).catch(() => {});
   }

@@ -2,9 +2,11 @@ import { test, before, after } from 'node:test';
 import {
   assert, login, expectOk, expectError, ensureOpenShift, getAvailableRoom, testDb,
   checkoutSettled, markRoomAvailable, randomDni, addHours, addDays, iso, money
+, setDepositRule
 } from '../helpers.js';
 
 let token;
+let previousRule;
 let rooms = [];
 const openStays = [];
 
@@ -29,10 +31,12 @@ async function freeRoom() {
 
 before(async () => {
   token = await login();
+  previousRule = await setDepositRule(token, 'percent', 0); // estas pruebas reservan sin abono
   await ensureOpenShift(token);
 });
 
 after(async () => {
+  if (previousRule) await setDepositRule(token, previousRule.type, previousRule.value);
   for (const stayId of openStays) await checkoutSettled(token, stayId).catch(() => {});
   for (const room of rooms) await markRoomAvailable(token, room.id).catch(() => {});
 });

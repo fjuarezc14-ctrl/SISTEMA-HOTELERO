@@ -31,10 +31,11 @@ export const stayController = {
 
   async quoteCheckIn(req, res, next) {
     try {
-      const { room_id, stay_type, hours_count, reservation_id } = req.query;
+      const { room_id, stay_type, units, hours_count, reservation_id } = req.query;
       const quote = await stayService.quoteCheckIn({
         room_id,
         stay_type,
+        units: units !== undefined && units !== '' ? Number(units) : undefined,
         hours_count: hours_count !== undefined ? Number(hours_count) : undefined,
         reservation_id: reservation_id || null
       });
@@ -47,11 +48,12 @@ export const stayController = {
   async checkIn(req, res, next) {
     try {
       // Solo campos permitidos (el precio lo calcula el servidor)
-      const { room_id, customer_data, stay_type, hours_count, companion_name, companions, initial_payment } = req.body;
+      const { room_id, customer_data, stay_type, units, hours_count, companion_name, companions, initial_payment } = req.body;
       const stay = await stayService.checkIn({
         room_id,
         customer_data,
         stay_type,
+        units,
         hours_count,
         companion_name,
         companions,

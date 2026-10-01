@@ -61,7 +61,21 @@ export const settingsService = {
       }
     }
 
+    // Regla del abono mínimo para reservar
+    let depositType;
+    let depositValue;
+    if (infoData.reservation_deposit_type !== undefined || infoData.reservation_deposit_value !== undefined) {
+      const current = await settingsRepository.getHotelInfo();
+      depositType = v.oneOf(infoData.reservation_deposit_type ?? current.reservation_deposit_type, 'El tipo de abono mínimo', ['percent', 'fixed']);
+      depositValue =
+        depositType === 'percent'
+          ? v.money(infoData.reservation_deposit_value ?? current.reservation_deposit_value, 'El porcentaje de abono', { min: 0, max: 100 })
+          : v.money(infoData.reservation_deposit_value ?? current.reservation_deposit_value, 'El abono mínimo fijo', { min: 0, max: 10000 });
+    }
+
     return await settingsRepository.updateHotelInfo({
+      reservation_deposit_type: depositType,
+      reservation_deposit_value: depositValue,
       business_name: opt(infoData.business_name, 'La razón social', { min: 2, max: 150 }),
       trade_name: opt(infoData.trade_name, 'El nombre comercial', { min: 2, max: 150 }),
       ruc,

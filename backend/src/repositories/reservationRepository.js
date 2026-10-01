@@ -47,18 +47,18 @@ export const reservationRepository = {
     return res.rows[0] || null;
   },
 
-  async create({ room_id, customer_id, work_shift_id, start_date, end_date, deposit_amount_pen = 0, payment_method = 'YAPE_PLIN', notes = '' }) {
+  async create({ room_id, customer_id, work_shift_id, start_date, end_date, deposit_amount_pen = 0, payment_method = 'YAPE_PLIN', notes = '', quoted_price_pen = null, stay_type = null, stay_units = null }) {
     const res = await query(
-      `INSERT INTO reservations (room_id, customer_id, work_shift_id, start_date, end_date, deposit_amount_pen, payment_method, status, notes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'confirmed', $8)
+      `INSERT INTO reservations (room_id, customer_id, work_shift_id, start_date, end_date, deposit_amount_pen, payment_method, status, notes, quoted_price_pen, stay_type, stay_units)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'confirmed', $8, $9, $10, $11)
        RETURNING *`,
-      [room_id, customer_id, work_shift_id, start_date, end_date, deposit_amount_pen, payment_method, notes]
+      [room_id, customer_id, work_shift_id, start_date, end_date, deposit_amount_pen, payment_method, notes, quoted_price_pen, stay_type, stay_units]
     );
     return res.rows[0];
   },
 
 
-  async update(id, { room_id, start_date, end_date, deposit_amount_pen, notes, status }) {
+  async update(id, { room_id, start_date, end_date, deposit_amount_pen, notes, status, quoted_price_pen, stay_type, stay_units }) {
     const res = await query(
       `UPDATE reservations
        SET room_id = COALESCE($2, room_id),
@@ -67,10 +67,13 @@ export const reservationRepository = {
            deposit_amount_pen = COALESCE($5, deposit_amount_pen),
            notes = COALESCE($6, notes),
            status = COALESCE($7, status),
+           quoted_price_pen = COALESCE($8, quoted_price_pen),
+           stay_type = COALESCE($9, stay_type),
+           stay_units = COALESCE($10, stay_units),
            updated_at = NOW()
        WHERE id = $1
        RETURNING *`,
-      [id, room_id, start_date, end_date, deposit_amount_pen, notes, status]
+      [id, room_id, start_date, end_date, deposit_amount_pen, notes, status, quoted_price_pen, stay_type, stay_units]
     );
     return res.rows[0] || null;
   },

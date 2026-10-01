@@ -131,3 +131,10 @@ export async function checkoutSettled(token, stayId) {
 export async function markRoomAvailable(token, roomId) {
   return await expectOk('PATCH', `/rooms/${roomId}/status`, { token, body: { status: 'available' } });
 }
+
+/** Cambia la regla de abono mínimo para reservas y devuelve la anterior (para restaurarla) */
+export async function setDepositRule(token, type, value) {
+  const info = await expectOk('GET', '/settings/hotel-info', { token });
+  await expectOk('PUT', '/settings/hotel-info', { token, body: { reservation_deposit_type: type, reservation_deposit_value: value } });
+  return { type: info.reservation_deposit_type, value: Number(info.reservation_deposit_value) };
+}

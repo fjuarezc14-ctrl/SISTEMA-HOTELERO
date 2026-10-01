@@ -14,11 +14,11 @@ export const reservationController = {
   async create(req, res, next) {
     try {
       const {
-        room_id, customer_data, start_date, end_date, deposit_amount_pen, payment_method,
+        room_id, customer_data, start_date, end_date, stay_type, units, deposit_amount_pen, payment_method,
         reference_number, split_payments, notes, voucher_type, customer_ruc, customer_business_name
       } = req.body;
       const reservation = await reservationService.createReservation({
-        room_id, customer_data, start_date, end_date, deposit_amount_pen, payment_method,
+        room_id, customer_data, start_date, end_date, stay_type, units, deposit_amount_pen, payment_method,
         reference_number, split_payments, notes, voucher_type, customer_ruc, customer_business_name,
         user_id: req.user.id
       });
@@ -64,9 +64,27 @@ export const reservationController = {
     }
   },
 
+  async quote(req, res, next) {
+    try {
+      const { room_id, start_date, stay_type, units, end_date, exclude_reservation_id } = req.query;
+      const quote = await reservationService.quoteReservation({
+        room_id,
+        start_date,
+        stay_type: stay_type || undefined,
+        units: units !== undefined && units !== '' ? Number(units) : undefined,
+        end_date: end_date || undefined,
+        exclude_reservation_id: exclude_reservation_id || null
+      });
+      res.json({ success: true, data: quote });
+    } catch (error) {
+      next(error);
+    }
+  },
+
   async update(req, res, next) {
     try {
-      const reservation = await reservationService.updateReservation(req.params.id, req.body);
+      const { room_id, start_date, stay_type, units, end_date, notes } = req.body;
+      const reservation = await reservationService.updateReservation(req.params.id, { room_id, start_date, stay_type, units, end_date, notes });
       res.json({
         success: true,
         message: 'Reserva actualizada exitosamente.',

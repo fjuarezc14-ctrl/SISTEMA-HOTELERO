@@ -68,7 +68,7 @@ export const stayService = {
    * Cotización de un check-in (lo que verá el recepcionista antes de confirmar).
    * Incluye conflicto con reservas si lo hay (en `conflict`, sin lanzar error).
    */
-  async quoteCheckIn({ room_id, stay_type = 'overnight', hours_count, reservation_id = null }) {
+  async quoteCheckIn({ room_id, stay_type = 'overnight', units, hours_count, reservation_id = null }) {
     const room = await roomRepository.findRoomById(room_id);
     if (!room) throw notFound('Habitación no encontrada.');
 
@@ -76,7 +76,7 @@ export const stayService = {
     const start = new Date();
     const quote = reservation
       ? await pricingService.quoteReservation(room, reservation, { start })
-      : { stay_type, ...(await pricingService.quoteWalkIn(room, { stay_type, hours_count, start })) };
+      : await pricingService.quoteStay(room, { stay_type, units: units ?? hours_count, start });
 
     const deposit = reservation ? Number(reservation.deposit_amount_pen || 0) : 0;
     let conflict = null;
@@ -113,6 +113,7 @@ export const stayService = {
     room_id,
     customer_data, // { document_type, document_number, full_name, phone } (ignorado si viene de reserva)
     stay_type = 'overnight',
+    units,
     hours_count,
     companion_name = '',
     companions = [],
@@ -131,7 +132,7 @@ export const stayService = {
     const startTime = new Date();
     const quote = reservation
       ? await pricingService.quoteReservation(room, reservation, { start: startTime })
-      : { stay_type, ...(await pricingService.quoteWalkIn(room, { stay_type, hours_count, start: startTime })) };
+      : await pricingService.quoteStay(room, { stay_type, units: units ?? hours_count, start: startTime });
 
     // 3. No pisar reservas de otros (incluye margen de limpieza)
     await occupancyService.assertRoomFree({

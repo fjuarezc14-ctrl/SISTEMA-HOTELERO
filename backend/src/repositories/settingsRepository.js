@@ -6,7 +6,7 @@ export const settingsRepository = {
     return res.rows[0] || null;
   },
 
-  async updateHotelInfo({ business_name, trade_name, ruc, address, phone, email, overnight_checkout_time, grace_period_minutes, ticket_footer_legend, cleaning_buffer_minutes, logo_url }) {
+  async updateHotelInfo({ business_name, trade_name, ruc, address, phone, email, overnight_checkout_time, grace_period_minutes, ticket_footer_legend, cleaning_buffer_minutes, logo_url, reservation_deposit_type, reservation_deposit_value }) {
     const res = await query(
       `UPDATE hotel_info
        SET business_name = COALESCE($1, business_name),
@@ -20,9 +20,11 @@ export const settingsRepository = {
            ticket_footer_legend = COALESCE($9, ticket_footer_legend),
            cleaning_buffer_minutes = COALESCE($10, cleaning_buffer_minutes),
            logo_url = COALESCE($11, logo_url),
+           reservation_deposit_type = COALESCE($12, reservation_deposit_type),
+           reservation_deposit_value = COALESCE($13, reservation_deposit_value),
            updated_at = NOW()
        RETURNING *`,
-      [business_name, trade_name, ruc, address, phone, email, overnight_checkout_time, grace_period_minutes, ticket_footer_legend, cleaning_buffer_minutes, logo_url]
+      [business_name, trade_name, ruc, address, phone, email, overnight_checkout_time, grace_period_minutes, ticket_footer_legend, cleaning_buffer_minutes, logo_url, reservation_deposit_type, reservation_deposit_value]
     );
     return res.rows[0] || null;
   },

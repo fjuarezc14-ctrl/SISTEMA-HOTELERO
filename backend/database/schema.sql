@@ -42,6 +42,10 @@ ALTER TABLE hotel_info ADD COLUMN IF NOT EXISTS logo_url TEXT;
 -- Margen para desocupar y limpiar la habitación entre una ocupación y la siguiente (reservas / check-in)
 ALTER TABLE hotel_info ADD COLUMN IF NOT EXISTS cleaning_buffer_minutes INT NOT NULL DEFAULT 60;
 
+-- Abono mínimo para reservar: porcentaje del total o monto fijo
+ALTER TABLE hotel_info ADD COLUMN IF NOT EXISTS reservation_deposit_type VARCHAR(10) NOT NULL DEFAULT 'percent';
+ALTER TABLE hotel_info ADD COLUMN IF NOT EXISTS reservation_deposit_value NUMERIC(10, 2) NOT NULL DEFAULT 30;
+
 -- Módulos permitidos por usuario (NULL = todos los módulos operativos). Los administradores siempre tienen todos.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS allowed_modules TEXT[];
 
@@ -355,3 +359,9 @@ CREATE TABLE IF NOT EXISTS textile_movements (
 
 CREATE INDEX IF NOT EXISTS idx_laundry_batch_items_batch ON laundry_batch_items(batch_id);
 CREATE INDEX IF NOT EXISTS idx_textile_movements_item ON textile_movements(item_id);
+
+-- 20. Precio del alojamiento cotizado al reservar (se respeta en el check-in aunque cambien las tarifas)
+ALTER TABLE reservations ADD COLUMN IF NOT EXISTS quoted_price_pen NUMERIC(10, 2);
+-- Duración elegida al reservar (mismo selector que el check-in): modalidad y cantidad (noches/días u horas)
+ALTER TABLE reservations ADD COLUMN IF NOT EXISTS stay_type VARCHAR(20);
+ALTER TABLE reservations ADD COLUMN IF NOT EXISTS stay_units INT;

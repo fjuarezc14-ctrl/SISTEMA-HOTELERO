@@ -44,10 +44,27 @@ export function nightsBetween(start, end) {
 
 export const pricingService = {
   /**
+   * Tarifa única de una estadía (check-in y reservas usan la misma):
+   * modalidad + cantidad (noches/días u horas) + llegada → precio y hora de salida.
+   * @returns {{ stay_type, units, price, expected_end_time, breakdown }}
+   */
+  async quoteStay(room, { stay_type = 'overnight', units, start = new Date() }) {
+    const quote =
+      stay_type === 'hours'
+        ? await this.quoteWalkIn(room, { stay_type, hours_count: units, start })
+        : await this.quoteWalkIn(room, { stay_type, nights: units, start });
+    return {
+      stay_type,
+      units: stay_type === 'hours' ? quote.breakdown.hours : quote.breakdown.nights,
+      ...quote
+    };
+  },
+
+  /**
    * Tarifa de una estadía nueva (walk-in).
    * @returns {{ price, expected_end_time, breakdown }}
    */
-  async quoteWalkIn(room, { stay_type = 'overnight', hours_count, start = new Date() }) {
+  async quoteWalkIn(room, { stay_type = 'overnight', hours_count, nights, start = new Date() }) {
     const checkout = await getCheckoutTime();
 
     if (stay_type === 'hours') {
@@ -67,11 +84,15 @@ export const pricingService = {
     }
 
     if (stay_type === 'overnight' || stay_type === 'full_day') {
-      const price = Number(stay_type === 'overnight' ? room.price_overnight_default : room.price_full_day_default);
+      const count = nights === undefined || nights === null || nights === '' ? 1 : Number(nights);
+      if (!Number.isInteger(count) || count < 1 || count > MAX_NIGHTS) {
+        throw badRequest(`La cantidad de ${stay_type === 'overnight' ? 'noches' : 'días'} debe ser un número entero entre 1 y ${MAX_NIGHTS}.`);
+      }
+      const rate = Number(stay_type === 'overnight' ? room.price_overnight_default : room.price_full_day_default);
       return {
-        price: round2(price),
-        expected_end_time: checkoutAfter(start, 1, checkout),
-        breakdown: { stay_type, nights: 1, nightly_rate: price }
+        price: round2(rate * count),
+        expected_end_time: checkoutAfter(start, count, checkout),
+        breakdown: { stay_type, nights: count, nightly_rate: rate }
       };
     }
 
@@ -79,16 +100,15 @@ export const pricingService = {
   },
 
   /**
-   * Tarifa de una estadía que viene de una reserva: se respeta la fecha de salida reservada.
-   * Precio = noches × tarifa por noche (si dura menos de un día, se cobra por horas).
+   * Tarifa de un rango de fechas (cotización de una reserva).
+   * Precio = noches × tarifa por noche (si es el mismo día y dura hasta 24 h, se cobra por horas).
    */
-  async quoteReservation(room, reservation, { start = new Date() } = {}) {
-    const end = new Date(reservation.end_date);
-    if (end <= new Date(start)) {
-      throw badRequest('La reserva ya terminó; no se puede hacer check-in. Reprográmala o crea una nueva.');
+  quoteRange(room, startDate, endDate) {
+    const reservedStart = new Date(startDate);
+    const end = new Date(endDate);
+    if (isNaN(reservedStart.getTime()) || isNaN(end.getTime()) || end <= reservedStart) {
+      throw badRequest('Las fechas de la reserva no son válidas.');
     }
-
-    const reservedStart = new Date(reservation.start_date);
     const durationHours = (end - reservedStart) / 3600000;
     const sameDay = reservedStart.toDateString() === end.toDateString();
 
@@ -99,7 +119,6 @@ export const pricingService = {
       return {
         stay_type: 'hours',
         price: round2(Number(room.price_hours_default) + extraHours * Number(room.price_extra_hour_default)),
-        expected_end_time: end,
         breakdown: { stay_type: 'hours', hours, base_hours: baseHours, extra_hours: extraHours }
       };
     }
@@ -110,8 +129,37 @@ export const pricingService = {
     return {
       stay_type: 'overnight',
       price: round2(nights * nightly),
-      expected_end_time: end,
       breakdown: { stay_type: 'overnight', nights, nightly_rate: nightly }
     };
+  },
+
+  /**
+   * Tarifa de una estadía que viene de una reserva: se respeta la fecha de salida reservada
+   * y el precio cotizado al reservar (aunque las tarifas hayan cambiado después).
+   */
+  async quoteReservation(room, reservation, { start = new Date() } = {}) {
+    const end = new Date(reservation.end_date);
+    if (end <= new Date(start)) {
+      throw badRequest('La reserva ya terminó; no se puede hacer check-in. Reprográmala o crea una nueva.');
+    }
+    // Reservas con modalidad guardada: misma tarifa que al reservar; antiguas: por rango de fechas
+    const quote = reservation.stay_type
+      ? await this.quoteStay(room, { stay_type: reservation.stay_type, units: reservation.stay_units, start: reservation.start_date })
+      : this.quoteRange(room, reservation.start_date, reservation.end_date);
+    const quoted = reservation.quoted_price_pen;
+    return {
+      ...quote,
+      price: quoted !== null && quoted !== undefined ? round2(quoted) : quote.price,
+      expected_end_time: end
+    };
+  },
+
+  /** Abono mínimo para reservar según la configuración (porcentaje del total o monto fijo, nunca más que el total) */
+  async minDeposit(total) {
+    const res = await query('SELECT reservation_deposit_type, reservation_deposit_value FROM hotel_info LIMIT 1');
+    const type = res.rows[0]?.reservation_deposit_type || 'percent';
+    const value = Number(res.rows[0]?.reservation_deposit_value ?? 0);
+    const min = type === 'fixed' ? value : (Number(total) * value) / 100;
+    return { min_deposit: round2(Math.min(Number(total), Math.max(0, min))), rule: { type, value } };
   }
 };
