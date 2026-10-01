@@ -5,6 +5,7 @@ import { shiftRepository } from '../repositories/shiftRepository.js';
 import { kardexRepository } from '../repositories/kardexRepository.js';
 import { withTransaction } from '../config/db.js';
 import { normalizePayment } from '../utils/payments.js';
+import * as v from '../utils/validate.js';
 import { issueVoucher } from './voucherService.js';
 
 function operationalError(message, statusCode) {
@@ -59,17 +60,20 @@ export const productService = {
   },
 
   async createProduct(productData) {
-    if (!productData.name || !productData.sale_price_pen) {
-      const error = new Error('El nombre y el precio de venta son obligatorios.');
-      error.statusCode = 400;
-      error.isOperational = true;
-      throw error;
-    }
-    return await productRepository.create(productData);
+    return await productRepository.create({
+      ...productData,
+      name: v.text(productData.name, 'El nombre del producto', { min: 2, max: 100 }),
+      sale_price_pen: v.money(productData.sale_price_pen, 'El precio de venta', { allowZero: false, max: 10000 }),
+      stock: v.integer(productData.stock ?? 0, 'El stock', { min: 0, max: 99999 })
+    });
   },
 
   async updateProduct(id, productData) {
-    return await productRepository.update(id, productData);
+    const data = { ...productData };
+    if (data.name !== undefined) data.name = v.text(data.name, 'El nombre del producto', { min: 2, max: 100 });
+    if (data.sale_price_pen !== undefined) data.sale_price_pen = v.money(data.sale_price_pen, 'El precio de venta', { allowZero: false, max: 10000 });
+    if (data.stock !== undefined) data.stock = v.integer(data.stock, 'El stock', { min: 0, max: 99999 });
+    return await productRepository.update(id, data);
   },
 
   // Cargar consumo a la habitación (TRANSACCIÓN ATÓMICA, uno o varios productos)
@@ -217,9 +221,10 @@ export const productService = {
       throw error;
     }
 
-    const qty = Number(quantity);
-    const unitCost = Number(unit_cost_pen);
-    const totalCost = qty * unitCost;
+    const qty = v.integer(quantity, 'La cantidad comprada', { min: 1, max: 99999 });
+    const unitCost = v.money(unit_cost_pen, 'El costo unitario', { max: 10000 });
+    const totalCost = Math.round(qty * unitCost * 100) / 100;
+    supplier_name = v.text(supplier_name, 'El proveedor', { max: 150, required: false });
 
     // Incrementar stock en productos
     const currentStock = Number(product.stock || 0);

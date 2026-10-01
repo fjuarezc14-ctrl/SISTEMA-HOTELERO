@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs';
 import { settingsRepository } from '../repositories/settingsRepository.js';
 import { userRepository } from '../repositories/userRepository.js';
 import { ROLES, ASSIGNABLE_MODULES } from '../constants/index.js';
+import * as v from '../utils/validate.js';
 
 function forbidden(message) {
   const error = new Error(message);
@@ -43,8 +44,33 @@ export const settingsService = {
       }
       return n;
     };
+    const opt = (value, field, opts) => (value === undefined || value === null ? undefined : v.text(value, field, opts));
+    const ruc = opt(infoData.ruc, 'El RUC', { required: false, max: 11 });
+    if (ruc && !/^(10|15|17|20)\d{9}$/.test(ruc)) throw v.badRequest('El RUC del hotel debe tener 11 dígitos.');
+    const checkout = opt(infoData.overnight_checkout_time, 'La hora de salida', { max: 5 });
+    if (checkout && !/^([01]\d|2[0-3]):[0-5]\d$/.test(checkout)) throw v.badRequest('La hora de salida debe tener formato HH:MM.');
+
+    // Logo: URL http(s) o imagen subida (png, jpg, webp o gif) de hasta ~500 KB
+    let logo = infoData.logo_url;
+    if (logo !== undefined && logo !== null) {
+      logo = String(logo).trim();
+      const isUrl = /^https?:\/\/\S+$/i.test(logo) && logo.length <= 1000;
+      const isImage = /^data:image\/(png|jpeg|jpg|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(logo) && logo.length <= 700000;
+      if (logo && !isUrl && !isImage) {
+        throw v.badRequest('El logo debe ser una URL http(s) o una imagen PNG, JPG, WEBP o GIF de hasta 500 KB.');
+      }
+    }
+
     return await settingsRepository.updateHotelInfo({
-      ...infoData,
+      business_name: opt(infoData.business_name, 'La razón social', { min: 2, max: 150 }),
+      trade_name: opt(infoData.trade_name, 'El nombre comercial', { min: 2, max: 150 }),
+      ruc,
+      address: opt(infoData.address, 'La dirección', { max: 255, required: false }),
+      phone: opt(infoData.phone, 'El teléfono', { max: 30, required: false }),
+      email: opt(infoData.email, 'El correo', { max: 100, required: false }),
+      overnight_checkout_time: checkout,
+      ticket_footer_legend: opt(infoData.ticket_footer_legend, 'La leyenda del ticket', { max: 500, required: false }),
+      logo_url: logo,
       grace_period_minutes: checkRange(infoData.grace_period_minutes, 'La tolerancia de salida (minutos)', 0, 240),
       cleaning_buffer_minutes: checkRange(infoData.cleaning_buffer_minutes, 'El margen de limpieza (minutos)', 0, 720)
     });

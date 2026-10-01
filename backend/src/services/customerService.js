@@ -1,3 +1,4 @@
+import * as v from '../utils/validate.js';
 import { customerRepository } from '../repositories/customerRepository.js';
 
 export const customerService = {
@@ -70,15 +71,12 @@ export const customerService = {
   },
 
   async registerOrUpdateCustomer({ document_type = 'DNI', document_number, full_name, phone = '', email = '', is_blacklisted = false, blacklist_reason = '' }) {
-    if (!document_number || !full_name) {
-      const error = new Error('El número de documento y el nombre completo son obligatorios.');
-      error.statusCode = 400;
-      error.isOperational = true;
-      throw error;
-    }
-
-    const cleanDoc = document_number.trim();
-    const cleanName = full_name.trim();
+    const data = v.customerData({ document_type, document_number, full_name, phone, email });
+    document_type = data.document_type;
+    const cleanDoc = data.document_number;
+    const cleanName = data.full_name;
+    phone = data.phone;
+    email = data.email;
 
     const existing = await customerRepository.findByDocument(cleanDoc);
     if (existing) {
@@ -86,10 +84,9 @@ export const customerService = {
         document_type,
         document_number: cleanDoc,
         full_name: cleanName,
-        phone: phone ? phone.trim() : existing.phone,
-        email: email ? email.trim() : existing.email,
-        is_blacklisted,
-        blacklist_reason
+        phone: phone || existing.phone,
+        email: email || existing.email
+        // El veto no se modifica por aquí (tiene su propia acción en Clientes / Incidentes)
       });
     }
 
@@ -97,24 +94,18 @@ export const customerService = {
       document_type,
       document_number: cleanDoc,
       full_name: cleanName,
-      phone: phone.trim(),
-      email: email.trim(),
-      is_blacklisted,
-      blacklist_reason
+      phone,
+      email,
+      is_blacklisted: Boolean(is_blacklisted),
+      blacklist_reason: is_blacklisted ? v.text(blacklist_reason, 'El motivo del veto', { max: 500, required: false }) : ''
     });
   },
 
   async updateCustomer(id, { document_type, document_number, full_name, phone = '', email = '', is_blacklisted, blacklist_reason = '' }) {
     const customer = await this.getCustomerById(id);
 
-    if (!document_number || !String(document_number).trim() || !full_name || !String(full_name).trim()) {
-      const error = new Error('El número de documento y el nombre completo son obligatorios.');
-      error.statusCode = 400;
-      error.isOperational = true;
-      throw error;
-    }
-
-    const cleanDoc = String(document_number).trim();
+    const data = v.customerData({ document_type: document_type || customer.document_type, document_number, full_name, phone, email });
+    const cleanDoc = data.document_number;
 
     // El documento no puede pertenecer a otro cliente
     const sameDoc = await customerRepository.findByDocument(cleanDoc);
@@ -128,13 +119,13 @@ export const customerService = {
     const blacklisted = is_blacklisted === undefined ? customer.is_blacklisted : Boolean(is_blacklisted);
 
     return await customerRepository.update(customer.id, {
-      document_type: document_type || customer.document_type,
+      document_type: data.document_type,
       document_number: cleanDoc,
-      full_name: String(full_name).trim(),
-      phone: String(phone || '').trim(),
-      email: String(email || '').trim(),
+      full_name: data.full_name,
+      phone: data.phone,
+      email: data.email,
       is_blacklisted: blacklisted,
-      blacklist_reason: blacklisted ? String(blacklist_reason || '').trim() : ''
+      blacklist_reason: blacklisted ? v.text(blacklist_reason, 'El motivo del veto', { max: 500, required: false }) : ''
     });
   },
 

@@ -1,3 +1,4 @@
+import * as v from '../utils/validate.js';
 import { incidentRepository } from '../repositories/incidentRepository.js';
 
 export const incidentService = {
@@ -14,9 +15,9 @@ export const incidentService = {
       room_id,
       customer_id,
       user_id,
-      incident_type,
-      description: description.trim(),
-      penalty_amount_pen: Number(penalty_amount_pen || 0)
+      incident_type: v.oneOf(incident_type, 'El tipo de incidente', ['damage', 'loss', 'unpaid_debt', 'disturbance', 'other']),
+      description: v.text(description, 'La descripción del incidente', { min: 3, max: 1000 }),
+      penalty_amount_pen: v.money(penalty_amount_pen || 0, 'La penalidad', { max: 10000 })
     });
   },
 

@@ -7,6 +7,7 @@ import { stayService } from './stayService.js';
 import { occupancyService } from './occupancyService.js';
 import { issueVoucher } from './voucherService.js';
 import { normalizePayment } from '../utils/payments.js';
+import * as v from '../utils/validate.js';
 
 function badRequest(message) {
   const error = new Error(message);
@@ -78,7 +79,8 @@ export const reservationService = {
     await occupancyService.assertRoomFree({ roomId: room.id, start: start_date, end: end_date });
 
     // Registrar o actualizar cliente
-    let customer = await customerRepository.findByDocument(customer_data.document_number.trim());
+    const custData = v.customerData(customer_data);
+    let customer = await customerRepository.findByDocument(custData.document_number);
     if (customer) {
       if (customer.is_blacklisted) {
         const error = new Error(`El cliente ${customer.full_name} se encuentra VETADO del hotel (Lista Negra). Motivo: ${customer.blacklist_reason || 'Sin especificar'}. No se pueden realizar reservas.`);
@@ -88,10 +90,10 @@ export const reservationService = {
       }
     } else {
       customer = await customerRepository.create({
-        document_type: customer_data.document_type || 'DNI',
-        document_number: customer_data.document_number.trim(),
-        full_name: customer_data.full_name.trim(),
-        phone: customer_data.phone ? customer_data.phone.trim() : ''
+        document_type: custData.document_type,
+        document_number: custData.document_number,
+        full_name: custData.full_name,
+        phone: custData.phone
       });
     }
 

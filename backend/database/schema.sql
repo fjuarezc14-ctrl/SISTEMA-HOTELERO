@@ -36,6 +36,9 @@ CREATE TABLE IF NOT EXISTS users (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Logo del hotel (URL http(s) o imagen subida como data URL)
+ALTER TABLE hotel_info ADD COLUMN IF NOT EXISTS logo_url TEXT;
+
 -- Margen para desocupar y limpiar la habitación entre una ocupación y la siguiente (reservas / check-in)
 ALTER TABLE hotel_info ADD COLUMN IF NOT EXISTS cleaning_buffer_minutes INT NOT NULL DEFAULT 60;
 

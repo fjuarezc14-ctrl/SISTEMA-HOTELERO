@@ -10,6 +10,7 @@ import { pricingService } from './pricingService.js';
 import { occupancyService } from './occupancyService.js';
 import { normalizePayment } from '../utils/payments.js';
 import { issueVoucher } from './voucherService.js';
+import * as v from '../utils/validate.js';
 import { query } from '../config/db.js';
 
 const round2 = (n) => Math.round(Number(n) * 100) / 100;
@@ -145,20 +146,18 @@ export const stayService = {
     if (reservation) {
       customer = await customerRepository.findById(reservation.customer_id);
     } else {
-      if (!customer_data?.document_number || !customer_data?.full_name) {
-        throw badRequest('El documento y el nombre del huésped son obligatorios.');
-      }
-      customer = await customerRepository.findByDocument(String(customer_data.document_number).trim());
+      const data = v.customerData(customer_data || {});
+      customer = await customerRepository.findByDocument(data.document_number);
       if (!customer) {
         customer = await customerRepository.create({
-          document_type: customer_data.document_type || 'DNI',
-          document_number: String(customer_data.document_number).trim(),
-          full_name: String(customer_data.full_name).trim().slice(0, 150),
-          phone: customer_data.phone ? String(customer_data.phone).trim() : ''
+          document_type: data.document_type,
+          document_number: data.document_number,
+          full_name: data.full_name,
+          phone: data.phone
         });
-      } else if (!customer.phone && customer_data.phone) {
+      } else if (!customer.phone && data.phone) {
         // Cliente registrado: sus datos no se modifican desde el check-in (solo completar teléfono vacío)
-        customer = await customerRepository.update(customer.id, { phone: String(customer_data.phone).trim() });
+        customer = await customerRepository.update(customer.id, { phone: data.phone });
       }
     }
     if (customer.is_blacklisted) {
