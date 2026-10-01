@@ -9,6 +9,7 @@ y que las reglas de negocio y permisos se cumplan. Usan el runner nativo de Node
 | `flows/stays.test.js` | Check-in (walk-in y desde reserva), tarifas del servidor, consumos, horas extra, salida tardía, penalidad y checkout |
 | `flows/store.test.js` | Tienda: carrito, stock, precio congelado en ventas, pago mixto |
 | `flows/vouchers.test.js` | Ticket / boleta / factura: numeración correlativa, RUC, un comprobante por operación |
+| `flows/duration.test.js` | Duración: pernocte (1 noche y horario), estadía por días, abono mínimo, precio reservado |
 | `flows/cash.test.js` | Caja y turnos: efectivo esperado, anulaciones, arqueo, un solo turno abierto |
 | `flows/validation.test.js` | Validaciones de datos y permisos por rol/módulo |
 | `flows/textiles.test.js` | Textiles: movimientos, lavandería, retorno con dañadas, stock bajo |
@@ -39,4 +40,5 @@ docker exec -e DB_NAME=hotel_test hotel_peru_backend npm run test:flows
 
 Variables opcionales: `TEST_API_URL` (por defecto `http://localhost:4021/api/v1`), `TEST_ADMIN_USER`, `TEST_ADMIN_PASSWORD`.
 
-Cada ejecución usa documentos y fechas aleatorias, así que se pueden correr muchas veces seguidas.
+Antes de cada corrida, `tests/resetTestDb.js` limpia la base de pruebas (reservas, estadías, caja, ventas, textiles)
+y deja las habitaciones disponibles. Solo funciona si `DB_NAME` contiene "test", así que nunca toca la base real.

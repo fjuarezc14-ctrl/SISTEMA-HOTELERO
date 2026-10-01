@@ -17,12 +17,22 @@ function badRequest(message) {
 
 const round2 = (n) => Math.round(Number(n) * 100) / 100;
 
-/** Hora de salida por noche configurada (HH:MM). Por defecto 12:00 */
-async function getCheckoutTime() {
-  const res = await query('SELECT overnight_checkout_time FROM hotel_info LIMIT 1');
-  const value = res.rows[0]?.overnight_checkout_time || '12:00';
-  const [h, m] = String(value).split(':').map((n) => parseInt(n, 10));
-  return { hours: Number.isInteger(h) ? h : 12, minutes: Number.isInteger(m) ? m : 0 };
+const parseTime = (value, fallback) => {
+  const [h, m] = String(value || fallback).split(':').map((n) => parseInt(n, 10));
+  return { hours: Number.isInteger(h) ? h : 0, minutes: Number.isInteger(m) ? m : 0 };
+};
+const toMinutes = (t) => t.hours * 60 + t.minutes;
+const fmtTime = (t) => `${String(t.hours).padStart(2, '0')}:${String(t.minutes).padStart(2, '0')}`;
+
+/** Horarios configurados del hotel */
+async function getSchedule() {
+  const res = await query('SELECT overnight_checkout_time, pernocte_start_time, pernocte_checkout_time FROM hotel_info LIMIT 1');
+  const row = res.rows[0] || {};
+  return {
+    dayCheckout: parseTime(row.overnight_checkout_time, '12:00'), // salida de la estadía por días
+    pernocteStart: parseTime(row.pernocte_start_time, '20:00'), // el pernocte se vende desde
+    pernocteCheckout: parseTime(row.pernocte_checkout_time, '09:00') // salida del pernocte
+  };
 }
 
 /** Día siguiente (o N días después) a la hora de salida del hotel (hora local del servidor = Lima) */
@@ -65,7 +75,7 @@ export const pricingService = {
    * @returns {{ price, expected_end_time, breakdown }}
    */
   async quoteWalkIn(room, { stay_type = 'overnight', hours_count, nights, start = new Date() }) {
-    const checkout = await getCheckoutTime();
+    const schedule = await getSchedule();
 
     if (stay_type === 'hours') {
       const baseHours = Number(room.hours_quantity_default) || 3;
@@ -83,15 +93,40 @@ export const pricingService = {
       };
     }
 
-    if (stay_type === 'overnight' || stay_type === 'full_day') {
+    // Pernocte: una sola noche, se vende desde la hora configurada y sale a su hora de salida
+    if (stay_type === 'overnight') {
+      if (nights !== undefined && nights !== null && nights !== '' && Number(nights) !== 1) {
+        throw badRequest('El pernocte es de una sola noche. Para más noches usa "Por días".');
+      }
+      const arrival = new Date(start);
+      const minuteOfDay = arrival.getHours() * 60 + arrival.getMinutes();
+      const sellFrom = toMinutes(schedule.pernocteStart);
+      const leaveAt = toMinutes(schedule.pernocteCheckout);
+      const inWindow = sellFrom > leaveAt ? minuteOfDay >= sellFrom || minuteOfDay < leaveAt : minuteOfDay >= sellFrom && minuteOfDay < leaveAt;
+      if (!inWindow) {
+        throw badRequest(`El pernocte se vende desde las ${fmtTime(schedule.pernocteStart)} hasta las ${fmtTime(schedule.pernocteCheckout)}. Para esta hora usa "Por días" o "Por horas".`);
+      }
+      const end = new Date(arrival);
+      if (minuteOfDay >= leaveAt) end.setDate(end.getDate() + 1); // llega en la noche: sale al día siguiente
+      end.setHours(schedule.pernocteCheckout.hours, schedule.pernocteCheckout.minutes, 0, 0);
+      const rate = Number(room.price_overnight_default);
+      return {
+        price: round2(rate),
+        expected_end_time: end,
+        breakdown: { stay_type, nights: 1, nightly_rate: rate }
+      };
+    }
+
+    // Por días: N días, sale el último día a la hora de salida del hotel
+    if (stay_type === 'full_day') {
       const count = nights === undefined || nights === null || nights === '' ? 1 : Number(nights);
       if (!Number.isInteger(count) || count < 1 || count > MAX_NIGHTS) {
-        throw badRequest(`La cantidad de ${stay_type === 'overnight' ? 'noches' : 'días'} debe ser un número entero entre 1 y ${MAX_NIGHTS}.`);
+        throw badRequest(`La cantidad de días debe ser un número entero entre 1 y ${MAX_NIGHTS}.`);
       }
-      const rate = Number(stay_type === 'overnight' ? room.price_overnight_default : room.price_full_day_default);
+      const rate = Number(room.price_full_day_default);
       return {
         price: round2(rate * count),
-        expected_end_time: checkoutAfter(start, count, checkout),
+        expected_end_time: checkoutAfter(start, count, schedule.dayCheckout),
         breakdown: { stay_type, nights: count, nightly_rate: rate }
       };
     }
@@ -123,13 +158,14 @@ export const pricingService = {
       };
     }
 
+    // Reservas antiguas por rango de fechas: se cobran como estadía por días
     const nights = nightsBetween(reservedStart, end);
-    if (nights > MAX_NIGHTS) throw badRequest(`Una estadía no puede superar ${MAX_NIGHTS} noches.`);
-    const nightly = Number(room.price_overnight_default);
+    if (nights > MAX_NIGHTS) throw badRequest(`Una estadía no puede superar ${MAX_NIGHTS} días.`);
+    const daily = Number(room.price_full_day_default);
     return {
-      stay_type: 'overnight',
-      price: round2(nights * nightly),
-      breakdown: { stay_type: 'overnight', nights, nightly_rate: nightly }
+      stay_type: 'full_day',
+      price: round2(nights * daily),
+      breakdown: { stay_type: 'full_day', nights, nightly_rate: daily }
     };
   },
 

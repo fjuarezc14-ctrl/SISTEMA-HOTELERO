@@ -162,7 +162,7 @@ async function main() {
   for (const plan of reservationPlan) {
     const start = limaDate(plan.days, plan.hour);
     const { room, quote } = await takeFreeRoom(
-      (r) => `/reservations/quote?room_id=${r.id}&start_date=${encodeURIComponent(start)}&stay_type=overnight&units=${plan.nights}`
+      (r) => `/reservations/quote?room_id=${r.id}&start_date=${encodeURIComponent(start)}&stay_type=full_day&units=${plan.nights}`
     );
     if (!room) break;
     const customer = customers.shift();
@@ -171,7 +171,7 @@ async function main() {
       room_id: room.id,
       customer_data: asCustomerData(customer),
       start_date: start,
-      stay_type: 'overnight',
+      stay_type: 'full_day',
       units: plan.nights,
       deposit_amount_pen: Math.min(deposit, Number(quote.price)),
       payment_method: plan.method,
@@ -186,7 +186,7 @@ async function main() {
   const products = (await api('GET', '/products')).filter((p) => p.stock > 5);
   const stays = [];
   const stayPlan = [
-    { stay_type: 'overnight', pay: true, method: 'CASH' },
+    { stay_type: 'full_day', pay: true, method: 'CASH' },
     { stay_type: 'hours', hours: 4, pay: true, method: 'YAPE_PLIN' },
     { stay_type: 'hours', pay: false, overdueMinutes: 50 }
   ];

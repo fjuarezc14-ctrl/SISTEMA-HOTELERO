@@ -6,7 +6,7 @@ export const settingsRepository = {
     return res.rows[0] || null;
   },
 
-  async updateHotelInfo({ business_name, trade_name, ruc, address, phone, email, overnight_checkout_time, grace_period_minutes, ticket_footer_legend, cleaning_buffer_minutes, logo_url, reservation_deposit_type, reservation_deposit_value }) {
+  async updateHotelInfo({ business_name, trade_name, ruc, address, phone, email, overnight_checkout_time, grace_period_minutes, ticket_footer_legend, cleaning_buffer_minutes, logo_url, reservation_deposit_type, reservation_deposit_value, pernocte_start_time, pernocte_checkout_time, standard_checkin_time }) {
     const res = await query(
       `UPDATE hotel_info
        SET business_name = COALESCE($1, business_name),
@@ -22,9 +22,12 @@ export const settingsRepository = {
            logo_url = COALESCE($11, logo_url),
            reservation_deposit_type = COALESCE($12, reservation_deposit_type),
            reservation_deposit_value = COALESCE($13, reservation_deposit_value),
+           pernocte_start_time = COALESCE($14, pernocte_start_time),
+           pernocte_checkout_time = COALESCE($15, pernocte_checkout_time),
+           standard_checkin_time = COALESCE($16, standard_checkin_time),
            updated_at = NOW()
        RETURNING *`,
-      [business_name, trade_name, ruc, address, phone, email, overnight_checkout_time, grace_period_minutes, ticket_footer_legend, cleaning_buffer_minutes, logo_url, reservation_deposit_type, reservation_deposit_value]
+      [business_name, trade_name, ruc, address, phone, email, overnight_checkout_time, grace_period_minutes, ticket_footer_legend, cleaning_buffer_minutes, logo_url, reservation_deposit_type, reservation_deposit_value, pernocte_start_time, pernocte_checkout_time, standard_checkin_time]
     );
     return res.rows[0] || null;
   },

@@ -46,6 +46,11 @@ ALTER TABLE hotel_info ADD COLUMN IF NOT EXISTS cleaning_buffer_minutes INT NOT 
 ALTER TABLE hotel_info ADD COLUMN IF NOT EXISTS reservation_deposit_type VARCHAR(10) NOT NULL DEFAULT 'percent';
 ALTER TABLE hotel_info ADD COLUMN IF NOT EXISTS reservation_deposit_value NUMERIC(10, 2) NOT NULL DEFAULT 30;
 
+-- Horarios: pernocte (se vende desde / sale a) y estadía por días (ingreso sugerido; la salida es overnight_checkout_time)
+ALTER TABLE hotel_info ADD COLUMN IF NOT EXISTS pernocte_start_time VARCHAR(5) NOT NULL DEFAULT '20:00';
+ALTER TABLE hotel_info ADD COLUMN IF NOT EXISTS pernocte_checkout_time VARCHAR(5) NOT NULL DEFAULT '09:00';
+ALTER TABLE hotel_info ADD COLUMN IF NOT EXISTS standard_checkin_time VARCHAR(5) NOT NULL DEFAULT '14:00';
+
 -- Módulos permitidos por usuario (NULL = todos los módulos operativos). Los administradores siempre tienen todos.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS allowed_modules TEXT[];
 
@@ -365,3 +370,19 @@ ALTER TABLE reservations ADD COLUMN IF NOT EXISTS quoted_price_pen NUMERIC(10, 2
 -- Duración elegida al reservar (mismo selector que el check-in): modalidad y cantidad (noches/días u horas)
 ALTER TABLE reservations ADD COLUMN IF NOT EXISTS stay_type VARCHAR(20);
 ALTER TABLE reservations ADD COLUMN IF NOT EXISTS stay_units INT;
+
+-- 21. Migraciones de datos que deben ejecutarse una sola vez
+CREATE TABLE IF NOT EXISTS schema_migrations (
+    name VARCHAR(100) PRIMARY KEY,
+    applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- "Por noche" pasa a ser pernocte (1 noche): las reservas creadas antes eran estadías de hotel,
+-- así que pasan a "Por días" conservando su precio cotizado
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM schema_migrations WHERE name = '2026_10_pernocte_por_dias') THEN
+    UPDATE reservations SET stay_type = 'full_day' WHERE stay_type = 'overnight';
+    INSERT INTO schema_migrations (name) VALUES ('2026_10_pernocte_por_dias');
+  END IF;
+END $$;

@@ -29,13 +29,13 @@ test('el efectivo esperado del turno = fondo + ingresos en efectivo − egresos 
 
 test('anular un cobro de estadía revierte lo pagado y vuelve a quedar saldo', async () => {
   const room = await getAvailableRoom(token, [], { freeDays: 2 });
-  const quote = await expectOk('GET', `/stays/quote?room_id=${room.id}&stay_type=overnight`, { token });
+  const quote = await expectOk('GET', `/stays/quote?room_id=${room.id}&stay_type=full_day`, { token });
   const stay = await expectOk('POST', '/stays/checkin', {
     token,
     body: {
       room_id: room.id,
       customer_data: { document_type: 'DNI', document_number: randomDni(), full_name: 'Huésped Anulación' },
-      stay_type: 'overnight',
+      stay_type: 'full_day',
       initial_payment: { amount: quote.price, payment_method: 'CASH' }
     }
   });

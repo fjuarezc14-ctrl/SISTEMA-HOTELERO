@@ -59,7 +59,7 @@ test('habitaciones: no se libera a mano una habitación con huésped', async () 
   await expectError('PATCH', `/rooms/${room.id}/status`, { token, body: { status: 'occupied' } }, 400);
   const stay = await expectOk('POST', '/stays/checkin', {
     token,
-    body: { room_id: room.id, customer_data: { document_type: 'DNI', document_number: randomDni(), full_name: 'Huésped Validación' }, stay_type: 'overnight' }
+    body: { room_id: room.id, customer_data: { document_type: 'DNI', document_number: randomDni(), full_name: 'Huésped Validación' }, stay_type: 'full_day' }
   });
   cleanups.push(async () => {
     await checkoutSettled(token, stay.id);

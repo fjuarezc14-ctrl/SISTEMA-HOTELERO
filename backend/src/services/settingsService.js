@@ -47,8 +47,15 @@ export const settingsService = {
     const opt = (value, field, opts) => (value === undefined || value === null ? undefined : v.text(value, field, opts));
     const ruc = opt(infoData.ruc, 'El RUC', { required: false, max: 11 });
     if (ruc && !/^(10|15|17|20)\d{9}$/.test(ruc)) throw v.badRequest('El RUC del hotel debe tener 11 dígitos.');
-    const checkout = opt(infoData.overnight_checkout_time, 'La hora de salida', { max: 5 });
-    if (checkout && !/^([01]\d|2[0-3]):[0-5]\d$/.test(checkout)) throw v.badRequest('La hora de salida debe tener formato HH:MM.');
+    const time = (value, field) => {
+      const t = opt(value, field, { max: 5 });
+      if (t && !/^([01]\d|2[0-3]):[0-5]\d$/.test(t)) throw v.badRequest(`${field} debe tener formato HH:MM.`);
+      return t;
+    };
+    const checkout = time(infoData.overnight_checkout_time, 'La hora de salida de la estadía por días');
+    const pernocteStart = time(infoData.pernocte_start_time, 'La hora desde la que se vende el pernocte');
+    const pernocteCheckout = time(infoData.pernocte_checkout_time, 'La hora de salida del pernocte');
+    const standardCheckin = time(infoData.standard_checkin_time, 'La hora de ingreso');
 
     // Logo: URL http(s) o imagen subida (png, jpg, webp o gif) de hasta ~500 KB
     let logo = infoData.logo_url;
@@ -83,6 +90,9 @@ export const settingsService = {
       phone: opt(infoData.phone, 'El teléfono', { max: 30, required: false }),
       email: opt(infoData.email, 'El correo', { max: 100, required: false }),
       overnight_checkout_time: checkout,
+      pernocte_start_time: pernocteStart,
+      pernocte_checkout_time: pernocteCheckout,
+      standard_checkin_time: standardCheckin,
       ticket_footer_legend: opt(infoData.ticket_footer_legend, 'La leyenda del ticket', { max: 500, required: false }),
       logo_url: logo,
       grace_period_minutes: checkRange(infoData.grace_period_minutes, 'La tolerancia de salida (minutos)', 0, 240),

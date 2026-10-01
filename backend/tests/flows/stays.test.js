@@ -52,12 +52,12 @@ test('cotización por horas: base + horas extra a la tarifa de la habitación', 
   await expectError('GET', `/stays/quote?room_id=${room.id}&stay_type=hours&hours_count=${base - 1}`, { token }, 400);
 });
 
-test('cotización por noche: sale al día siguiente a la hora configurada', async () => {
+test('cotización por días: sale al día siguiente a la hora de salida del hotel', async () => {
   const room = rooms[0];
   const type = await roomType(room);
   const info = await expectOk('GET', '/settings/hotel-info', { token });
-  const quote = await expectOk('GET', `/stays/quote?room_id=${room.id}&stay_type=overnight`, { token });
-  assert.equal(money(quote.price), money(type.price_overnight_default));
+  const quote = await expectOk('GET', `/stays/quote?room_id=${room.id}&stay_type=full_day`, { token });
+  assert.equal(money(quote.price), money(type.price_full_day_default));
   const end = new Date(quote.expected_end_time);
   const limaTime = new Intl.DateTimeFormat('en-GB', { timeZone: 'America/Lima', hour: '2-digit', minute: '2-digit' }).format(end);
   assert.equal(limaTime, String(info.overnight_checkout_time).slice(0, 5));
@@ -65,11 +65,11 @@ test('cotización por noche: sale al día siguiente a la hora configurada', asyn
 
 test('check-in sin reserva: el precio lo pone el servidor y no se puede cobrar de más', async () => {
   const room = rooms[0];
-  const quote = await expectOk('GET', `/stays/quote?room_id=${room.id}&stay_type=overnight`, { token });
+  const quote = await expectOk('GET', `/stays/quote?room_id=${room.id}&stay_type=full_day`, { token });
 
   await expectError('POST', '/stays/checkin', {
     token,
-    body: { room_id: room.id, customer_data: customer(), stay_type: 'overnight', initial_payment: { amount: quote.price + 5, payment_method: 'CASH' } }
+    body: { room_id: room.id, customer_data: customer(), stay_type: 'full_day', initial_payment: { amount: quote.price + 5, payment_method: 'CASH' } }
   }, 400);
 
   const stay = await expectOk('POST', '/stays/checkin', {
@@ -77,7 +77,7 @@ test('check-in sin reserva: el precio lo pone el servidor y no se puede cobrar d
     body: {
       room_id: room.id,
       customer_data: customer(),
-      stay_type: 'overnight',
+      stay_type: 'full_day',
       custom_price: 1, // debe ignorarse
       initial_payment: { amount: quote.price, payment_method: 'YAPE_PLIN', reference_number: 'OP-123' }
     }
@@ -175,14 +175,14 @@ test('check-in desde reserva: respeta la salida reservada y cobra total − abon
   });
 
   // Un walk-in no puede ocupar la habitación encima de la reserva
-  const walkInQuote = await expectOk('GET', `/stays/quote?room_id=${room.id}&stay_type=overnight`, { token });
+  const walkInQuote = await expectOk('GET', `/stays/quote?room_id=${room.id}&stay_type=full_day`, { token });
   assert.ok(walkInQuote.conflict, 'La cotización debe avisar del conflicto con la reserva');
-  await expectError('POST', '/stays/checkin', { token, body: { room_id: room.id, customer_data: customer(), stay_type: 'overnight' } }, 409);
+  await expectError('POST', '/stays/checkin', { token, body: { room_id: room.id, customer_data: customer(), stay_type: 'full_day' } }, 409);
 
   const quote = await expectOk('GET', `/stays/quote?room_id=${room.id}&reservation_id=${reservation.id}`, { token });
   assert.equal(quote.conflict, null);
   assert.equal(quote.breakdown.nights, 2);
-  assert.equal(money(quote.price), money(2 * Number(type.price_overnight_default)));
+  assert.equal(money(quote.price), money(2 * Number(type.price_full_day_default)));
   assert.equal(money(quote.deposit), deposit);
   assert.equal(money(quote.amount_due), money(quote.price - deposit));
 
