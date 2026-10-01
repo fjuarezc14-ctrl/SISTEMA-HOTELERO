@@ -304,3 +304,54 @@ CREATE TABLE IF NOT EXISTS voucher_sequences (
     series VARCHAR(10) PRIMARY KEY,
     last_number INT NOT NULL DEFAULT 0
 );
+
+-- 19. Gestión de textiles y lavandería (módulo independiente)
+CREATE TABLE IF NOT EXISTS textile_items (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(120) UNIQUE NOT NULL,
+    category VARCHAR(20) NOT NULL DEFAULT 'bedding', -- bedding (ropa de cama), bath (ropa de baño)
+    min_stock INT NOT NULL DEFAULT 0,             -- mínimo de piezas limpias en almacén
+    clean_qty INT NOT NULL DEFAULT 0 CHECK (clean_qty >= 0),       -- limpias en almacén
+    in_use_qty INT NOT NULL DEFAULT 0 CHECK (in_use_qty >= 0),     -- en habitaciones
+    dirty_qty INT NOT NULL DEFAULT 0 CHECK (dirty_qty >= 0),       -- usadas, por lavar
+    laundry_qty INT NOT NULL DEFAULT 0 CHECK (laundry_qty >= 0),   -- en lavandería
+    discarded_qty INT NOT NULL DEFAULT 0 CHECK (discarded_qty >= 0), -- dadas de baja
+    is_active BOOLEAN NOT NULL DEFAULT true,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS laundry_batches (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    code VARCHAR(20) UNIQUE NOT NULL,
+    provider VARCHAR(150) NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'sent', -- sent (en lavado), returned (entregado)
+    sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    expected_return_at TIMESTAMPTZ,
+    returned_at TIMESTAMPTZ,
+    notes TEXT,
+    user_id UUID REFERENCES users(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS laundry_batch_items (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    batch_id UUID NOT NULL REFERENCES laundry_batches(id) ON DELETE CASCADE,
+    item_id UUID NOT NULL REFERENCES textile_items(id) ON DELETE RESTRICT,
+    quantity INT NOT NULL CHECK (quantity > 0),
+    returned_qty INT NOT NULL DEFAULT 0,
+    damaged_qty INT NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS textile_movements (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    item_id UUID NOT NULL REFERENCES textile_items(id) ON DELETE CASCADE,
+    movement_type VARCHAR(30) NOT NULL, -- purchase, assign, swap, collect, discard, laundry_send, laundry_return, adjustment
+    quantity INT NOT NULL,
+    batch_id UUID REFERENCES laundry_batches(id) ON DELETE SET NULL,
+    notes TEXT,
+    user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_laundry_batch_items_batch ON laundry_batch_items(batch_id);
+CREATE INDEX IF NOT EXISTS idx_textile_movements_item ON textile_movements(item_id);

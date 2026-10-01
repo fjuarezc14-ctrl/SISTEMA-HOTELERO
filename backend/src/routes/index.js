@@ -13,6 +13,7 @@ import reservationRoutes from './reservationRoutes.js';
 import receiptRoutes from './receiptRoutes.js';
 import incidentRoutes from './incidentRoutes.js';
 import reportRoutes from './reportRoutes.js';
+import textileRoutes from './textileRoutes.js';
 
 const apiRouter = Router();
 
@@ -30,6 +31,7 @@ apiRouter.use('/reservations', reservationRoutes);
 apiRouter.use('/receipts', receiptRoutes);
 apiRouter.use('/incidents', incidentRoutes);
 apiRouter.use('/reports', reportRoutes);
+apiRouter.use('/textiles', textileRoutes);
 
 export default apiRouter;
 
