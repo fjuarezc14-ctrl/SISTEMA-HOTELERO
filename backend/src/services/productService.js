@@ -4,6 +4,7 @@ import { cashRepository } from '../repositories/cashRepository.js';
 import { shiftRepository } from '../repositories/shiftRepository.js';
 import { kardexRepository } from '../repositories/kardexRepository.js';
 import { withTransaction } from '../config/db.js';
+import { normalizePayment } from '../utils/payments.js';
 
 function operationalError(message, statusCode) {
   const error = new Error(message);
@@ -88,9 +89,9 @@ export const productService = {
       for (const l of lines) {
         // 1. Registrar consumo
         const consumeRes = await txQuery(
-          `INSERT INTO room_consumptions (stay_id, product_id, quantity, unit_price_pen, total_price_pen)
-           VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-          [stay.id, l.product.id, l.qty, l.unitPrice, l.totalPrice]
+          `INSERT INTO room_consumptions (stay_id, product_id, product_name, quantity, unit_price_pen, total_price_pen)
+           VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+          [stay.id, l.product.id, l.product.name, l.qty, l.unitPrice, l.totalPrice]
         );
         created.push(consumeRes.rows[0]);
 
@@ -124,7 +125,10 @@ export const productService = {
       throw operationalError('No hay un turno de caja abierto para registrar la venta.', 400);
     }
 
-    const totalAmount = lines.reduce((sum, l) => sum + l.totalPrice, 0);
+    const totalAmount = Math.round(lines.reduce((sum, l) => sum + l.totalPrice, 0) * 100) / 100;
+
+    // El pago (simple o mixto) debe cubrir exactamente el total de la venta
+    normalizePayment({ amount: totalAmount, payment_method, reference_number, split_payments }, totalAmount);
 
     // Verificar si viene una habitación vinculada
     let stayInfo = null;
@@ -132,11 +136,27 @@ export const productService = {
       stayInfo = await stayRepository.findById(stay_id);
     }
 
-    // Descontar stock de todos los productos (todo o nada)
-    await withTransaction(async (txQuery) => {
+    const paymentLabel = payment_method === 'MIXED' && Array.isArray(split_payments) && split_payments.length > 0 ? 'MIXED' : payment_method || 'CASH';
+
+    // Descontar stock y guardar el detalle de la venta con el precio de este momento (todo o nada)
+    const sale = await withTransaction(async (txQuery) => {
       for (const l of lines) {
         await decrementStockTx(txQuery, l);
       }
+      const saleRes = await txQuery(
+        `INSERT INTO store_sales (work_shift_id, stay_id, user_id, total_pen, payment_method)
+         VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+        [activeShift.id, stayInfo ? stayInfo.id : null, user_id, totalAmount, paymentLabel]
+      );
+      const saleRow = saleRes.rows[0];
+      for (const l of lines) {
+        await txQuery(
+          `INSERT INTO store_sale_items (sale_id, product_id, product_name, quantity, unit_price_pen, total_price_pen)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [saleRow.id, l.product.id, l.product.name, l.qty, l.unitPrice, l.totalPrice]
+        );
+      }
+      return saleRow;
     });
 
     const itemsLabel = lines.map((l) => `${l.product.name} (x${l.qty})`).join(', ');
@@ -161,7 +181,8 @@ export const productService = {
             category: 'store',
             amount_pen: itemAmt,
             payment_method: item.payment_method,
-            reference_number: item.reference_number || reference_number || ''
+            reference_number: item.reference_number || reference_number || '',
+            store_sale_id: sale.id
           });
         }
       }
@@ -176,7 +197,8 @@ export const productService = {
         category: 'store',
         amount_pen: totalAmount,
         payment_method: payment_method || 'CASH',
-        reference_number: reference_number || ''
+        reference_number: reference_number || '',
+        store_sale_id: sale.id
       });
     }
   },

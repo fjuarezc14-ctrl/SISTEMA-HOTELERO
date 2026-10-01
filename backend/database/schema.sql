@@ -266,3 +266,32 @@ CREATE INDEX IF NOT EXISTS idx_stays_work_shift ON stays(work_shift_id);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_user ON audit_logs(user_id);
 
 
+
+-- 17. Ventas de tienda con detalle por producto (precio congelado al momento de la venta)
+CREATE TABLE IF NOT EXISTS store_sales (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    work_shift_id UUID NOT NULL REFERENCES work_shifts(id) ON DELETE CASCADE,
+    stay_id UUID REFERENCES stays(id) ON DELETE SET NULL,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    total_pen NUMERIC(10, 2) NOT NULL,
+    payment_method VARCHAR(20) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS store_sale_items (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    sale_id UUID NOT NULL REFERENCES store_sales(id) ON DELETE CASCADE,
+    product_id UUID NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
+    product_name VARCHAR(100) NOT NULL,
+    quantity INT NOT NULL,
+    unit_price_pen NUMERIC(10, 2) NOT NULL,
+    total_price_pen NUMERIC(10, 2) NOT NULL
+);
+
+ALTER TABLE cash_transactions ADD COLUMN IF NOT EXISTS store_sale_id UUID REFERENCES store_sales(id) ON DELETE SET NULL;
+-- Nombre del producto congelado en los consumos (si luego se renombra, el histórico no cambia)
+ALTER TABLE room_consumptions ADD COLUMN IF NOT EXISTS product_name VARCHAR(100);
+
+CREATE INDEX IF NOT EXISTS idx_store_sales_shift ON store_sales(work_shift_id);
+CREATE INDEX IF NOT EXISTS idx_store_sale_items_sale ON store_sale_items(sale_id);
+CREATE INDEX IF NOT EXISTS idx_cash_transactions_store_sale ON cash_transactions(store_sale_id);

@@ -68,7 +68,7 @@ export const productRepository = {
     const sql = `
       SELECT 
         c.*,
-        p.name AS product_name
+        COALESCE(c.product_name, p.name) AS product_name
       FROM room_consumptions c
       JOIN products p ON c.product_id = p.id
       WHERE c.stay_id = $1
