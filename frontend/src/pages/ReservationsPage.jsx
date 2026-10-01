@@ -3,7 +3,7 @@ import { api } from '../api/apiClient';
 import { Pagination, usePagination } from '../components/Pagination';
 import { formatPEN, formatDatePeru } from '../utils/formatters';
 import { ReservationModal, buildReservationTicket } from '../components/ReservationModal';
-import { TicketPrintModal } from '../components/TicketPrintModal';
+import { useReceipt } from '../context/ReceiptContext';
 import { Badge } from '../components/Badge';
 
 import { CheckInModal } from '../components/CheckInModal';
@@ -116,15 +116,16 @@ export function ReservationsPage() {
   };
 
   // Reimprimir ticket de reserva
-  const [ticketData, setTicketData] = useState(null);
+  const { printReceipt } = useReceipt();
   const handlePrintTicket = (r) => {
     const room = rooms.find((rm) => rm.id === r.room_id);
-    setTicketData(
+    printReceipt(
       buildReservationTicket({
         reservation: r,
         roomNumber: r.room_number,
         customerName: r.customer_name,
         documentNumber: r.customer_document,
+        documentType: r.document_type,
         nightlyPrice: room?.price_overnight_default,
         paymentMethod: r.payment_method
       })
@@ -364,7 +365,6 @@ export function ReservationsPage() {
       )}
 
       {/* Modales */}
-      <TicketPrintModal isOpen={!!ticketData} onClose={() => setTicketData(null)} ticketData={ticketData} />
 
       <ReservationModal
         isOpen={isCreateModalOpen}

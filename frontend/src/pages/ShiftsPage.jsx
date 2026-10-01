@@ -3,7 +3,8 @@ import { useShift } from '../context/ShiftContext';
 import { api } from '../api/apiClient';
 import { Pagination, usePagination } from '../components/Pagination';
 import { formatPEN, formatDatePeru } from '../utils/formatters';
-import { TicketPrintModal } from '../components/TicketPrintModal';
+import { useReceipt } from '../context/ReceiptContext';
+import { shiftClosureReceipt } from '../utils/receipts';
 import {
   Clock,
   Wallet,
@@ -27,9 +28,7 @@ export function ShiftsPage() {
   const [activeTransactions, setActiveTransactions] = useState([]);
   const [loadingTransactions, setLoadingTransactions] = useState(false);
 
-  // Ticket Modal de Arqueo
-  const [isTicketOpen, setIsTicketOpen] = useState(false);
-  const [ticketData, setTicketData] = useState(null);
+  const { printReceipt } = useReceipt();
 
   const fetchHistory = async () => {
     try {
@@ -63,26 +62,7 @@ export function ShiftsPage() {
     }
   }, [activeShift, hasActiveShift]);
 
-  const handlePrintShiftTicket = (shiftInfo) => {
-    const data = {
-      ticket_number: `ARQ-${shiftInfo.id?.substring(0, 6) || Date.now().toString().slice(-6)}`,
-      date: shiftInfo.closed_at || new Date(),
-      customer_name: `Cajero: ${shiftInfo.user_full_name}`,
-      room_number: `RELEVO CAJA`,
-      total_amount: Number(shiftInfo.total_revenue_pen || 0),
-      payment_method: 'Resumen de Arqueo',
-      items: [
-        { name: 'Fondo Inicial', quantity: 1, unit_price: Number(shiftInfo.initial_cash_pen || 0), total_price: Number(shiftInfo.initial_cash_pen || 0) },
-        { name: 'Efectivo Esperado', quantity: 1, unit_price: Number(shiftInfo.expected_cash_pen || 0), total_price: Number(shiftInfo.expected_cash_pen || 0) },
-        { name: 'Efectivo Real Contado', quantity: 1, unit_price: Number(shiftInfo.actual_cash_pen || 0), total_price: Number(shiftInfo.actual_cash_pen || 0) },
-        { name: 'Yape / Plin Total', quantity: 1, unit_price: Number(shiftInfo.total_yape_plin_pen || 0), total_price: Number(shiftInfo.total_yape_plin_pen || 0) },
-        { name: 'Tarjetas POS Total', quantity: 1, unit_price: Number(shiftInfo.total_card_pen || 0), total_price: Number(shiftInfo.total_card_pen || 0) },
-        { name: 'Diferencia de Cierre', quantity: 1, unit_price: Number(shiftInfo.difference_pen || 0), total_price: Number(shiftInfo.difference_pen || 0) }
-      ]
-    };
-    setTicketData(data);
-    setIsTicketOpen(true);
-  };
+  const handlePrintShiftTicket = (shiftInfo) => printReceipt(shiftClosureReceipt(shiftInfo));
 
   const activeTxPage = usePagination(activeTransactions, { resetKey: activeTransactions.length });
   const historyPage = usePagination(history, { resetKey: history.length });
@@ -364,12 +344,6 @@ export function ShiftsPage() {
         )}
       </div>
 
-      {/* Ticket Modal para Impresión de Arqueo */}
-      <TicketPrintModal
-        isOpen={isTicketOpen}
-        onClose={() => setIsTicketOpen(false)}
-        ticketData={ticketData}
-      />
     </div>
   );
 }

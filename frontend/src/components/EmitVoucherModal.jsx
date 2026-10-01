@@ -2,7 +2,9 @@ import React, { useState } from 'react';
 import { Modal } from './Modal';
 import { VoucherSelector } from './VoucherSelector';
 import { api } from '../api/apiClient';
-import { formatPEN, printElectronicVoucherTicket } from '../utils/formatters';
+import { formatPEN } from '../utils/formatters';
+import { useReceipt } from '../context/ReceiptContext';
+import { cashReceipt } from '../utils/receipts';
 import { Printer, CheckCircle2, AlertCircle } from 'lucide-react';
 
 export function EmitVoucherModal({ isOpen, onClose, transaction, onSuccess }) {
@@ -12,6 +14,7 @@ export function EmitVoucherModal({ isOpen, onClose, transaction, onSuccess }) {
   const [businessAddress, setBusinessAddress] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const { printReceipt } = useReceipt();
 
   if (!transaction) return null;
 
@@ -33,37 +36,16 @@ export function EmitVoucherModal({ isOpen, onClose, transaction, onSuccess }) {
       setLoading(true);
       setError('');
 
-      const generatedSeries = isFactura ? 'F001' : 'B001';
-      const generatedNum = transaction.voucher_number || String(Math.floor(Math.random() * 899999 + 100000));
-      const fullVoucherNum = `${generatedSeries}-${generatedNum}`;
-
-      // Actualizar transacción en el backend
-      await api.patch(`/cash/transactions/${transaction.id}/voucher`, {
+      // El número correlativo lo asigna el servidor
+      const res = await api.patch(`/cash/transactions/${transaction.id}/voucher`, {
         voucher_type: voucherType,
-        voucher_number: fullVoucherNum,
         customer_ruc: isFactura ? rucNumber.trim() : '',
         customer_business_name: isFactura ? businessName.trim() : ''
       });
 
-      // Gatillar impresor 80mm en modo simulación SUNAT
-      printElectronicVoucherTicket({
-        voucherType,
-        voucherSeries: generatedSeries,
-        voucherNumber: generatedNum,
-        customerDocType: isFactura ? 'RUC' : 'DNI',
-        customerDocNumber: isFactura ? rucNumber.trim() : '',
-        customerName: isFactura ? businessName.trim() : (transaction.concept || 'CLIENTE'),
-        customerAddress: isFactura ? businessAddress.trim() : '',
-        paymentMethod: transaction.payment_method || 'EFECTIVO',
-        totalAmount: amount,
-        items: [
-          {
-            qty: 1,
-            description: transaction.concept || 'Servicio General',
-            price: amount
-          }
-        ]
-      });
+      const receipt = cashReceipt({ ...transaction, ...res.data }, [{ ...transaction, ...res.data }]);
+      if (isFactura && businessAddress.trim()) receipt.customer.address = businessAddress.trim();
+      printReceipt(receipt);
 
       if (onSuccess) onSuccess();
       onClose();

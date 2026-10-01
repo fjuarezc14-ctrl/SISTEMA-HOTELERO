@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api/apiClient';
+import { escapeHtml } from '../utils/escapeHtml';
 import { Pagination, usePagination } from '../components/Pagination';
 import { formatPEN, formatDatePeru } from '../utils/formatters';
 import {
@@ -105,7 +106,7 @@ export function IncidentsPage() {
         if (window.confirm(`¿Deseas ingresar el cobro de la penalidad por ${formatPEN(inc.penalty_amount_pen)} a la Caja Chica del turno?`)) {
           await api.post('/cash/transaction', {
             transaction_type: 'income',
-            concept: `Cobro de Incidente Hab. ${inc.room_number}: ${inc.description.slice(0, 40)}`,
+            concept: `Cobro de Incidente Hab. ${escapeHtml(inc.room_number)}: ${inc.description.slice(0, 40)}`,
             category: 'incident',
             amount_pen: Number(inc.penalty_amount_pen),
             payment_method: 'CASH'
@@ -166,15 +167,15 @@ export function IncidentsPage() {
 
           <div class="card">
             <div class="row"><span class="label">Fecha y Hora de Emisión:</span><span class="value">${nowStr}</span></div>
-            <div class="row"><span class="label">Habitación Afectada:</span><span class="value">Hab. ${inc.room_number}</span></div>
-            <div class="row"><span class="label">Huésped Responsable:</span><span class="value">${inc.customer_name || 'Huésped Registrado'} ${inc.customer_document ? `(Doc: ${inc.customer_document})` : ''}</span></div>
-            <div class="row"><span class="label">Registrado Por:</span><span class="value">${inc.registered_by_user || 'Recepción'}</span></div>
+            <div class="row"><span class="label">Habitación Afectada:</span><span class="value">Hab. ${escapeHtml(inc.room_number)}</span></div>
+            <div class="row"><span class="label">Huésped Responsable:</span><span class="value">${escapeHtml(inc.customer_name || 'Huésped Registrado')} ${inc.customer_document ? `(Doc: ${escapeHtml(inc.customer_document)})` : ''}</span></div>
+            <div class="row"><span class="label">Registrado Por:</span><span class="value">${escapeHtml(inc.registered_by_user || 'Recepción')}</span></div>
             <div class="row"><span class="label">Monto de Penalidad / Daño:</span><span class="value" style="color: #e11d48; font-size: 14px;">${formatPEN(inc.penalty_amount_pen)}</span></div>
           </div>
 
           <div class="box-desc">
             <strong>Descripción Detallada del Incidente / Ocurrencia:</strong><br/>
-            "${inc.description}"
+            "${escapeHtml(inc.description)}"
           </div>
 
           <p style="margin-top: 25px; font-size: 11px; color: #334155;">

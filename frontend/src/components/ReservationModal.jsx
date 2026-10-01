@@ -1,40 +1,41 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Modal } from './Modal';
 import { api } from '../api/apiClient';
-import { formatPEN, formatDatePeru, PAYMENT_METHOD_LABELS } from '../utils/formatters';
+import { formatPEN, formatDatePeru } from '../utils/formatters';
 import { PaymentSelector } from './PaymentSelector';
 import { CustomerFields, EMPTY_CUSTOMER, customerToForm } from './CustomerFields';
-import { TicketPrintModal } from './TicketPrintModal';
+import { useReceipt } from '../context/ReceiptContext';
 import { validateDocument, validateFullName, validatePhone, validateAmount, validateDateRange } from '../utils/validators';
 import { toDateTimeInput, checkoutAfterDays, nightsBetween } from '../utils/dateInput';
 import { Calendar, UserCheck, AlertCircle, Check } from 'lucide-react';
 
 const STAY_DAY_OPTIONS = [1, 2, 3, 4, 5];
 
-/** Datos para el ticket de una reserva (también se usa al reimprimir desde la lista) */
-export function buildReservationTicket({ reservation, roomNumber, customerName, documentNumber, nightlyPrice = 0, paymentMethod }) {
+/** Comprobante de una reserva (también se usa al reimprimir desde la lista) */
+export function buildReservationTicket({ reservation, roomNumber, customerName, documentNumber, documentType = 'DNI', nightlyPrice = 0, paymentMethod }) {
   const deposit = Number(reservation.deposit_amount_pen || 0);
   const nights = nightsBetween(reservation.start_date, reservation.end_date);
   const estimatedTotal = Number(nightlyPrice || 0) * nights;
-  const summary = [{ label: 'ABONO INICIAL', value: formatPEN(deposit) }];
+  const summary = [];
   if (estimatedTotal > 0) {
-    summary.push({ label: 'SALDO ESTIMADO', value: formatPEN(Math.max(0, estimatedTotal - deposit)) });
+    summary.push({ label: 'TOTAL ESTIMADO', value: formatPEN(estimatedTotal) });
+    summary.push({ label: 'SALDO AL INGRESAR', value: formatPEN(Math.max(0, estimatedTotal - deposit)) });
   }
   return {
-    ticket_number: `RES-${String(reservation.id || '').substring(0, 8).toUpperCase()}`,
+    voucher_type: reservation.voucher?.voucher_type || 'TICKET',
+    voucher_number: reservation.voucher?.voucher_number || null,
+    title: 'CONSTANCIA DE RESERVA',
     date: reservation.created_at || new Date(),
-    customer_name: customerName,
-    document_number: documentNumber,
+    customer: { name: customerName, doc_type: documentType, doc_number: documentNumber },
     room_number: roomNumber,
     details: [
       { label: 'LLEGADA', value: formatDatePeru(reservation.start_date) },
       { label: 'SALIDA', value: formatDatePeru(reservation.end_date) },
       { label: 'NOCHES', value: String(nights) }
     ],
-    items: [{ name: `Reserva Hab. ${roomNumber} (${nights} noche${nights > 1 ? 's' : ''})`, total: estimatedTotal || deposit }],
-    total_amount: estimatedTotal || deposit,
-    payment_method:
-      deposit > 0 ? PAYMENT_METHOD_LABELS[paymentMethod] || (paymentMethod === 'MIXED' ? 'Pago Mixto' : paymentMethod) : 'Sin abono',
+    items: [{ description: `Abono inicial - Reserva Hab. ${roomNumber}`, amount: deposit }],
+    total: deposit,
+    payments: deposit > 0 ? [{ method: paymentMethod, amount: deposit }] : [],
     summary
   };
 }
@@ -61,7 +62,7 @@ export function ReservationModal({ isOpen, onClose, reservation = null, preselec
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [ticketData, setTicketData] = useState(null);
+  const { printReceipt } = useReceipt();
 
   const resetForm = () => {
     setError('');
@@ -206,12 +207,13 @@ export function ReservationModal({ isOpen, onClose, reservation = null, preselec
       });
 
       // Ticket de la reserva
-      setTicketData(
+      printReceipt(
         buildReservationTicket({
           reservation: res.data,
           roomNumber: selectedRoom?.room_number,
           customerName: customer.full_name.trim(),
           documentNumber: customer.document_number.trim(),
+          documentType: customer.document_type,
           nightlyPrice: selectedRoom?.price_overnight_default,
           paymentMethod
         })
@@ -390,9 +392,6 @@ export function ReservationModal({ isOpen, onClose, reservation = null, preselec
           </div>
         </form>
       </Modal>
-
-      {/* Ticket de la reserva confirmada */}
-      <TicketPrintModal isOpen={!!ticketData} onClose={() => setTicketData(null)} ticketData={ticketData} />
     </>
   );
 }

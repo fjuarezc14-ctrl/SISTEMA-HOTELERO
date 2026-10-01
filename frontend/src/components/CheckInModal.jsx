@@ -5,6 +5,8 @@ import { formatPEN, formatDatePeru } from '../utils/formatters';
 import { PaymentSelector } from './PaymentSelector';
 import { VoucherSelector } from './VoucherSelector';
 import { CustomerFields, EMPTY_CUSTOMER, customerToForm } from './CustomerFields';
+import { useReceipt } from '../context/ReceiptContext';
+import { checkInReceipt } from '../utils/receipts';
 import { UserCheck, AlertCircle, Clock, Moon, Sun, ShieldAlert, CalendarClock } from 'lucide-react';
 import { validateDocument, validateFullName, validatePhone } from '../utils/validators';
 
@@ -51,6 +53,7 @@ export function CheckInModal({ isOpen, onClose, room, reservationData = null, up
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const { printReceipt } = useReceipt();
 
   const baseHours = Number(room?.hours_quantity_default) || 3;
 
@@ -179,13 +182,14 @@ export function CheckInModal({ isOpen, onClose, room, reservationData = null, up
 
     try {
       setLoading(true);
+      let res;
       if (fromReservation) {
-        await api.post(`/reservations/${reservationData.id}/checkin`, {
+        res = await api.post(`/reservations/${reservationData.id}/checkin`, {
           companion_name: companionName.trim(),
           initial_payment: initialPayment
         });
       } else {
-        await api.post('/stays/checkin', {
+        res = await api.post('/stays/checkin', {
           room_id: room.id,
           customer_data: {
             document_type: customer.document_type,
@@ -198,6 +202,17 @@ export function CheckInModal({ isOpen, onClose, room, reservationData = null, up
           companion_name: companionName.trim(),
           initial_payment: initialPayment
         });
+      }
+      // Comprobante del cobro realizado al ingresar
+      if (res?.data?.paid_now > 0) {
+        printReceipt(
+          checkInReceipt({
+            stay: res.data,
+            room,
+            quote,
+            customer: { name: customer.full_name, doc_type: customer.document_type, doc_number: customer.document_number }
+          })
+        );
       }
       onSuccess();
       handleClose();

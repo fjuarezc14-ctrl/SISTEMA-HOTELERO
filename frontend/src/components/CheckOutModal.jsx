@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Modal } from './Modal';
 import { api } from '../api/apiClient';
-import { formatPEN, formatDatePeru, printElectronicVoucherTicket } from '../utils/formatters';
+import { formatPEN, formatDatePeru } from '../utils/formatters';
+import { useReceipt } from '../context/ReceiptContext';
+import { checkOutReceipt } from '../utils/receipts';
 import { PaymentSelector } from './PaymentSelector';
 import { VoucherSelector } from './VoucherSelector';
 import { LogOut, AlertCircle, Receipt, AlertTriangle } from 'lucide-react';
@@ -10,6 +12,7 @@ import { useGlobalStore } from '../context/GlobalStoreContext';
 
 export function CheckOutModal({ isOpen, onClose, room, onSuccess }) {
   const { hotelInfo } = useGlobalStore();
+  const { printReceipt } = useReceipt();
   const graceMinutes = hotelInfo?.grace_period_minutes !== undefined ? Number(hotelInfo.grace_period_minutes) : 10;
   const [stayData, setStayData] = useState(null);
   const [loadingStay, setLoadingStay] = useState(false);
@@ -114,7 +117,7 @@ export function CheckOutModal({ isOpen, onClose, room, onSuccess }) {
       setLoading(true);
       setError('');
 
-      await api.post('/stays/checkout', {
+      const res = await api.post('/stays/checkout', {
         stay_id: stayData.id,
         final_payment: amountToPay > 0 ? {
           amount: amountToPay,
@@ -132,35 +135,15 @@ export function CheckOutModal({ isOpen, onClose, room, onSuccess }) {
         } : null
       });
 
-      // Si se seleccionó Boleta o Factura, imprimir el comprobante electrónico 80mm en modo demo
-      if (voucherType !== 'NONE') {
-        const isFactura = voucherType === 'FACTURA';
-        printElectronicVoucherTicket({
-          voucherType,
-          customerDocType: isFactura ? 'RUC' : (stayData.document_type || 'DNI'),
-          customerDocNumber: isFactura ? rucNumber.trim() : (stayData.document_number || ''),
-          customerName: isFactura ? businessName.trim() : (stayData.customer_name || ''),
-          customerAddress: isFactura ? businessAddress.trim() : '',
-          paymentMethod: paymentMethod === 'MIXED' ? 'PAGO MIXTO' : paymentMethod,
-          totalAmount: quote.total,
-          items: [
-            {
-              qty: 1,
-              description: `Hospedaje Hab. ${room.room_number} (${stayData.stay_type || 'Estadía'})`,
-              price: quote.stay_price + quote.overstay_cost
-            },
-            ...(Number(stayData.total_consumptions_price_pen || 0) > 0 ? [{
-              qty: 1,
-              description: 'Consumos Tienda / Minibar',
-              price: Number(stayData.total_consumptions_price_pen || 0)
-            }] : []),
-            ...(penaltyVal > 0 ? [{
-              qty: 1,
-              description: 'Penalidad / Novedad en Habitación',
-              price: penaltyVal
-            }] : [])
-          ]
-        });
+      // Comprobante del cobro final (ticket, boleta o factura)
+      if (res?.data?.checkout_summary?.paid_now > 0) {
+        printReceipt(
+          checkOutReceipt({
+            result: res.data,
+            room,
+            customer: { name: stayData.customer_name, doc_type: stayData.document_type, doc_number: stayData.document_number }
+          })
+        );
       }
 
       onSuccess();

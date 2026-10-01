@@ -3,10 +3,13 @@ import { Modal } from './Modal';
 import { useShift } from '../context/ShiftContext';
 import { formatPEN } from '../utils/formatters';
 import { CashCounter, CashCounterToggle } from './CashCounter';
+import { useReceipt } from '../context/ReceiptContext';
+import { shiftClosureReceipt } from '../utils/receipts';
 import { CheckCircle2, AlertTriangle, AlertCircle, Calculator } from 'lucide-react';
 
-export function CloseShiftModal({ isOpen, onClose, onShiftClosed = () => {} }) {
+export function CloseShiftModal({ isOpen, onClose }) {
   const { activeShift, closeShift } = useShift();
+  const { printReceipt } = useReceipt();
   const [actualCash, setActualCash] = useState('');
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
@@ -32,24 +35,13 @@ export function CloseShiftModal({ isOpen, onClose, onShiftClosed = () => {} }) {
       setLoading(true);
       const result = await closeShift(activeShift.id, actualCashNum, notes);
       
-      const closureTicketData = {
-        ticket_number: `ARQ-${Date.now().toString().slice(-6)}`,
-        date: new Date(),
-        customer_name: `Recepcionista: ${activeShift.user_full_name}`,
-        room_number: `RELEVO GUARDIAS`,
-        total_amount: Number(activeShift.live_total_revenue_pen || 0),
-        payment_method: 'Cierre de Arqueo',
-        items: [
-          { name: 'Fondo Base Inicial', quantity: 1, unit_price: Number(activeShift.initial_cash_pen || 0), total_price: Number(activeShift.initial_cash_pen || 0) },
-          { name: 'Efectivo en Gaveta (Esperado)', quantity: 1, unit_price: expectedCash, total_price: expectedCash },
-          { name: 'Efectivo Real Contado', quantity: 1, unit_price: actualCashNum, total_price: actualCashNum },
-          { name: 'Yape / Plin Recibido', quantity: 1, unit_price: Number(activeShift.live_total_yape_plin_pen || 0), total_price: Number(activeShift.live_total_yape_plin_pen || 0) },
-          { name: 'Tarjetas POS Recibidas', quantity: 1, unit_price: Number(activeShift.live_total_card_pen || 0), total_price: Number(activeShift.live_total_card_pen || 0) },
-          { name: 'Diferencia (Faltante/Sobrante)', quantity: 1, unit_price: difference, total_price: difference }
-        ]
-      };
-
-      onShiftClosed(closureTicketData);
+      // Ticket de arqueo
+      printReceipt(
+        shiftClosureReceipt(
+          { ...activeShift, closed_at: result?.closed_at || new Date() },
+          { actualCash: actualCashNum, expectedCash, cashierName: activeShift.user_full_name }
+        )
+      );
       onClose();
     } catch (err) {
       setError(err.message || 'Error al cerrar el turno.');

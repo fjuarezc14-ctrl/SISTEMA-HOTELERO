@@ -1,18 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api/apiClient';
-import { formatPEN, formatDatePeru, PAYMENT_METHOD_LABELS, printElectronicVoucherTicket } from '../utils/formatters';
+import { formatPEN, formatDatePeru, PAYMENT_METHOD_LABELS } from '../utils/formatters';
 import { useShift } from '../context/ShiftContext';
 import { EmitVoucherModal } from '../components/EmitVoucherModal';
 import { CashMovementModal } from '../components/CashMovementModal';
 import { CancelTransactionModal } from '../components/CancelTransactionModal';
+import { VoucherCell } from '../components/VoucherCell';
+import { useReceipt } from '../context/ReceiptContext';
+import { cashReceipt } from '../utils/receipts';
 import { Pagination } from '../components/Pagination';
 import {
   Wallet,
   Plus,
   AlertCircle,
   Ban,
-  FileText,
-  Printer,
   Lock,
   Unlock,
   ChevronRight,
@@ -80,6 +81,14 @@ export function CashPage({ onOpenShiftModal = () => {}, onCloseShiftModal = () =
     fetchTransactions();
   }, [scope, dateFrom, dateTo, activeShift?.id]);
 
+  // Reimprimir comprobante / emitir boleta o factura
+  const { printReceipt } = useReceipt();
+  const handleReprint = (tx) => printReceipt(cashReceipt(tx, transactions));
+  const handleEmitVoucher = (tx) => {
+    setSelectedVoucherTx(tx);
+    setIsVoucherModalOpen(true);
+  };
+
   // Modal de anulación (requiere autorización de administrador)
   const [cancelingTx, setCancelingTx] = useState(null);
   const handleCancelTransaction = (t) => setCancelingTx(t);
@@ -137,44 +146,7 @@ export function CashPage({ onOpenShiftModal = () => {}, onCloseShiftModal = () =
 
       {/* Columna Comprobante SUNAT */}
       <td className="py-3 px-3">
-        {t.voucher_type && t.voucher_type !== 'NONE' ? (
-          <button
-            type="button"
-            onClick={() => {
-              const isFactura = t.voucher_type === 'FACTURA';
-              printElectronicVoucherTicket({
-                voucherType: t.voucher_type,
-                voucherSeries: (t.voucher_number || '').split('-')[0] || (isFactura ? 'F001' : 'B001'),
-                voucherNumber: (t.voucher_number || '').split('-')[1] || '000001',
-                customerDocType: isFactura ? 'RUC' : 'DNI',
-                customerDocNumber: isFactura ? t.customer_ruc : '',
-                customerName: isFactura ? t.customer_business_name : t.concept,
-                paymentMethod: t.payment_method,
-                totalAmount: t.amount_pen,
-                items: [{ qty: 1, description: t.concept, price: t.amount_pen }]
-              });
-            }}
-            className="px-2.5 py-1 rounded-lg text-[10px] font-extrabold bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 flex items-center gap-1 transition-colors"
-            title="Re-imprimir comprobante electrónico 80mm"
-          >
-            <Printer className="w-3 h-3 text-indigo-600" />
-            <span>{t.voucher_type === 'FACTURA' ? '🏢 FACTURA' : '📄 BOLETA'} {t.voucher_number || 'E-001'}</span>
-          </button>
-        ) : t.transaction_type === 'income' && !t.is_cancelled ? (
-          <button
-            type="button"
-            onClick={() => {
-              setSelectedVoucherTx(t);
-              setIsVoucherModalOpen(true);
-            }}
-            className="px-2.5 py-1 rounded-lg text-[10px] font-extrabold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1 transition-colors shadow-2xs"
-          >
-            <FileText className="w-3 h-3 text-emerald-600" />
-            <span>Emitir Comprobante</span>
-          </button>
-        ) : (
-          <span className="text-[10px] text-slate-400 font-mono">Ticket Interno</span>
-        )}
+        <VoucherCell tx={t} onReprint={handleReprint} onEmit={handleEmitVoucher} />
       </td>
 
       <td className={`py-3 px-3 text-right font-mono font-bold ${t.is_cancelled ? 'line-through text-slate-400' : 'text-slate-900'}`}>
