@@ -8,6 +8,7 @@ export const reservationRepository = {
         r.room_number,
         rt.name AS room_type_name,
         c.full_name AS customer_name,
+        c.document_type,
         c.document_number AS customer_document,
         c.phone AS customer_phone
       FROM reservations res
@@ -33,6 +34,7 @@ export const reservationRepository = {
         r.room_number,
         rt.name AS room_type_name,
         c.full_name AS customer_name,
+        c.document_type,
         c.document_number AS customer_document,
         c.phone AS customer_phone
       FROM reservations res

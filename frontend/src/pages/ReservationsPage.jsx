@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api/apiClient';
 import { formatPEN, formatDatePeru } from '../utils/formatters';
-import { CreateReservationModal } from '../components/CreateReservationModal';
-import { EditReservationModal } from '../components/EditReservationModal';
+import { ReservationModal, buildReservationTicket } from '../components/ReservationModal';
+import { TicketPrintModal } from '../components/TicketPrintModal';
+import { Badge } from '../components/Badge';
+
 import { CheckInModal } from '../components/CheckInModal';
 import { ReservationTimeline } from '../components/ReservationTimeline';
 import {
@@ -15,8 +17,16 @@ import {
   UserX,
   List,
   CalendarDays,
-  UserCheck
+  UserCheck,
+  Printer
 } from 'lucide-react';
+
+const RESERVATION_STATUS = {
+  confirmed: { label: 'Confirmada', tone: 'emerald' },
+  checked_in: { label: 'En Hospedaje', tone: 'blue' },
+  no_show: { label: 'No-Show', tone: 'amber' },
+  cancelled: { label: 'Cancelada', tone: 'rose' }
+};
 
 export function ReservationsPage() {
   const [reservations, setReservations] = useState([]);
@@ -104,9 +114,28 @@ export function ReservationsPage() {
     window.open(waUrl, '_blank');
   };
 
+  // Reimprimir ticket de reserva
+  const [ticketData, setTicketData] = useState(null);
+  const handlePrintTicket = (r) => {
+    const room = rooms.find((rm) => rm.id === r.room_id);
+    setTicketData(
+      buildReservationTicket({
+        reservation: r,
+        roomNumber: r.room_number,
+        customerName: r.customer_name,
+        documentNumber: r.customer_document,
+        nightlyPrice: room?.price_overnight_default,
+        paymentMethod: r.payment_method
+      })
+    );
+  };
+
   // Filtrado dinámico
   const filteredReservations = reservations.filter((r) => {
-    const matchesStatus = statusFilter === 'all' || r.status === statusFilter;
+    const matchesStatus =
+      statusFilter === 'all' ||
+      r.status === statusFilter ||
+      (statusFilter === 'cancelled' && r.status === 'no_show');
     const query = searchQuery.toLowerCase().trim();
     const matchesSearch =
       !query ||
@@ -265,23 +294,9 @@ export function ReservationsPage() {
                         {formatPEN(r.deposit_amount_pen)}
                       </td>
                       <td className="py-3 px-3 text-center">
-                        {r.status === 'confirmed' ? (
-                          <span className="px-2.5 py-1 rounded-lg text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300">
-                            Confirmada
-                          </span>
-                        ) : r.status === 'checked_in' ? (
-                          <span className="px-2.5 py-1 rounded-lg text-[10px] font-black bg-blue-100 text-blue-800 border border-blue-300">
-                            En Hospedaje
-                          </span>
-                        ) : r.status === 'no_show' ? (
-                          <span className="px-2.5 py-1 rounded-lg text-[10px] font-black bg-amber-100 text-amber-800 border border-amber-300">
-                            No-Show
-                          </span>
-                        ) : (
-                          <span className="px-2.5 py-1 rounded-lg text-[10px] font-black bg-rose-100 text-rose-800 border border-rose-300">
-                            Cancelada
-                          </span>
-                        )}
+                        <Badge tone={RESERVATION_STATUS[r.status]?.tone}>
+                          {RESERVATION_STATUS[r.status]?.label || r.status}
+                        </Badge>
                       </td>
                       <td className="py-3 px-3 text-right space-x-1.5">
                         <button
@@ -291,6 +306,15 @@ export function ReservationsPage() {
                         >
                           <Share2 className="w-3 h-3 text-emerald-600" />
                           <span>WhatsApp</span>
+                        </button>
+
+                        <button
+                          onClick={() => handlePrintTicket(r)}
+                          className="px-2 py-1 bg-slate-100 text-slate-700 hover:bg-slate-200 font-semibold rounded-lg transition-all text-[11px] inline-flex items-center gap-1"
+                          title="Imprimir ticket de la reserva"
+                        >
+                          <Printer className="w-3 h-3 text-slate-600" />
+                          <span>Ticket</span>
                         </button>
 
                         <button
@@ -336,14 +360,16 @@ export function ReservationsPage() {
       )}
 
       {/* Modales */}
-      <CreateReservationModal
+      <TicketPrintModal isOpen={!!ticketData} onClose={() => setTicketData(null)} ticketData={ticketData} />
+
+      <ReservationModal
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
         rooms={rooms}
         onSuccess={fetchReservations}
       />
 
-      <EditReservationModal
+      <ReservationModal
         isOpen={isEditModalOpen}
         onClose={() => setIsEditModalOpen(false)}
         reservation={selectedReservationForEdit}

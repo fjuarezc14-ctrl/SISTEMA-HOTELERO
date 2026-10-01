@@ -56,6 +56,13 @@ export function TicketPrintModal({ isOpen, onClose, ticketData }) {
             <p><strong>CLIENTE:</strong> {ticketData.customer_name || 'Cliente Varios'}</p>
             {ticketData.document_number && <p><strong>DOC:</strong> {ticketData.document_number}</p>}
             {ticketData.room_number && <p><strong>HABITACIÓN:</strong> {ticketData.room_number}</p>}
+            {/* Líneas adicionales: [{ label, value }] (ej. llegada/salida de una reserva) */}
+            {Array.isArray(ticketData.details) &&
+              ticketData.details.map((d) => (
+                <p key={d.label}>
+                  <strong>{d.label}:</strong> {d.value}
+                </p>
+              ))}
           </div>
 
           <table className="w-full text-[10px] my-2">
@@ -69,8 +76,10 @@ export function TicketPrintModal({ isOpen, onClose, ticketData }) {
               {ticketData.items ? (
                 ticketData.items.map((item, idx) => (
                   <tr key={idx}>
-                    <td className="py-1">{item.name} {item.qty ? `(x${item.qty})` : ''}</td>
-                    <td className="py-1 text-right">{formatPEN(item.total)}</td>
+                    <td className="py-1">
+                      {item.name} {(item.qty ?? item.quantity) > 1 ? `(x${item.qty ?? item.quantity})` : ''}
+                    </td>
+                    <td className="py-1 text-right">{formatPEN(item.total ?? item.total_price ?? 0)}</td>
                   </tr>
                 ))
               ) : (
@@ -91,6 +100,13 @@ export function TicketPrintModal({ isOpen, onClose, ticketData }) {
               <span>FORMA PAGO:</span>
               <span className="uppercase">{ticketData.payment_method || 'EFECTIVO'}</span>
             </div>
+            {Array.isArray(ticketData.summary) &&
+              ticketData.summary.map((line) => (
+                <div key={line.label} className="flex justify-between font-bold">
+                  <span>{line.label}:</span>
+                  <span>{line.value}</span>
+                </div>
+              ))}
           </div>
 
           <div className="text-center text-[9px] pt-3 border-t border-dashed border-black space-y-0.5">

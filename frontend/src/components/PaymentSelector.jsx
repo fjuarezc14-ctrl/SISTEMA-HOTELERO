@@ -11,7 +11,8 @@ export function PaymentSelector({
   referenceNumber,
   setReferenceNumber,
   splitPayments,
-  setSplitPayments
+  setSplitPayments,
+  amountLabel = 'Monto a Cobrar (S/)'
 }) {
   const targetTotal = Number(totalAmount || 0);
 
@@ -109,7 +110,7 @@ export function PaymentSelector({
       {paymentMethod !== 'MIXED' && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
           <div>
-            <label className="block text-[11px] font-semibold text-slate-600 mb-1">Monto a Cobrar (S/)</label>
+            <label className="block text-[11px] font-semibold text-slate-600 mb-1">{amountLabel}</label>
             <input
               type="number"
               step="0.50"

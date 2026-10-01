@@ -22,6 +22,8 @@ export const pool = new Pool({
   max: 20,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 5000,
+  // Fechas sin zona horaria (ej. '2026-10-15T14:00' de un datetime-local) se interpretan en hora de Perú
+  options: `-c timezone=${process.env.TIMEZONE || 'America/Lima'}`
 });
 
 pool.on('error', (err) => {

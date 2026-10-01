@@ -6,7 +6,7 @@ import { CheckInModal } from '../components/CheckInModal';
 import { CheckOutModal } from '../components/CheckOutModal';
 import { ConsumptionModal } from '../components/ConsumptionModal';
 import { ExtraHoursModal } from '../components/ExtraHoursModal';
-import { CreateReservationModal } from '../components/CreateReservationModal';
+import { ReservationModal } from '../components/ReservationModal';
 import { RoomFormModal } from '../components/RoomFormModal';
 import {
   BedDouble,
@@ -649,7 +649,7 @@ export function ReceptionPage() {
         onSuccess={fetchData}
       />
 
-      <CreateReservationModal
+      <ReservationModal
         isOpen={isReservationModalOpen}
         onClose={() => setIsReservationModalOpen(false)}
         rooms={rooms.filter(r => r.status !== 'maintenance')}
