@@ -606,17 +606,17 @@ export function SettingsPage() {
               </h4>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Hora Salida Pernocte</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Hora de Salida (Por Noche)</label>
                   <input
                     type="time"
                     value={overnightCheckoutTime}
                     onChange={(e) => setOvernightCheckoutTime(e.target.value)}
                     className="w-full bg-white border border-slate-300 rounded-xl p-2 text-xs font-bold font-mono text-slate-900 focus:outline-none focus:border-emerald-600"
                   />
-                  <span className="text-[10px] text-slate-500">Ej: 12:00 PM del día siguiente</span>
+                  <span className="text-[10px] text-slate-500">Hora en que sale al día siguiente quien entró por noche o día completo</span>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Minutos de Gracia (Sobrestadía)</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Tolerancia de Salida (minutos)</label>
                   <input
                     type="number"
                     min="0"
@@ -625,7 +625,7 @@ export function SettingsPage() {
                     onChange={(e) => setGracePeriodMinutes(e.target.value)}
                     className="w-full bg-white border border-slate-300 rounded-xl p-2 text-xs font-bold font-mono text-slate-900 focus:outline-none focus:border-emerald-600"
                   />
-                  <span className="text-[10px] text-slate-500">Margen libre sin cobro extra</span>
+                  <span className="text-[10px] text-slate-500">Minutos después de la hora de salida antes de cobrar horas extra</span>
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">Margen de Limpieza (minutos)</label>
