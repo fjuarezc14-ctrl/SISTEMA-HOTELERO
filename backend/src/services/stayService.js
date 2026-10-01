@@ -227,6 +227,19 @@ export const stayService = {
 
       const updated = await stayRepository.updateStayPrices(stay.id, { total_paid_pen: round2(deposit + paidNow) }, txQuery);
 
+      // Si viene de una reserva con abono, vincular el movimiento de caja de la seña a esta estadía
+      if (reservation && deposit > 0 && reservation.work_shift_id) {
+        await txQuery(
+          `UPDATE cash_transactions 
+           SET stay_id = $1 
+           WHERE work_shift_id = $2 
+             AND stay_id IS NULL 
+             AND category = 'stay' 
+             AND concept LIKE $3`,
+          [stay.id, reservation.work_shift_id, `%Abono de Reserva Hab. ${room.room_number}%`]
+        );
+      }
+
       // Acompañantes (Ficha Registral MINCETUR / PNP)
       if (Array.isArray(companions) && companions.length > 0) {
         for (const comp of companions) {
@@ -330,15 +343,40 @@ export const stayService = {
         await stayRepository.updateStayPrices(stay.id, { total_stay_price_pen: round2(quote.stay_price + quote.overstay_cost) }, txQuery);
       }
 
-      // Registrar en caja: primero la penalidad (categoría incidente) y luego el resto (estadía), con un solo comprobante
+      // Registrar en caja: primero penalidad (incidente), luego consumos (tienda) y finalmente saldo de estadía (hospedaje)
       const voucher = payments.length > 0 ? await issueVoucher(final_payment) : null;
       let penaltyLeft = quote.penalty;
+      let storeLeft = round2(Math.min(quote.consumptions, Math.max(0, quote.amount_due - penaltyLeft)));
+      let stayLeft = round2(Math.max(0, quote.amount_due - penaltyLeft - storeLeft));
+
+      let consumptionSummary = '';
+      if (storeLeft > 0) {
+        const consumptionsRes = await txQuery(
+          'SELECT product_name, quantity FROM room_consumptions WHERE stay_id = $1 ORDER BY id ASC',
+          [stay.id]
+        );
+        if (consumptionsRes.rows.length > 0) {
+          consumptionSummary = consumptionsRes.rows.map(c => `${c.quantity}x ${c.product_name}`).join(', ');
+        }
+      }
+
       for (const p of payments) {
         const methodLabel = p.payment_method === 'YAPE_PLIN' ? 'Yape/Plin' : p.payment_method === 'CARD' ? 'Tarjeta' : 'Efectivo';
         const suffix = payments.length > 1 ? ` (${methodLabel})` : '';
+
+        // 1. Asignar parte a penalidad / daños
         const penaltyPart = round2(Math.min(penaltyLeft, p.amount));
-        const stayPart = round2(p.amount - penaltyPart);
         penaltyLeft = round2(penaltyLeft - penaltyPart);
+        let rem = round2(p.amount - penaltyPart);
+
+        // 2. Asignar parte a consumos de tienda
+        const storePart = round2(Math.min(storeLeft, rem));
+        storeLeft = round2(storeLeft - storePart);
+        rem = round2(rem - storePart);
+
+        // 3. Asignar resto a hospedaje
+        const stayPart = round2(Math.min(stayLeft, rem));
+        stayLeft = round2(stayLeft - stayPart);
 
         if (penaltyPart > 0) {
           await cashRepository.create({
@@ -349,6 +387,23 @@ export const stayService = {
             concept: `Penalidad Check-out Hab. ${stay.room_number} - ${stay.customer_name}${suffix}`.slice(0, 150),
             category: 'incident',
             amount_pen: penaltyPart,
+            payment_method: p.payment_method,
+            reference_number: p.reference_number,
+            ...voucher
+          }, txQuery);
+        }
+        if (storePart > 0) {
+          const storeConcept = consumptionSummary
+            ? `Consumos Tienda Hab. ${stay.room_number} - ${stay.customer_name}: ${consumptionSummary}${suffix}`
+            : `Consumos Tienda Hab. ${stay.room_number} - ${stay.customer_name}${suffix}`;
+          await cashRepository.create({
+            work_shift_id: activeShift.id,
+            stay_id: stay.id,
+            user_id,
+            transaction_type: 'income',
+            concept: storeConcept.slice(0, 150),
+            category: 'store',
+            amount_pen: storePart,
             payment_method: p.payment_method,
             reference_number: p.reference_number,
             ...voucher

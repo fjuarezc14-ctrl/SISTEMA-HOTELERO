@@ -19,10 +19,40 @@ export function Badge({ tone = 'slate', icon: Icon = null, className = '', child
   return (
     <span
       title={title}
-      className={`inline-flex items-center justify-center gap-1 max-w-full px-2 py-1 rounded-lg border text-[10px] font-black leading-tight text-center whitespace-normal break-words align-middle ${TONES[tone] || TONES.slate} ${className}`}
+      className={`inline-flex items-center justify-center gap-1 max-w-full px-2 py-0.5 rounded-lg border text-[10px] font-black leading-tight text-center whitespace-normal break-words align-middle ${TONES[tone] || TONES.slate} ${className}`}
     >
       {Icon && <Icon className="w-3 h-3 shrink-0" />}
       <span>{children}</span>
     </span>
+  );
+}
+
+export function CategoryBadge({ category, className = '' }) {
+  const cat = String(category || 'other').toLowerCase();
+  if (cat === 'stay') {
+    return (
+      <Badge tone="blue" className={className} title="Hospedaje / Estadía">
+        Hospedaje
+      </Badge>
+    );
+  }
+  if (cat === 'store' || cat === 'consumption') {
+    return (
+      <Badge tone="violet" className={className} title="Tienda / Consumos">
+        Tienda
+      </Badge>
+    );
+  }
+  if (cat === 'incident') {
+    return (
+      <Badge tone="amber" className={className} title="Incidente / Penalidad">
+        Incidente
+      </Badge>
+    );
+  }
+  return (
+    <Badge tone="slate" className={className} title="Otro movimiento">
+      {category || 'Otro'}
+    </Badge>
   );
 }

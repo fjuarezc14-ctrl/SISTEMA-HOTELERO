@@ -87,15 +87,27 @@ export const cashRepository = {
         u.full_name AS user_full_name,
         r.room_number,
         c.full_name AS customer_name,
-        (
-          SELECT json_agg(json_build_object(
-                   'product_name', i.product_name,
-                   'quantity', i.quantity,
-                   'unit_price_pen', i.unit_price_pen,
-                   'total_price_pen', i.total_price_pen
-                 ))
-            FROM store_sale_items i
-           WHERE i.sale_id = t.store_sale_id
+        COALESCE(
+          (
+            SELECT json_agg(json_build_object(
+                     'product_name', i.product_name,
+                     'quantity', i.quantity,
+                     'unit_price_pen', i.unit_price_pen,
+                     'total_price_pen', i.total_price_pen
+                   ))
+              FROM store_sale_items i
+             WHERE i.sale_id = t.store_sale_id
+          ),
+          (
+            SELECT json_agg(json_build_object(
+                     'product_name', rc.product_name,
+                     'quantity', rc.quantity,
+                     'unit_price_pen', rc.unit_price_pen,
+                     'total_price_pen', rc.total_price_pen
+                   ))
+              FROM room_consumptions rc
+             WHERE rc.stay_id = t.stay_id AND t.category = 'store'
+          )
         ) AS sale_items
       FROM cash_transactions t
       JOIN users u ON t.user_id = u.id

@@ -9,6 +9,7 @@ import { cashReceipt } from '../utils/receipts';
 import { EmitVoucherModal } from '../components/EmitVoucherModal';
 import { ShiftsPage } from './ShiftsPage';
 import { exportToExcel } from '../utils/exportExcel';
+import { CategoryBadge } from '../components/Badge';
 import {
   BarChart3,
   Wallet,
@@ -529,9 +530,7 @@ function KpiReports() {
                         <td className="py-3 px-3 font-mono text-slate-500">{formatDatePeru(t.created_at)}</td>
                         <td className="py-3 px-3 font-semibold text-slate-900">{t.concept}</td>
                         <td className="py-3 px-3">
-                          <span className="inline-flex items-center justify-center text-center leading-tight align-middle px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700 capitalize border border-slate-200">
-                            {t.category}
-                          </span>
+                          <CategoryBadge category={t.category} />
                         </td>
                         <td className="py-3 px-3">
                           <span className={`inline-flex items-center justify-center text-center leading-tight align-middle px-2 py-0.5 rounded text-[10px] font-bold ${
