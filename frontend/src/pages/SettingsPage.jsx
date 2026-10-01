@@ -45,6 +45,10 @@ export function SettingsPage() {
   const [overnightCheckoutTime, setOvernightCheckoutTime] = useState('12:00');
   const [gracePeriodMinutes, setGracePeriodMinutes] = useState(10);
   const [cleaningBufferMinutes, setCleaningBufferMinutes] = useState(60);
+  const [depositType, setDepositType] = useState('percent');
+  const [depositValue, setDepositValue] = useState('30');
+  const [depositMsg, setDepositMsg] = useState('');
+  const [savingDeposit, setSavingDeposit] = useState(false);
   const [ticketFooterLegend, setTicketFooterLegend] = useState('');
   const [savingHotel, setSavingHotel] = useState(false);
   const [hotelSuccess, setHotelSuccess] = useState('');
@@ -83,6 +87,8 @@ export function SettingsPage() {
         setOvernightCheckoutTime(infoData.overnight_checkout_time || '12:00');
         setGracePeriodMinutes(infoData.grace_period_minutes !== undefined ? infoData.grace_period_minutes : 10);
         setCleaningBufferMinutes(infoData.cleaning_buffer_minutes !== undefined ? infoData.cleaning_buffer_minutes : 60);
+        setDepositType(infoData.reservation_deposit_type || 'percent');
+        setDepositValue(String(Number(infoData.reservation_deposit_value ?? 30)));
         setTicketFooterLegend(infoData.ticket_footer_legend || '¡Gracias por su preferencia en Hotel Zafiro! Conserve sus objetos de valor.');
       }
     } catch (err) {
@@ -247,6 +253,26 @@ export function SettingsPage() {
     }
   };
 
+  const handleSaveDepositRule = async (e) => {
+    e.preventDefault();
+    setDepositMsg('');
+    const value = Number(depositValue);
+    if (!Number.isFinite(value) || value < 0 || (depositType === 'percent' && value > 100)) {
+      setDepositMsg(depositType === 'percent' ? '❌ El porcentaje debe estar entre 0 y 100.' : '❌ Ingresa un monto válido (0 o mayor).');
+      return;
+    }
+    try {
+      setSavingDeposit(true);
+      await api.put('/settings/hotel-info', { reservation_deposit_type: depositType, reservation_deposit_value: value });
+      invalidateCache?.('hotel_info');
+      setDepositMsg('✅ Abono mínimo guardado.');
+    } catch (err) {
+      setDepositMsg(`❌ ${err.message || 'No se pudo guardar.'}`);
+    } finally {
+      setSavingDeposit(false);
+    }
+  };
+
   const handleSaveHotelInfo = async (e) => {
     e.preventDefault();
     setHotelError('');
@@ -397,6 +423,54 @@ export function SettingsPage() {
               </div>
             ))}
           </div>
+
+          {/* Abono mínimo para reservar */}
+          <form onSubmit={handleSaveDepositRule} className="p-4 bg-violet-50/60 border border-violet-200 rounded-2xl space-y-3">
+            <div>
+              <h4 className="text-xs font-bold text-violet-900 uppercase tracking-wider">Abono mínimo para reservar</h4>
+              <p className="text-[11px] text-slate-600">
+                Monto mínimo que se cobra al reservar. El cliente puede abonar más o pagar el total.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Tipo</label>
+                <select
+                  value={depositType}
+                  onChange={(e) => setDepositType(e.target.value)}
+                  className="w-full bg-white border border-slate-300 rounded-xl p-2 text-xs font-bold text-slate-900 focus:outline-none focus:border-violet-500"
+                >
+                  <option value="percent">Porcentaje del total (%)</option>
+                  <option value="fixed">Monto fijo (S/)</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">{depositType === 'percent' ? 'Porcentaje (%)' : 'Monto (S/)'}</label>
+                <input
+                  type="number"
+                  min="0"
+                  max={depositType === 'percent' ? '100' : undefined}
+                  step={depositType === 'percent' ? '1' : '0.50'}
+                  value={depositValue}
+                  onChange={(e) => setDepositValue(e.target.value)}
+                  className="w-full bg-white border border-slate-300 rounded-xl p-2 text-xs font-bold font-mono text-slate-900 focus:outline-none focus:border-violet-500"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={savingDeposit}
+                className="px-4 py-2 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-sm"
+              >
+                {savingDeposit ? 'Guardando...' : 'Guardar abono mínimo'}
+              </button>
+            </div>
+            <p className="text-[11px] text-slate-500">
+              {depositType === 'percent'
+                ? `Ejemplo: en una reserva de S/ 200.00 el abono mínimo será S/ ${((200 * (Number(depositValue) || 0)) / 100).toFixed(2)}.`
+                : `Si la reserva cuesta menos de S/ ${(Number(depositValue) || 0).toFixed(2)}, el mínimo será el total.`}
+            </p>
+            {depositMsg && <p className="text-xs font-semibold text-slate-700">{depositMsg}</p>}
+          </form>
         </div>
       )}
 

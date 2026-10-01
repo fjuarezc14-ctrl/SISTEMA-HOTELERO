@@ -140,7 +140,15 @@ async function main() {
   if (rooms.length < 8) {
     console.log(`⚠️ Solo hay ${rooms.length} habitaciones disponibles; se cargarán menos datos.`);
   }
-  const takeRoom = () => rooms.shift();
+
+  /** Saca de la lista la primera habitación sin conflicto para la cotización indicada */
+  const takeFreeRoom = async (quoteUrlFor) => {
+    for (let i = 0; i < rooms.length; i++) {
+      const quote = await api('GET', quoteUrlFor(rooms[i]));
+      if (!quote.conflict) return { room: rooms.splice(i, 1)[0], quote };
+    }
+    return { room: null, quote: null };
+  };
 
   // Reservas: llegadas en 0-3 días (aparecen en avisos) y una para la próxima semana (no debe avisar)
   const reservationPlan = [
@@ -152,15 +160,20 @@ async function main() {
   ];
   let reservationsCreated = 0;
   for (const plan of reservationPlan) {
-    const room = takeRoom();
+    const start = limaDate(plan.days, plan.hour);
+    const { room, quote } = await takeFreeRoom(
+      (r) => `/reservations/quote?room_id=${r.id}&start_date=${encodeURIComponent(start)}&stay_type=overnight&units=${plan.nights}`
+    );
     if (!room) break;
     const customer = customers.shift();
+    const deposit = Math.max(plan.deposit, Number(quote.min_deposit));
     await api('POST', '/reservations', {
       room_id: room.id,
       customer_data: asCustomerData(customer),
-      start_date: limaDate(plan.days, plan.hour),
-      end_date: limaDate(plan.days + plan.nights, 12),
-      deposit_amount_pen: plan.deposit,
+      start_date: start,
+      stay_type: 'overnight',
+      units: plan.nights,
+      deposit_amount_pen: Math.min(deposit, Number(quote.price)),
       payment_method: plan.method,
       reference_number: plan.method === 'CASH' ? '' : `OP${Math.floor(Math.random() * 900000 + 100000)}`,
       notes: plan.days === 7 ? 'Reserva de la próxima semana (no debe aparecer en avisos)' : 'Reserva de demostración'
@@ -178,17 +191,19 @@ async function main() {
     { stay_type: 'hours', pay: false, overdueMinutes: 50 }
   ];
   for (const plan of stayPlan) {
-    const room = takeRoom();
+    const quoteParams = (r) => {
+      const params = new URLSearchParams({ room_id: r.id, stay_type: plan.stay_type });
+      if (plan.hours) params.set('units', String(plan.hours));
+      return `/stays/quote?${params}`;
+    };
+    const { room, quote } = await takeFreeRoom(quoteParams);
     if (!room) break;
     const customer = customers.shift();
-    const quoteParams = new URLSearchParams({ room_id: room.id, stay_type: plan.stay_type });
-    if (plan.hours) quoteParams.set('hours_count', String(plan.hours));
-    const quote = await api('GET', `/stays/quote?${quoteParams}`);
     const stay = await api('POST', '/stays/checkin', {
       room_id: room.id,
       customer_data: asCustomerData(customer),
       stay_type: plan.stay_type,
-      hours_count: plan.hours,
+      units: plan.hours,
       initial_payment: plan.pay
         ? { amount: quote.amount_due, payment_method: plan.method, reference_number: plan.method === 'CASH' ? '' : 'OP' + Date.now().toString().slice(-6) }
         : null

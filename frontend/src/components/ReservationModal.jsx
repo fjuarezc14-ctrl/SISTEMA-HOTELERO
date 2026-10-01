@@ -4,22 +4,23 @@ import { api } from '../api/apiClient';
 import { formatPEN, formatDatePeru } from '../utils/formatters';
 import { PaymentSelector } from './PaymentSelector';
 import { CustomerFields, EMPTY_CUSTOMER, customerToForm } from './CustomerFields';
+import { StayDurationPicker } from './StayDurationPicker';
 import { useReceipt } from '../context/ReceiptContext';
-import { validateDocument, validateFullName, validatePhone, validateAmount, validateDateRange } from '../utils/validators';
-import { toDateTimeInput, checkoutAfterDays, nightsBetween } from '../utils/dateInput';
-import { Calendar, UserCheck, AlertCircle, Check } from 'lucide-react';
+import { validateDocument, validateFullName, validatePhone } from '../utils/validators';
+import { toDateTimeInput, nightsBetween } from '../utils/dateInput';
+import { Calendar, UserCheck, AlertCircle, Check, CalendarClock } from 'lucide-react';
 
-const STAY_DAY_OPTIONS = [1, 2, 3, 4, 5];
+const round2 = (n) => Math.round(Number(n) * 100) / 100;
 
 /** Comprobante de una reserva (también se usa al reimprimir desde la lista) */
-export function buildReservationTicket({ reservation, roomNumber, customerName, documentNumber, documentType = 'DNI', nightlyPrice = 0, paymentMethod }) {
+export function buildReservationTicket({ reservation, roomNumber, customerName, documentNumber, documentType = 'DNI', total = null, paymentMethod }) {
   const deposit = Number(reservation.deposit_amount_pen || 0);
   const nights = nightsBetween(reservation.start_date, reservation.end_date);
-  const estimatedTotal = Number(nightlyPrice || 0) * nights;
+  const stayTotal = Number(total ?? reservation.quoted_price_pen ?? 0);
   const summary = [];
-  if (estimatedTotal > 0) {
-    summary.push({ label: 'TOTAL ESTIMADO', value: formatPEN(estimatedTotal) });
-    summary.push({ label: 'SALDO AL INGRESAR', value: formatPEN(Math.max(0, estimatedTotal - deposit)) });
+  if (stayTotal > 0) {
+    summary.push({ label: 'TOTAL ALOJAMIENTO', value: formatPEN(stayTotal) });
+    summary.push({ label: 'SALDO AL INGRESAR', value: formatPEN(Math.max(0, stayTotal - deposit)) });
   }
   return {
     voucher_type: reservation.voucher?.voucher_type || 'TICKET',
@@ -31,7 +32,9 @@ export function buildReservationTicket({ reservation, roomNumber, customerName, 
     details: [
       { label: 'LLEGADA', value: formatDatePeru(reservation.start_date) },
       { label: 'SALIDA', value: formatDatePeru(reservation.end_date) },
-      { label: 'NOCHES', value: String(nights) }
+      reservation.stay_type === 'hours'
+        ? { label: 'HORAS', value: String(reservation.stay_units || '') }
+        : { label: 'NOCHES', value: String(reservation.stay_units || nights) }
     ],
     items: [{ description: `Abono inicial - Reserva Hab. ${roomNumber}`, amount: deposit }],
     total: deposit,
@@ -42,8 +45,9 @@ export function buildReservationTicket({ reservation, roomNumber, customerName, 
 
 /**
  * Modal único de reservas.
- * - Sin `reservation`: crea una nueva (cliente, fechas, abono inicial, ticket).
- * - Con `reservation`: edita/reprograma (habitación, fechas y notas; el cliente y el abono no se modifican).
+ * - Sin `reservation`: crea una nueva (cliente, llegada + duración, abono inicial, ticket).
+ * - Con `reservation`: reprograma (habitación, llegada, duración y notas; el cliente y el abono no cambian).
+ * La duración usa el mismo selector que el check-in y el precio lo calcula el backend.
  */
 export function ReservationModal({ isOpen, onClose, reservation = null, preselectedRoom = null, rooms = [], onSuccess = () => {} }) {
   const isEdit = Boolean(reservation);
@@ -52,9 +56,12 @@ export function ReservationModal({ isOpen, onClose, reservation = null, preselec
   const [customer, setCustomer] = useState(EMPTY_CUSTOMER);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [stayDays, setStayDays] = useState(1); // null = salida elegida a mano
+  const [stayType, setStayType] = useState('overnight');
+  const [units, setUnits] = useState(1);
+  const [quote, setQuote] = useState(null);
+  const [quoteError, setQuoteError] = useState('');
   const [depositAmount, setDepositAmount] = useState('0.00');
+  const [depositTouched, setDepositTouched] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState('YAPE_PLIN');
   const [referenceNumber, setReferenceNumber] = useState('');
   const [splitPayments, setSplitPayments] = useState([]);
@@ -66,9 +73,12 @@ export function ReservationModal({ isOpen, onClose, reservation = null, preselec
 
   const resetForm = () => {
     setError('');
+    setQuote(null);
+    setQuoteError('');
     setReferenceNumber('');
     setSplitPayments([]);
     setPaymentMethod('YAPE_PLIN');
+    setDepositTouched(false);
     if (reservation) {
       setRoomId(reservation.room_id || '');
       setCustomer(
@@ -81,18 +91,18 @@ export function ReservationModal({ isOpen, onClose, reservation = null, preselec
       );
       setSelectedCustomer(null);
       setStartDate(toDateTimeInput(reservation.start_date));
-      setEndDate(toDateTimeInput(reservation.end_date));
-      setStayDays(null);
+      // Reservas antiguas sin modalidad guardada: por noche, con las noches de su rango
+      setStayType(reservation.stay_type || 'overnight');
+      setUnits(reservation.stay_units || nightsBetween(reservation.start_date, reservation.end_date));
       setDepositAmount(String(reservation.deposit_amount_pen || '0.00'));
       setNotes(reservation.notes || '');
     } else {
-      const now = toDateTimeInput(new Date());
       setRoomId(preselectedRoom?.id || rooms[0]?.id || '');
       setCustomer(EMPTY_CUSTOMER);
       setSelectedCustomer(null);
-      setStartDate(now);
-      setEndDate(checkoutAfterDays(now, 1));
-      setStayDays(1);
+      setStartDate(toDateTimeInput(new Date()));
+      setStayType('overnight');
+      setUnits(1);
       setDepositAmount('0.00');
       setNotes('');
     }
@@ -112,50 +122,75 @@ export function ReservationModal({ isOpen, onClose, reservation = null, preselec
     }
   }, [isOpen, rooms, preselectedRoom, roomId]);
 
+  // Cotización del backend: total del alojamiento, salida, abono mínimo y conflictos
+  useEffect(() => {
+    if (!isOpen || !roomId || !startDate) return;
+    let cancelled = false;
+    const params = new URLSearchParams({ room_id: roomId, start_date: startDate, stay_type: stayType, units: String(units) });
+    if (isEdit) params.set('exclude_reservation_id', reservation.id);
+    const timer = setTimeout(() => {
+      api
+        .get(`/reservations/quote?${params.toString()}`)
+        .then((res) => {
+          if (cancelled) return;
+          setQuote(res.data);
+          setQuoteError('');
+          // Sugerir el abono mínimo mientras el recepcionista no haya escrito otro monto
+          if (!isEdit && !depositTouched) setDepositAmount(Number(res.data.min_deposit).toFixed(2));
+        })
+        .catch((err) => {
+          if (cancelled) return;
+          setQuote(null);
+          setQuoteError(err.message || 'No se pudo calcular el precio.');
+        });
+    }, 250);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [isOpen, roomId, startDate, stayType, units]);
+
   const handleClose = () => {
     resetForm();
     onClose();
   };
 
-  const handleStartChange = (value) => {
-    setStartDate(value);
-    if (value && stayDays) setEndDate(checkoutAfterDays(value, stayDays));
-  };
-
-  const handleSelectDays = (days) => {
-    setStayDays(days);
-    setEndDate(checkoutAfterDays(startDate, days));
-  };
-
   const isBlacklisted = Boolean(selectedCustomer?.is_blacklisted);
   const selectedRoom = rooms.find((r) => r.id === roomId) || preselectedRoom;
+  const total = Number(quote?.price || 0);
+  const minDeposit = Number(quote?.min_deposit || 0);
+  const deposit = isEdit ? Number(reservation.deposit_amount_pen || 0) : parseFloat(depositAmount) || 0;
+
+  const setDeposit = (amount) => {
+    setDepositTouched(true);
+    setDepositAmount(round2(amount).toFixed(2));
+  };
 
   const validate = () => {
     if (!roomId) return 'Debes seleccionar una habitación.';
-    if (!startDate || !endDate) return 'Las fechas de llegada y salida son obligatorias.';
-
-    // La llegada no puede ser pasada (tolerancia de 1 hora). Al editar, se permite mantener la fecha original.
+    if (!startDate) return 'La fecha de llegada es obligatoria.';
     const start = new Date(startDate);
     const unchangedStart = isEdit && startDate === toDateTimeInput(reservation.start_date);
     if (isNaN(start.getTime())) return 'La fecha de llegada no es válida.';
     if (!unchangedStart && start.getTime() < Date.now() - 60 * 60 * 1000) return 'La fecha de llegada no puede ser en el pasado.';
-
-    const rangeErr = validateDateRange(startDate, endDate);
-    if (rangeErr) return rangeErr;
-    if (isEdit) return null;
+    if (!quote) return quoteError || 'Espera el cálculo del precio.';
+    if (quote.conflict) return quote.conflict;
+    if (isEdit) {
+      if (deposit > total + 0.01) return `El nuevo total (${formatPEN(total)}) es menor al abono ya pagado (${formatPEN(deposit)}).`;
+      return null;
+    }
 
     if (isBlacklisted) {
       return `⛔ CLIENTE VETADO: ${selectedCustomer.full_name} se encuentra en Lista Negra (${selectedCustomer.blacklist_reason || 'Sin motivo'}). No se puede agendar la reserva.`;
     }
-    const deposit = parseFloat(depositAmount) || 0;
     const err =
       validateDocument(customer.document_type, customer.document_number) ||
       validateFullName(customer.full_name) ||
-      validatePhone(customer.phone, false) ||
-      (deposit < 0 ? 'El abono inicial no puede ser negativo.' : null) ||
-      (deposit > 0 ? validateAmount(depositAmount, 'Abono inicial') : null);
+      validatePhone(customer.phone, false);
     if (err) return err;
 
+    if (deposit + 0.001 < minDeposit) return `El abono mínimo para esta reserva es ${formatPEN(minDeposit)}.`;
+    if (deposit > total + 0.01) return `El abono no puede superar el total del alojamiento (${formatPEN(total)}).`;
     if (deposit > 0 && paymentMethod === 'MIXED') {
       const splitSum = splitPayments.reduce((acc, curr) => acc + (parseFloat(curr.amount) || 0), 0);
       if (Math.abs(splitSum - deposit) > 0.01) {
@@ -180,7 +215,8 @@ export function ReservationModal({ isOpen, onClose, reservation = null, preselec
         await api.put(`/reservations/${reservation.id}`, {
           room_id: roomId,
           start_date: startDate,
-          end_date: endDate,
+          stay_type: stayType,
+          units: Number(units),
           notes: notes.trim()
         });
         onSuccess();
@@ -188,7 +224,6 @@ export function ReservationModal({ isOpen, onClose, reservation = null, preselec
         return;
       }
 
-      const deposit = parseFloat(depositAmount) || 0;
       const res = await api.post('/reservations', {
         room_id: roomId,
         customer_data: {
@@ -198,7 +233,8 @@ export function ReservationModal({ isOpen, onClose, reservation = null, preselec
           phone: customer.phone.trim()
         },
         start_date: startDate,
-        end_date: endDate,
+        stay_type: stayType,
+        units: Number(units),
         deposit_amount_pen: deposit,
         payment_method: paymentMethod,
         reference_number: referenceNumber.trim(),
@@ -206,7 +242,6 @@ export function ReservationModal({ isOpen, onClose, reservation = null, preselec
         notes: notes.trim()
       });
 
-      // Ticket de la reserva
       printReceipt(
         buildReservationTicket({
           reservation: res.data,
@@ -214,7 +249,7 @@ export function ReservationModal({ isOpen, onClose, reservation = null, preselec
           customerName: customer.full_name.trim(),
           documentNumber: customer.document_number.trim(),
           documentType: customer.document_type,
-          nightlyPrice: selectedRoom?.price_overnight_default,
+          total,
           paymentMethod
         })
       );
@@ -228,170 +263,194 @@ export function ReservationModal({ isOpen, onClose, reservation = null, preselec
     }
   };
 
-  const title = isEdit
-    ? `Editar / Reprogramar Reserva — Hab. ${reservation.room_number}`
-    : 'Agendar Nueva Reserva de Habitación';
+  const title = isEdit ? `Editar / Reprogramar Reserva — Hab. ${reservation.room_number}` : 'Agendar Nueva Reserva de Habitación';
 
   return (
-    <>
-      <Modal isOpen={isOpen} onClose={handleClose} title={title} maxWidth="max-w-2xl">
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {error && (
-            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
-              <span>{error}</span>
+    <Modal isOpen={isOpen} onClose={handleClose} title={title} maxWidth="max-w-2xl">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {error && (
+          <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+            <span>{error}</span>
+          </div>
+        )}
+
+        {/* 1. Habitación, llegada y duración */}
+        <div className="p-4 bg-white border border-slate-200 rounded-2xl space-y-3 shadow-sm">
+          <div className="text-xs font-bold text-emerald-700 uppercase tracking-wider flex items-center gap-1.5">
+            <Calendar className="w-4 h-4" />
+            <span>Habitación, llegada y duración</span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Habitación</label>
+              <select
+                value={roomId}
+                onChange={(e) => setRoomId(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs text-slate-900 font-bold focus:outline-none focus:border-emerald-600"
+              >
+                {rooms.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    Hab. {r.room_number} - {r.room_type_name || 'Estándar'}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Fecha / Hora de Llegada</label>
+              <input
+                type="datetime-local"
+                required
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 text-xs text-slate-900 focus:outline-none focus:border-emerald-600"
+              />
+            </div>
+          </div>
+
+          <StayDurationPicker
+            room={selectedRoom}
+            stayType={stayType}
+            units={units}
+            quote={quote}
+            onChange={({ stayType: t, units: u }) => {
+              setStayType(t);
+              setUnits(u);
+            }}
+          />
+
+          {quote && !quote.conflict && (
+            <p className="text-[11px] text-slate-500">
+              Salida: <strong className="text-slate-800">{formatDatePeru(quote.end_date)}</strong>
+            </p>
+          )}
+          {(quote?.conflict || quoteError) && (
+            <div className="p-3 bg-rose-50 border border-rose-300 rounded-xl text-rose-900 text-xs flex items-start gap-2 font-bold">
+              <CalendarClock className="w-4 h-4 text-rose-600 shrink-0" />
+              <span>{quote?.conflict || quoteError}</span>
             </div>
           )}
+        </div>
 
-          {/* 1. Habitación y Fechas */}
-          <div className="p-4 bg-white border border-slate-200 rounded-2xl space-y-3 shadow-sm">
-            <div className="flex flex-wrap items-center justify-between gap-2 pb-1">
-              <div className="text-xs font-bold text-emerald-700 uppercase tracking-wider flex items-center gap-1.5">
-                <Calendar className="w-4 h-4" />
-                <span>Habitación y Horarios Agendados</span>
-              </div>
+        {/* 2. Datos del Huésped */}
+        <div className="p-4 bg-white border border-slate-200 rounded-2xl space-y-3 shadow-sm">
+          <div className="text-xs font-bold text-emerald-700 uppercase tracking-wider flex items-center gap-1.5">
+            <UserCheck className="w-4 h-4" />
+            <span>Datos del Huésped</span>
+          </div>
+          <CustomerFields
+            customer={customer}
+            setCustomer={setCustomer}
+            selectedCustomer={selectedCustomer}
+            setSelectedCustomer={setSelectedCustomer}
+            locked={isEdit}
+          />
+        </div>
 
-              {/* Duración rápida: salida a las 12:00 PM, N días después de la llegada */}
-              <div className="flex flex-wrap items-center gap-1" title="Calcula la salida a las 12:00 PM según la fecha de llegada">
-                {STAY_DAY_OPTIONS.map((days) => (
+        {/* 3. Costo del alojamiento y abono */}
+        <div className="p-4 bg-white border border-slate-200 rounded-2xl space-y-3 shadow-sm">
+          <div className="text-xs font-extrabold text-emerald-800 uppercase tracking-wider">Costo y abono inicial</div>
+
+          <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs space-y-1">
+            <div className="flex justify-between">
+              <span className="text-slate-600">Total del alojamiento</span>
+              <span className="font-mono font-black text-slate-900">{quote ? formatPEN(total) : '—'}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-600">{isEdit ? 'Abono ya pagado' : 'Abono inicial'}</span>
+              <span className="font-mono font-bold text-violet-700">− {formatPEN(deposit)}</span>
+            </div>
+            <div className="flex justify-between pt-1 border-t border-slate-200 text-sm">
+              <span className="font-bold text-slate-800">Saldo a pagar al llegar</span>
+              <span className="font-mono font-black text-emerald-700">{quote ? formatPEN(Math.max(0, total - deposit)) : '—'}</span>
+            </div>
+            {!isEdit && quote && (
+              <p className="text-[11px] text-slate-500 pt-1">
+                Abono mínimo: <strong>{formatPEN(minDeposit)}</strong>
+                {quote.rule?.type === 'percent' ? ` (${Number(quote.rule.value)}% del total)` : ' (monto fijo)'}
+              </p>
+            )}
+          </div>
+
+          {!isEdit && (
+            <>
+              <div className="flex flex-wrap items-center gap-1.5">
+                {[
+                  { label: `Mínimo ${formatPEN(minDeposit)}`, amount: minDeposit },
+                  { label: '50%', amount: total / 2 },
+                  { label: `Completo ${formatPEN(total)}`, amount: total }
+                ].map((opt) => (
                   <button
-                    key={days}
+                    key={opt.label}
                     type="button"
-                    onClick={() => handleSelectDays(days)}
-                    className={`px-2.5 py-1 rounded-lg border text-[11px] font-extrabold transition-colors ${
-                      stayDays === days
-                        ? 'bg-amber-500 border-amber-500 text-white'
-                        : 'bg-amber-50 border-amber-300 text-amber-900 hover:bg-amber-100'
+                    disabled={!quote || opt.amount + 0.001 < minDeposit}
+                    onClick={() => setDeposit(opt.amount)}
+                    className={`px-3 py-1.5 rounded-lg border text-[11px] font-extrabold transition-colors disabled:opacity-40 ${
+                      Math.abs(deposit - round2(opt.amount)) < 0.01 ? 'bg-violet-600 border-violet-600 text-white' : 'bg-violet-50 border-violet-200 text-violet-800 hover:bg-violet-100'
                     }`}
                   >
-                    {days} {days === 1 ? 'día' : 'días'}
+                    {opt.label}
                   </button>
                 ))}
               </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Habitación</label>
-                <select
-                  value={roomId}
-                  onChange={(e) => setRoomId(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs text-slate-900 font-bold focus:outline-none focus:border-emerald-600"
-                >
-                  {rooms.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      Hab. {r.room_number} - {r.room_type_name || 'Estándar'} (S/{r.price_overnight_default}/noche)
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Fecha / Hora Llegada</label>
-                <input
-                  type="datetime-local"
-                  required
-                  value={startDate}
-                  onChange={(e) => handleStartChange(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 text-xs text-slate-900 focus:outline-none focus:border-emerald-600"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Fecha / Hora Salida</label>
-                <input
-                  type="datetime-local"
-                  required
-                  value={endDate}
-                  min={startDate}
-                  onChange={(e) => {
-                    setEndDate(e.target.value);
-                    setStayDays(null);
-                  }}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 text-xs text-slate-900 focus:outline-none focus:border-emerald-600"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* 2. Datos del Huésped */}
-          <div className="p-4 bg-white border border-slate-200 rounded-2xl space-y-3 shadow-sm">
-            <div className="text-xs font-bold text-emerald-700 uppercase tracking-wider flex items-center gap-1.5">
-              <UserCheck className="w-4 h-4" />
-              <span>Datos del Huésped</span>
-            </div>
-            <CustomerFields
-              customer={customer}
-              setCustomer={setCustomer}
-              selectedCustomer={selectedCustomer}
-              setSelectedCustomer={setSelectedCustomer}
-              locked={isEdit}
-            />
-          </div>
-
-          {/* 3. Abono inicial */}
-          {isEdit ? (
-            <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between text-xs">
-              <span className="font-semibold text-emerald-900">Abono inicial registrado (no editable)</span>
-              <span className="font-mono font-black text-emerald-700">{formatPEN(reservation.deposit_amount_pen)}</span>
-            </div>
-          ) : (
-            <div className="p-4 bg-white border border-slate-200 rounded-2xl space-y-3 shadow-sm">
-              <div className="text-xs font-extrabold text-emerald-800 uppercase tracking-wider mb-1">Abono inicial (S/)</div>
               <PaymentSelector
-                totalAmount={parseFloat(depositAmount) || 0}
+                totalAmount={deposit}
                 paymentMethod={paymentMethod}
                 setPaymentMethod={setPaymentMethod}
                 singleAmount={depositAmount}
-                setSingleAmount={setDepositAmount}
+                setSingleAmount={(value) => {
+                  setDepositTouched(true);
+                  setDepositAmount(value);
+                }}
                 referenceNumber={referenceNumber}
                 setReferenceNumber={setReferenceNumber}
                 splitPayments={splitPayments}
                 setSplitPayments={setSplitPayments}
                 amountLabel="Abono inicial (S/)"
               />
-            </div>
+            </>
           )}
+        </div>
 
-          {/* Notas */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">Notas / Observaciones (Opcional)</label>
-            <input
-              type="text"
-              maxLength={250}
-              placeholder="Ej: Llegada de madrugada, requiere cama matrimonial adicional"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 text-xs text-slate-900 focus:outline-none focus:border-emerald-600"
-            />
-          </div>
+        {/* Notas */}
+        <div>
+          <label className="block text-xs font-semibold text-slate-700 mb-1">Notas / Observaciones (Opcional)</label>
+          <input
+            type="text"
+            maxLength={250}
+            placeholder="Ej: Llegada de madrugada, requiere cama matrimonial adicional"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 text-xs text-slate-900 focus:outline-none focus:border-emerald-600"
+          />
+        </div>
 
-          {/* Botones de Acción */}
-          <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
-            <button type="button" onClick={handleClose} className="px-4 py-2 text-xs font-medium text-slate-500 hover:text-slate-900">
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={saving || isBlacklisted}
-              className={`px-6 py-2.5 text-xs font-bold rounded-xl shadow-md transition-all flex items-center gap-2 ${
-                isBlacklisted ? 'bg-rose-700 text-white cursor-not-allowed opacity-90' : 'bg-amber-500 hover:bg-amber-600 text-white'
-              }`}
-            >
-              {isEdit ? <Check className="w-4 h-4" /> : <Calendar className="w-4 h-4" />}
-              <span>
-                {saving
-                  ? 'Guardando...'
-                  : isBlacklisted
-                  ? '⛔ Cliente Vetado (Reserva Bloqueada)'
-                  : isEdit
-                  ? 'Guardar Cambios'
-                  : 'Confirmar Reserva'}
-              </span>
-            </button>
-          </div>
-        </form>
-      </Modal>
-    </>
+        {/* Botones de Acción */}
+        <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
+          <button type="button" onClick={handleClose} className="px-4 py-2 text-xs font-medium text-slate-500 hover:text-slate-900">
+            Cancelar
+          </button>
+          <button
+            type="submit"
+            disabled={saving || isBlacklisted || !quote || Boolean(quote?.conflict)}
+            className={`px-6 py-2.5 text-xs font-bold rounded-xl shadow-md transition-all flex items-center gap-2 disabled:opacity-60 ${
+              isBlacklisted ? 'bg-rose-700 text-white cursor-not-allowed' : 'bg-amber-500 hover:bg-amber-600 text-white'
+            }`}
+          >
+            {isEdit ? <Check className="w-4 h-4" /> : <Calendar className="w-4 h-4" />}
+            <span>
+              {saving
+                ? 'Guardando...'
+                : isBlacklisted
+                ? '⛔ Cliente Vetado (Reserva Bloqueada)'
+                : isEdit
+                ? 'Guardar Cambios'
+                : `Confirmar Reserva${deposit > 0 ? ` y cobrar ${formatPEN(deposit)}` : ''}`}
+            </span>
+          </button>
+        </div>
+      </form>
+    </Modal>
   );
 }

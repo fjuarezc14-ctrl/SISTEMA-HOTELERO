@@ -7,20 +7,9 @@ import { VoucherSelector } from './VoucherSelector';
 import { CustomerFields, EMPTY_CUSTOMER, customerToForm } from './CustomerFields';
 import { useReceipt } from '../context/ReceiptContext';
 import { checkInReceipt } from '../utils/receipts';
-import { UserCheck, AlertCircle, Clock, Moon, Sun, ShieldAlert, CalendarClock } from 'lucide-react';
+import { UserCheck, AlertCircle, Clock, ShieldAlert, CalendarClock } from 'lucide-react';
+import { StayDurationPicker } from './StayDurationPicker';
 import { validateDocument, validateFullName, validatePhone } from '../utils/validators';
-
-const STAY_TYPES = [
-  { id: 'overnight', label: 'Por Noche', icon: Moon, color: 'indigo', priceField: 'price_overnight_default' },
-  { id: 'full_day', label: 'Día Completo', icon: Sun, color: 'amber', priceField: 'price_full_day_default' },
-  { id: 'hours', label: 'Por Horas', icon: Clock, color: 'emerald', priceField: 'price_hours_default' }
-];
-
-const SELECTED_STYLES = {
-  indigo: 'bg-indigo-50 border-indigo-300',
-  amber: 'bg-amber-50 border-amber-300',
-  emerald: 'bg-emerald-50 border-emerald-300'
-};
 
 /**
  * Check-in de una habitación (walk-in o desde una reserva).
@@ -34,7 +23,7 @@ export function CheckInModal({ isOpen, onClose, room, reservationData = null, up
   const [companionName, setCompanionName] = useState('');
 
   const [stayType, setStayType] = useState('overnight');
-  const [hoursCount, setHoursCount] = useState(3);
+  const [units, setUnits] = useState(1); // noches/días u horas según la modalidad
 
   const [quote, setQuote] = useState(null);
   const [quoteError, setQuoteError] = useState('');
@@ -55,7 +44,6 @@ export function CheckInModal({ isOpen, onClose, room, reservationData = null, up
   const [error, setError] = useState('');
   const { printReceipt } = useReceipt();
 
-  const baseHours = Number(room?.hours_quantity_default) || 3;
 
   // Inicializar solo al abrir el modal
   const wasOpen = useRef(false);
@@ -63,7 +51,7 @@ export function CheckInModal({ isOpen, onClose, room, reservationData = null, up
     if (isOpen && !wasOpen.current) {
       setCompanionName('');
       setStayType('overnight');
-      setHoursCount(baseHours);
+      setUnits(1);
       setVoucherType('NONE');
       setRucNumber('');
       setBusinessName('');
@@ -102,7 +90,7 @@ export function CheckInModal({ isOpen, onClose, room, reservationData = null, up
       params.set('reservation_id', reservationData.id);
     } else {
       params.set('stay_type', stayType);
-      if (stayType === 'hours') params.set('hours_count', String(hoursCount));
+      params.set('units', String(units));
     }
     setQuoteError('');
     api
@@ -116,7 +104,7 @@ export function CheckInModal({ isOpen, onClose, room, reservationData = null, up
     return () => {
       cancelled = true;
     };
-  }, [isOpen, room?.id, fromReservation, reservationData?.id, stayType, hoursCount]);
+  }, [isOpen, room?.id, fromReservation, reservationData?.id, stayType, units]);
 
   const amountDue = Number(quote?.amount_due || 0);
   const isBlacklisted = Boolean(selectedCustomer?.is_blacklisted);
@@ -198,7 +186,7 @@ export function CheckInModal({ isOpen, onClose, room, reservationData = null, up
             phone: customer.phone.trim()
           },
           stay_type: stayType,
-          hours_count: stayType === 'hours' ? Number(hoursCount) : undefined,
+          units: Number(units),
           companion_name: companionName.trim(),
           initial_payment: initialPayment
         });
@@ -291,56 +279,16 @@ export function CheckInModal({ isOpen, onClose, room, reservationData = null, up
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {STAY_TYPES.map(({ id, label, icon: Icon, color, priceField }) => (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => setStayType(id)}
-                    className={`p-3 rounded-xl border text-left transition-all ${
-                      stayType === id ? `${SELECTED_STYLES[color]} text-slate-900 shadow-sm` : 'bg-slate-50 border-slate-200 text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    <div className="flex items-center gap-1.5 text-xs font-bold">
-                      <Icon className="w-4 h-4" />
-                      <span>{label}</span>
-                    </div>
-                    <p className="text-sm font-black font-mono mt-2">
-                      {formatPEN(stayType === id && quote ? quote.price : room[priceField])}
-                    </p>
-                  </button>
-                ))}
-              </div>
-
-              {stayType === 'hours' && (
-                <div className="p-3 bg-emerald-50/80 border border-emerald-200 rounded-2xl space-y-2">
-                  <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-                    <span className="font-extrabold text-slate-800">Horas ({baseHours}h base)</span>
-                    <span className="font-bold text-emerald-800">
-                      +{formatPEN(room.price_extra_hour_default)} por hora adicional
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-4 sm:grid-cols-7 gap-1.5">
-                    {[0, 1, 2, 3, 4, 5, 6].map((extra) => {
-                      const total = baseHours + extra;
-                      return (
-                        <button
-                          key={extra}
-                          type="button"
-                          onClick={() => setHoursCount(total)}
-                          className={`py-2 px-1 rounded-xl text-xs font-extrabold border flex flex-col items-center ${
-                            hoursCount === total ? 'bg-emerald-600 border-emerald-600 text-white' : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100'
-                          }`}
-                        >
-                          <span>{extra === 0 ? 'Base' : `+${extra}h`}</span>
-                          <span className="text-[9px] font-mono opacity-80">{total}h</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
+              <StayDurationPicker
+                room={room}
+                stayType={stayType}
+                units={units}
+                quote={quote}
+                onChange={({ stayType: t, units: u }) => {
+                  setStayType(t);
+                  setUnits(u);
+                }}
+              />
               {quote && (
                 <p className="text-[11px] text-slate-500">
                   Salida prevista: <strong className="text-slate-800">{formatDatePeru(quote.expected_end_time)}</strong>

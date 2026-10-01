@@ -4,6 +4,7 @@ import { Pagination, usePagination } from '../components/Pagination';
 import { formatPEN, formatDatePeru } from '../utils/formatters';
 import { ReservationModal, buildReservationTicket } from '../components/ReservationModal';
 import { useReceipt } from '../context/ReceiptContext';
+import { nightsBetween } from '../utils/dateInput';
 import { Badge } from '../components/Badge';
 
 import { CheckInModal } from '../components/CheckInModal';
@@ -126,7 +127,7 @@ export function ReservationsPage() {
         customerName: r.customer_name,
         documentNumber: r.customer_document,
         documentType: r.document_type,
-        nightlyPrice: room?.price_overnight_default,
+        total: r.quoted_price_pen ?? (room ? Number(room.price_overnight_default) * nightsBetween(r.start_date, r.end_date) : null),
         paymentMethod: r.payment_method
       })
     );
@@ -277,7 +278,7 @@ export function ReservationsPage() {
                     <th className="py-3 px-3">Huésped / Documento</th>
                     <th className="py-3 px-3">Fecha Llegada</th>
                     <th className="py-3 px-3">Fecha Salida</th>
-                    <th className="py-3 px-3 text-right">Abono Inicial</th>
+                    <th className="py-3 px-3 text-right">Total / Abono</th>
                     <th className="py-3 px-3 text-center">Estado</th>
                     <th className="py-3 px-3 text-right">Acciones</th>
                   </tr>
@@ -294,8 +295,9 @@ export function ReservationsPage() {
                       </td>
                       <td className="py-3 px-3 text-slate-700">{formatDatePeru(r.start_date)}</td>
                       <td className="py-3 px-3 text-slate-700">{formatDatePeru(r.end_date)}</td>
-                      <td className="py-3 px-3 text-right font-mono font-bold text-emerald-700">
-                        {formatPEN(r.deposit_amount_pen)}
+                      <td className="py-3 px-3 text-right font-mono">
+                        {r.quoted_price_pen != null && <span className="block font-black text-slate-900">{formatPEN(r.quoted_price_pen)}</span>}
+                        <span className="block text-[11px] font-bold text-emerald-700">Abono {formatPEN(r.deposit_amount_pen)}</span>
                       </td>
                       <td className="py-3 px-3 text-center">
                         <Badge tone={RESERVATION_STATUS[r.status]?.tone}>
