@@ -279,6 +279,7 @@ export const stayService = {
     const stayPrice = round2(stay.total_stay_price_pen);
     const consumptions = round2(stay.total_consumptions_price_pen);
     const paid = round2(stay.total_paid_pen);
+    const total = round2(stayPrice + overstayCost + consumptions + penalty);
     const balance = round2(total - paid);
 
     return {
