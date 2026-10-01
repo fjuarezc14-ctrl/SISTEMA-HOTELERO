@@ -5,6 +5,7 @@ import { useGlobalStore } from '../context/GlobalStoreContext';
 import { validateDocument, validateAmount, validateQuantity, validatePhone, validateFullName, validateText } from '../utils/validators';
 import { Sliders, Bed, Hotel, Edit2, Plus, Check, AlertCircle, Trash2, Upload, Image } from 'lucide-react';
 import { Modal } from '../components/Modal';
+import { RoomFormModal } from '../components/RoomFormModal';
 
 export function SettingsPage() {
   const { getRoomTypes, getHotelInfo, updateHotelInfo, invalidateCache } = useGlobalStore();
@@ -28,12 +29,6 @@ export function SettingsPage() {
   // Modal Crear / Editar Habitación
   const [isRoomModalOpen, setIsRoomModalOpen] = useState(false);
   const [editingRoom, setEditingRoom] = useState(null);
-  const [newRoomNumber, setNewRoomNumber] = useState('');
-  const [newRoomTypeId, setNewRoomTypeId] = useState('');
-  const [newRoomFloor, setNewRoomFloor] = useState(1);
-  const [newRoomStatus, setNewRoomStatus] = useState('available');
-  const [savingRoom, setSavingRoom] = useState(false);
-  const [roomError, setRoomError] = useState('');
 
   // Form Hotel Info
   const [businessName, setBusinessName] = useState('');
@@ -196,21 +191,11 @@ export function SettingsPage() {
 
   const handleOpenCreateRoom = () => {
     setEditingRoom(null);
-    setNewRoomNumber('');
-    if (roomTypes.length > 0) setNewRoomTypeId(roomTypes[0].id);
-    setNewRoomFloor(1);
-    setNewRoomStatus('available');
-    setRoomError('');
     setIsRoomModalOpen(true);
   };
 
   const handleOpenEditRoom = (room) => {
     setEditingRoom(room);
-    setNewRoomNumber(room.room_number || '');
-    setNewRoomTypeId(room.room_type_id || (roomTypes[0] ? roomTypes[0].id : ''));
-    setNewRoomFloor(room.floor || 1);
-    setNewRoomStatus(room.status || 'available');
-    setRoomError('');
     setIsRoomModalOpen(true);
   };
 
@@ -221,50 +206,6 @@ export function SettingsPage() {
       await fetchData();
     } catch (err) {
       alert(err.message || 'No se pudo eliminar la habitación. Asegúrate de que no tenga estadías asociadas.');
-    }
-  };
-
-  const handleSaveRoom = async (e) => {
-    e.preventDefault();
-    setRoomError('');
-
-    const numErr = validateText(newRoomNumber, 'Número de habitación', 1, 10);
-    const floorErr = validateQuantity(newRoomFloor, 'Piso', 1, 99);
-    const firstErr = numErr || floorErr;
-    if (firstErr) {
-      setRoomError(firstErr);
-      return;
-    }
-
-    if (!newRoomTypeId) {
-      setRoomError('Selecciona el tipo de habitación.');
-      return;
-    }
-
-    try {
-      setSavingRoom(true);
-      if (editingRoom) {
-        await api.put(`/rooms/${editingRoom.id}`, {
-          room_number: newRoomNumber.trim(),
-          room_type_id: newRoomTypeId,
-          floor: parseInt(newRoomFloor, 10) || 1,
-          status: newRoomStatus
-        });
-      } else {
-        await api.post('/rooms', {
-          room_number: newRoomNumber.trim(),
-          room_type_id: newRoomTypeId,
-          floor: parseInt(newRoomFloor, 10) || 1,
-          status: 'available'
-        });
-      }
-      setIsRoomModalOpen(false);
-      setNewRoomNumber('');
-      await fetchData();
-    } catch (err) {
-      setRoomError(err.message || 'Error guardando habitación.');
-    } finally {
-      setSavingRoom(false);
     }
   };
 
@@ -704,7 +645,29 @@ export function SettingsPage() {
                     <td className="py-3 px-3 font-mono font-black text-slate-900 text-sm">{r.room_number}</td>
                     <td className="py-3 px-3 text-slate-600">Piso {r.floor}</td>
                     <td className="py-3 px-3 font-semibold text-emerald-700">{r.room_type_name}</td>
-                    <td className="py-3 px-3 capitalize text-slate-700">{r.status}</td>
+                    <td className="py-3 px-3">
+                      {r.status === 'available' ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                          Disponible
+                        </span>
+                      ) : r.status === 'occupied' ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                          <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+                          Ocupada
+                        </span>
+                      ) : r.status === 'cleaning' ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                          En Limpieza
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                          <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                          Mantenimiento
+                        </span>
+                      )}
+                    </td>
                     <td className="py-3 px-3 text-right space-x-2">
                       <button
                         onClick={() => handleOpenEditRoom(r)}
@@ -998,94 +961,12 @@ export function SettingsPage() {
       </Modal>
 
       {/* Modal Crear / Editar Habitación */}
-      <Modal
+      <RoomFormModal
         isOpen={isRoomModalOpen}
         onClose={() => setIsRoomModalOpen(false)}
-        title={editingRoom ? `Modificar Habitación ${editingRoom.room_number}` : "Añadir Nueva Habitación"}
-      >
-        <form onSubmit={handleSaveRoom} className="space-y-4">
-          {roomError && (
-            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              <span>{roomError}</span>
-            </div>
-          )}
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Número de Habitación</label>
-              <input
-                type="text"
-                required
-                placeholder="Ej: 305"
-                value={newRoomNumber}
-                onChange={(e) => setNewRoomNumber(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs font-mono font-bold text-slate-900 focus:outline-none focus:border-emerald-600"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Piso</label>
-              <input
-                type="number"
-                min="1"
-                max="20"
-                required
-                value={newRoomFloor}
-                onChange={(e) => setNewRoomFloor(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs font-bold text-slate-900 focus:outline-none focus:border-emerald-600"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">Categoría / Tipo</label>
-            <select
-              value={newRoomTypeId}
-              onChange={(e) => setNewRoomTypeId(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs text-slate-900 focus:outline-none focus:border-emerald-600"
-            >
-              {roomTypes.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name} (3h: S/{t.price_hours_default} | Pernocte: S/{t.price_overnight_default} | Día: S/{t.price_full_day_default})
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {editingRoom && (
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Estado de Operación</label>
-              <select
-                value={newRoomStatus}
-                onChange={(e) => setNewRoomStatus(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs text-slate-900 focus:outline-none focus:border-emerald-600"
-              >
-                <option value="available">Disponible (Libre)</option>
-                <option value="cleaning">En Limpieza</option>
-                <option value="maintenance">En Mantenimiento</option>
-                <option value="occupied">Ocupada</option>
-              </select>
-            </div>
-          )}
-
-          <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
-            <button
-              type="button"
-              onClick={() => setIsRoomModalOpen(false)}
-              className="px-4 py-2 text-xs font-medium text-slate-500 hover:text-slate-900"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={savingRoom}
-              className="px-5 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl shadow-md"
-            >
-              {savingRoom ? 'Guardando...' : (editingRoom ? 'Guardar Cambios' : 'Crear Habitación')}
-            </button>
-          </div>
-        </form>
-      </Modal>
+        room={editingRoom}
+        onSuccess={() => fetchData()}
+      />
 
       {/* Modal Crear Nuevo Tipo de Habitación */}
       <Modal
