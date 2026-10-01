@@ -6,6 +6,8 @@ import { PaymentSelector } from './PaymentSelector';
 import { CustomerFields, EMPTY_CUSTOMER, customerToForm } from './CustomerFields';
 import { StayDurationPicker } from './StayDurationPicker';
 import { useReceipt } from '../context/ReceiptContext';
+import { useGlobalStore } from '../context/GlobalStoreContext';
+import { schedule } from '../utils/schedule';
 import { validateDocument, validateFullName, validatePhone } from '../utils/validators';
 import { toDateTimeInput, nightsBetween } from '../utils/dateInput';
 import { Calendar, UserCheck, AlertCircle, Check, CalendarClock } from 'lucide-react';
@@ -70,6 +72,15 @@ export function ReservationModal({ isOpen, onClose, reservation = null, preselec
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const { printReceipt } = useReceipt();
+  const { hotelInfo } = useGlobalStore();
+
+  // Llegada sugerida: hoy a la hora de ingreso del hotel (o ahora, si ya pasó)
+  const defaultArrival = () => {
+    const [h, m] = schedule(hotelInfo).checkin.split(':').map(Number);
+    const d = new Date();
+    d.setHours(h || 14, m || 0, 0, 0);
+    return toDateTimeInput(d > new Date() ? d : new Date());
+  };
 
   const resetForm = () => {
     setError('');
@@ -92,7 +103,7 @@ export function ReservationModal({ isOpen, onClose, reservation = null, preselec
       setSelectedCustomer(null);
       setStartDate(toDateTimeInput(reservation.start_date));
       // Reservas antiguas sin modalidad guardada: por noche, con las noches de su rango
-      setStayType(reservation.stay_type || 'overnight');
+      setStayType(reservation.stay_type || 'full_day');
       setUnits(reservation.stay_units || nightsBetween(reservation.start_date, reservation.end_date));
       setDepositAmount(String(reservation.deposit_amount_pen || '0.00'));
       setNotes(reservation.notes || '');
@@ -100,8 +111,8 @@ export function ReservationModal({ isOpen, onClose, reservation = null, preselec
       setRoomId(preselectedRoom?.id || rooms[0]?.id || '');
       setCustomer(EMPTY_CUSTOMER);
       setSelectedCustomer(null);
-      setStartDate(toDateTimeInput(new Date()));
-      setStayType('overnight');
+      setStartDate(defaultArrival());
+      setStayType('full_day');
       setUnits(1);
       setDepositAmount('0.00');
       setNotes('');

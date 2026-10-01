@@ -9,6 +9,8 @@ import { useReceipt } from '../context/ReceiptContext';
 import { checkInReceipt } from '../utils/receipts';
 import { UserCheck, AlertCircle, Clock, ShieldAlert, CalendarClock } from 'lucide-react';
 import { StayDurationPicker } from './StayDurationPicker';
+import { useGlobalStore } from '../context/GlobalStoreContext';
+import { isPernocteTime } from '../utils/schedule';
 import { validateDocument, validateFullName, validatePhone } from '../utils/validators';
 
 /**
@@ -43,6 +45,7 @@ export function CheckInModal({ isOpen, onClose, room, reservationData = null, up
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const { printReceipt } = useReceipt();
+  const { hotelInfo } = useGlobalStore();
 
 
   // Inicializar solo al abrir el modal
@@ -50,7 +53,8 @@ export function CheckInModal({ isOpen, onClose, room, reservationData = null, up
   useEffect(() => {
     if (isOpen && !wasOpen.current) {
       setCompanionName('');
-      setStayType('overnight');
+      // De noche se sugiere pernocte; de día, estadía por días
+      setStayType(isPernocteTime(hotelInfo) ? 'overnight' : 'full_day');
       setUnits(1);
       setVoucherType('NONE');
       setRucNumber('');

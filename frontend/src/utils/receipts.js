@@ -1,7 +1,7 @@
 // Constructores de comprobantes (formato de ReceiptDocument) para cada flujo del sistema.
 import { formatDatePeru } from './formatters';
 
-const STAY_TYPE_TEXT = { hours: 'Por horas', overnight: 'Por noche', full_day: 'Día completo' };
+const STAY_TYPE_TEXT = { hours: 'Por horas', overnight: 'Pernocte', full_day: 'Por días' };
 
 const toPayments = (payments = []) =>
   payments.map((p) => ({ method: p.payment_method, amount: Number(p.amount), reference: p.reference_number || '' }));

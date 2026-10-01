@@ -68,8 +68,8 @@ export const PAYMENT_METHOD_LABELS = {
 
 export const STAY_TYPE_LABELS = {
   hours: 'Por Horas',
-  overnight: 'Por Noche',
-  full_day: 'Día Completo'
+  overnight: 'Por Noche (pernocte)',
+  full_day: 'Por Días'
 };
 
 export const ROOM_STATUS_CONFIG = {

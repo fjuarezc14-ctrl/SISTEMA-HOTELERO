@@ -1,10 +1,12 @@
 import React from 'react';
 import { Moon, Sun, Clock } from 'lucide-react';
 import { formatPEN } from '../utils/formatters';
+import { useGlobalStore } from '../context/GlobalStoreContext';
+import { schedule, formatTime12 } from '../utils/schedule';
 
 export const STAY_TYPES = [
   { id: 'overnight', label: 'Por Noche', unit: 'noche', units: 'noches', icon: Moon, priceField: 'price_overnight_default', selected: 'bg-indigo-50 border-indigo-300' },
-  { id: 'full_day', label: 'Día Completo', unit: 'día', units: 'días', icon: Sun, priceField: 'price_full_day_default', selected: 'bg-amber-50 border-amber-300' },
+  { id: 'full_day', label: 'Por Días', unit: 'día', units: 'días', icon: Sun, priceField: 'price_full_day_default', selected: 'bg-amber-50 border-amber-300' },
   { id: 'hours', label: 'Por Horas', unit: 'hora', units: 'horas', icon: Clock, priceField: 'price_hours_default', selected: 'bg-emerald-50 border-emerald-300' }
 ];
 
@@ -18,10 +20,14 @@ export function defaultUnits(stayType, room) {
 
 /**
  * Selector de duración único para reservas y check-in:
- * modalidad (noche / día completo / horas) + cantidad (noches o días, u horas).
+ * - Por noche (pernocte): una sola noche, sin cantidad; sale a la hora de salida del pernocte.
+ * - Por días: cantidad de días; sale el último día a la hora de salida del hotel.
+ * - Por horas: horas base + horas extra.
  * El precio y la salida los calcula el backend; aquí solo se muestra `quote` si llega.
  */
 export function StayDurationPicker({ room, stayType, units, onChange, quote = null }) {
+  const { hotelInfo } = useGlobalStore();
+  const times = schedule(hotelInfo);
   const baseHours = Number(room?.hours_quantity_default) || 3;
   const config = STAY_TYPES.find((t) => t.id === stayType) || STAY_TYPES[0];
 
@@ -56,8 +62,15 @@ export function StayDurationPicker({ room, stayType, units, onChange, quote = nu
         ))}
       </div>
 
-      {/* Cantidad */}
+      {/* Cantidad (el pernocte es siempre una noche) */}
       <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+        {stayType === 'overnight' ? (
+          <p className="text-xs text-slate-700">
+            <strong>1 noche (pernocte).</strong> Se vende desde las {formatTime12(times.pernocteStart)} y sale a las{' '}
+            {formatTime12(times.pernocteCheckout)}. Para más noches usa <strong>Por Días</strong>.
+          </p>
+        ) : (
+        <>
         <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
           <span className="font-bold text-slate-800">
             {stayType === 'hours' ? `Horas (base ${baseHours}h)` : `Cantidad de ${config.units}`}
@@ -96,6 +109,9 @@ export function StayDurationPicker({ room, stayType, units, onChange, quote = nu
             <span>{stayType === 'hours' ? 'h' : config.units}</span>
           </label>
         </div>
+
+        </>
+        )}
 
         {quote && (
           <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-200 text-xs">

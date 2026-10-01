@@ -166,7 +166,7 @@ function KpiReports() {
         <td>${escapeHtml(s.document_type)}: ${escapeHtml(s.document_number)}</td>
         <td>${escapeHtml(s.phone || 'Sin teléfono')}</td>
         <td style="text-align: center; font-weight: bold;">Hab. ${escapeHtml(s.room_number)}</td>
-        <td style="text-align: uppercase;">${s.stay_type === 'hours' ? 'Por Horas' : s.stay_type === 'overnight' ? 'Pernocte' : 'Día Completo'}</td>
+        <td style="text-align: uppercase;">${s.stay_type === 'hours' ? 'Por Horas' : s.stay_type === 'overnight' ? 'Pernocte' : 'Por Días'}</td>
       </tr>
     `).join('');
 

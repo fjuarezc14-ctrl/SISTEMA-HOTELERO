@@ -53,11 +53,11 @@ export function Sidebar({ currentTab, setCurrentTab, isMobileOpen = false, setIs
     { id: 'store', label: 'Tienda & Consumos', icon: ShoppingBag },
     { id: 'cash', label: 'Caja & Movimientos', icon: Wallet },
     { id: 'customers', label: 'Clientes / DNI', icon: Users },
-    { id: 'settings', label: 'Tarifas & Hotel', icon: Sliders },
     { id: 'users', label: 'Usuarios', icon: UserCog },
     { id: 'reports', label: 'Reportes & KPIs', icon: BarChart3 },
     { id: 'incidents', label: 'Incidentes', icon: ShieldAlert },
-    { id: 'textiles', label: 'Gestión Textiles', icon: Shirt }
+    { id: 'textiles', label: 'Gestión Textiles', icon: Shirt },
+    { id: 'settings', label: 'Configuración', icon: Sliders }
   ].filter((item) => canAccessModule(user, item.id));
 
   const hotelName = hotelInfo?.trade_name || hotelInfo?.business_name || 'Hotel Zafiro';
