@@ -91,3 +91,29 @@ export async function getAvailableRoom(token, exceptIds = []) {
 }
 
 export { assert };
+
+/**
+ * Acceso directo a la base de PRUEBAS (para simular el paso del tiempo, ej. salida tardía).
+ * Exige que DB_NAME contenga "test" para no tocar nunca la base real.
+ */
+export async function testDb(sql, params = []) {
+  if (!/test/i.test(process.env.DB_NAME || '')) {
+    throw new Error('testDb() solo se puede usar con una base de datos de pruebas (DB_NAME=hotel_test).');
+  }
+  const { query } = await import('../src/config/db.js');
+  return (await query(sql, params)).rows;
+}
+
+/** Hace check-out cobrando exactamente el saldo (para limpiar estadías de prueba) */
+export async function checkoutSettled(token, stayId) {
+  const quote = await expectOk('GET', `/stays/${stayId}/checkout-quote`, { token });
+  return await expectOk('POST', '/stays/checkout', {
+    token,
+    body: { stay_id: stayId, final_payment: quote.amount_due > 0 ? { amount: quote.amount_due, payment_method: 'CASH' } : null }
+  });
+}
+
+/** Deja la habitación disponible (tras un check-out queda en limpieza) */
+export async function markRoomAvailable(token, roomId) {
+  return await expectOk('PATCH', `/rooms/${roomId}/status`, { token, body: { status: 'available' } });
+}

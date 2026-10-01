@@ -183,7 +183,8 @@ export const reservationService = {
     });
   },
 
-  async convertToCheckIn(reservationId, { user_id, stay_type = 'hours', hours_count = 3, custom_price = null }) {
+  // Check-in desde una reserva: respeta la salida reservada y cobra solo el saldo (total − abono)
+  async convertToCheckIn(reservationId, { user_id, initial_payment = null, companion_name = '' }) {
     const reservation = await reservationRepository.findById(reservationId);
     if (!reservation) {
       const error = new Error('Reserva no encontrada.');
@@ -193,31 +194,15 @@ export const reservationService = {
     }
 
     if (reservation.status !== 'confirmed') {
-      const error = new Error('Esta reserva ya fue procesada o cancelada.');
-      error.statusCode = 400;
-      error.isOperational = true;
-      throw error;
+      throw badRequest('Esta reserva ya fue procesada o cancelada.');
     }
 
-    // Ejecutar Check-in pasando el abono previo como initial_payment si existía
     const stay = await stayService.checkIn({
       room_id: reservation.room_id,
-      customer_data: {
-        document_type: reservation.document_type || 'DNI',
-        document_number: reservation.customer_document,
-        full_name: reservation.customer_name,
-        phone: reservation.customer_phone
-      },
-      stay_type,
-      hours_count,
-      custom_price,
-      initial_payment: reservation.deposit_amount_pen > 0 ? {
-        amount: Number(reservation.deposit_amount_pen),
-        payment_method: reservation.payment_method,
-        reference_number: 'ABONO_RESERVA',
-        skip_cash_transaction: true // El abono ya fue registrado en caja al crear la reserva
-      } : null,
-      user_id
+      companion_name,
+      initial_payment,
+      user_id,
+      reservation
     });
 
     // Actualizar estado de reserva a checked_in
