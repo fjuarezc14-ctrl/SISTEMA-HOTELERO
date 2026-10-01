@@ -5,6 +5,7 @@
  *
  * Uso (con el backend corriendo):
  *   docker exec hotel_peru_backend npm run seed:demo
+ * Solo textiles:  docker exec hotel_peru_backend npm run seed:demo -- textiles
  * Variables opcionales: DEMO_API_URL, DEMO_ADMIN_USER, DEMO_ADMIN_PASSWORD
  *
  * No se ejecuta con NODE_ENV=production.
@@ -59,9 +60,49 @@ const CUSTOMERS = [
   'Patricia Isabel Cruz Medina'
 ];
 
+const TEXTILES = [
+  ['Sábanas Blancas 2 Plazas (180 Hilos)', 'bedding', 48, 16],
+  ['Sábanas King Size Matrimonial', 'bedding', 24, 8],
+  ['Fundas de Almohada Estándar', 'bedding', 96, 30],
+  ['Protectores de Colchón Impermeables', 'bedding', 28, 10],
+  ['Colchas / Edredones Térmicos', 'bedding', 32, 10],
+  ['Almohadas Anatómicas de Microfibra', 'bedding', 52, 12],
+  ['Toallas de Baño Extra Grandes (70x140cm)', 'bath', 72, 24],
+  ['Toallas de Mano 100% Algodón', 'bath', 60, 20],
+  ['Toallas de Rostro Suaves', 'bath', 45, 15],
+  ['Alfombras de Baño Antideslizantes', 'bath', 32, 10]
+];
+
+async function seedTextiles() {
+  const existing = new Set((await api('GET', '/textiles/items')).map((i) => i.name));
+  const created = [];
+  for (const [name, category, total, minStock] of TEXTILES) {
+    if (existing.has(name)) continue;
+    const item = await api('POST', '/textiles/items', { name, category, min_stock: minStock, initial_qty: total });
+    // La mitad en habitaciones, algunas usadas por lavar
+    await api('POST', `/textiles/items/${item.id}/move`, { type: 'assign', quantity: Math.floor(total / 2) });
+    await api('POST', `/textiles/items/${item.id}/move`, { type: 'swap', quantity: Math.max(1, Math.floor(total / 6)) });
+    created.push(item);
+  }
+  if (created.length > 0) {
+    // Un lote en lavandería con parte de lo que está por lavar
+    await api('POST', '/textiles/laundry', {
+      provider: 'Lavandería Industrial San Martín',
+      items: created.slice(0, 4).map((i) => ({ item_id: i.id, quantity: 2 }))
+    });
+  }
+  console.log(`   ✔ ${created.length} prendas de textiles${created.length ? ' y 1 lote en lavandería' : ' (ya existían)'}`);
+}
+
 async function main() {
   console.log(`🌱 Cargando datos de demostración en ${API} ...`);
   token = (await api('POST', '/auth/login', { username: ADMIN_USER, password: ADMIN_PASSWORD })).token;
+
+  if (process.argv.includes('textiles')) {
+    await seedTextiles();
+    console.log('✅ Textiles de demostración cargados.');
+    return;
+  }
 
   // Turno abierto (lo abre el admin si no hay)
   let shift = await api('GET', '/shifts/active');
@@ -217,6 +258,8 @@ async function main() {
       penalty_amount_pen: 35
     }).then(() => console.log('   ✔ 1 incidente reportado')).catch((e) => console.log(`   ⚠️ Incidente no creado: ${e.message}`));
   }
+
+  await seedTextiles();
 
   console.log('✅ Datos de demostración cargados.');
 }

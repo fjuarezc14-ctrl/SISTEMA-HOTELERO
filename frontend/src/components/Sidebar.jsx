@@ -57,7 +57,7 @@ export function Sidebar({ currentTab, setCurrentTab, isMobileOpen = false, setIs
     { id: 'users', label: 'Usuarios', icon: UserCog },
     { id: 'reports', label: 'Reportes & KPIs', icon: BarChart3 },
     { id: 'incidents', label: 'Incidentes', icon: ShieldAlert },
-    { id: 'textiles', label: 'Gestión Textiles', isTest: true }
+    { id: 'textiles', label: 'Gestión Textiles', icon: Shirt }
   ].filter((item) => canAccessModule(user, item.id));
 
   const hotelName = hotelInfo?.trade_name || hotelInfo?.business_name || 'Hotel Zafiro';
@@ -135,11 +135,6 @@ export function Sidebar({ currentTab, setCurrentTab, isMobileOpen = false, setIs
                 {item.id === 'incidents' && reportedIncidentsCount > 0 && (
                   <span className="inline-flex items-center justify-center text-center leading-tight align-middle px-2 py-0.5 text-[10px] font-black uppercase tracking-wider rounded-full bg-rose-600 text-white animate-pulse shadow-sm shadow-rose-600/30">
                     🚨 {reportedIncidentsCount}
-                  </span>
-                )}
-                {item.isTest && (
-                  <span className="inline-flex items-center justify-center text-center leading-tight align-middle px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider rounded bg-amber-500 text-white animate-pulse shadow-sm">
-                    En Prueba
                   </span>
                 )}
               </button>
