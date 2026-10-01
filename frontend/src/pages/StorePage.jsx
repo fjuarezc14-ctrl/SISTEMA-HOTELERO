@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { api } from '../api/apiClient';
-import { formatPEN, printElectronicVoucherTicket } from '../utils/formatters';
-import { getNextSequenceNumber } from '../utils/ticketCounter';
+import { Pagination, usePagination } from '../components/Pagination';
+import { formatPEN } from '../utils/formatters';
 import { useShift } from '../context/ShiftContext';
 import { useGlobalStore } from '../context/GlobalStoreContext';
 import { validateText, validatePrice, validateQuantity, validateSupplierName } from '../utils/validators';
@@ -10,7 +10,8 @@ import { CartItemList } from '../components/CartItemList';
 import { useCart } from '../hooks/useCart';
 import { PaymentSelector } from '../components/PaymentSelector';
 import { VoucherSelector } from '../components/VoucherSelector';
-import { TicketPrintModal } from '../components/TicketPrintModal';
+import { useReceipt } from '../context/ReceiptContext';
+import { storeSaleReceipt } from '../utils/receipts';
 import { ShoppingBag, ShoppingCart, Plus, QrCode, Wallet, CreditCard, AlertCircle, Check, Bed, Printer } from 'lucide-react';
 import { Modal } from '../components/Modal';
 
@@ -40,9 +41,7 @@ export function StorePage() {
   const [businessName, setBusinessName] = useState('');
   const [businessAddress, setBusinessAddress] = useState('');
 
-  // Ticket Modal
-  const [isTicketModalOpen, setIsTicketModalOpen] = useState(false);
-  const [ticketData, setTicketData] = useState(null);
+  const { printReceipt } = useReceipt();
 
   // Modal para Crear / Editar Producto
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
@@ -158,7 +157,7 @@ export function StorePage() {
 
     try {
       setSelling(true);
-      await api.post('/products/direct-sale', {
+      const res = await api.post('/products/direct-sale', {
         items: toApiItems(),
         payment_method: paymentMethod,
         reference_number: referenceNumber.trim(),
@@ -169,47 +168,26 @@ export function StorePage() {
         customer_business_name: businessName.trim()
       });
 
+
       const linkedStay = activeStays.find((s) => s.id === selectedStayId);
       const linkedText = linkedStay ? ` (Vinculado a Hab. ${linkedStay.room_number})` : '';
 
-      // Si seleccionó Boleta o Factura, gatillar impresor de comprobante electrónico
-      if (voucherType !== 'NONE') {
-        const isFactura = voucherType === 'FACTURA';
-        printElectronicVoucherTicket({
-          voucherType,
-          customerDocType: isFactura ? 'RUC' : (linkedStay?.document_type || 'DNI'),
-          customerDocNumber: isFactura ? rucNumber.trim() : (linkedStay?.document_number || '12345678'),
-          customerName: isFactura ? businessName.trim() : (linkedStay ? linkedStay.customer_name : 'CLIENTE MOSTRADOR'),
-          customerAddress: isFactura ? businessAddress.trim() : '',
-          paymentMethod: paymentMethod === 'MIXED' ? 'PAGO MIXTO' : paymentMethod,
-          totalAmount: totalSaleCost,
-          items: cart.map((c) => ({
-            qty: c.qty,
-            description: c.product.name,
-            price: Number(c.product.sale_price_pen || 0) * c.qty
-          }))
-        });
-      } else {
-        // Generar ticket de venta interno estándar
-        const seq = getNextSequenceNumber('TICKET');
-        const newTicketData = {
-          ticket_number: seq.full,
-          date: new Date(),
-          customer_name: linkedStay ? linkedStay.customer_name : 'Cliente Mostrador',
-          room_number: linkedStay ? linkedStay.room_number : null,
-          total_amount: totalSaleCost,
-          payment_method: paymentMethod === 'MIXED' ? 'Pago Mixto' : paymentMethod,
-          items: cart.map((c) => ({
-            name: c.product.name,
-            quantity: c.qty,
-            unit_price: Number(c.product.sale_price_pen || 0),
-            total_price: Number(c.product.sale_price_pen || 0) * c.qty
-          }))
-        };
-
-        setTicketData(newTicketData);
-        setIsTicketModalOpen(true);
-      }
+      // Comprobante unificado (ticket, boleta o factura con número correlativo del servidor)
+      const tx = res.data;
+      printReceipt(
+        storeSaleReceipt({
+          tx,
+          cart,
+          customer: linkedStay
+            ? { name: linkedStay.customer_name, doc_type: linkedStay.document_type, doc_number: linkedStay.document_number }
+            : { name: 'CLIENTE VARIOS' },
+          roomNumber: linkedStay?.room_number,
+          payments:
+            paymentMethod === 'MIXED'
+              ? splitPayments.filter((sp) => Number(sp.amount) > 0).map((sp) => ({ method: sp.payment_method, amount: Number(sp.amount), reference: sp.reference_number }))
+              : [{ method: paymentMethod, amount: totalSaleCost, reference: referenceNumber.trim() }]
+        })
+      );
 
       const changeText = cashReceived !== '' && change > 0 ? ` · Vuelto: ${formatPEN(change)}` : '';
       setSellSuccess(`¡Venta procesada con éxito! (${itemCount} producto(s) · ${formatPEN(totalSaleCost)})${linkedText}${changeText}`);
@@ -291,6 +269,8 @@ export function StorePage() {
       setSubmittingProduct(false);
     }
   };
+
+  const inventoryPage = usePagination(products, { resetKey: products.length });
 
   return (
     <div className="space-y-6">
@@ -412,7 +392,7 @@ export function StorePage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {products.map((p) => (
+                {inventoryPage.pageItems.map((p) => (
                   <tr key={p.id} className="hover:bg-slate-50 transition-colors">
                     <td className="py-3 px-3 font-semibold text-slate-900">{p.name}</td>
                     <td className="py-3 px-3 text-right font-mono font-bold text-emerald-700">
@@ -420,7 +400,7 @@ export function StorePage() {
                     </td>
                     <td className="py-3 px-3 text-center">
                       <span
-                        className={`px-2.5 py-1 rounded-lg text-xs font-bold ${
+                        className={`inline-flex items-center justify-center text-center leading-tight align-middle px-2.5 py-1 rounded-lg text-xs font-bold ${
                           p.stock <= 5
                             ? 'bg-rose-50 text-rose-700 border border-rose-200'
                             : 'bg-slate-100 text-slate-700'
@@ -441,6 +421,7 @@ export function StorePage() {
                 ))}
               </tbody>
             </table>
+            <Pagination page={inventoryPage.page} totalPages={inventoryPage.totalPages} totalItems={inventoryPage.totalItems} onChange={inventoryPage.setPage} label="productos" />
           </div>
         )}
       </div>
@@ -715,12 +696,6 @@ export function StorePage() {
         </form>
       </Modal>
 
-      {/* Ticket Modal para Impresión/WhatsApp de Venta Tienda */}
-      <TicketPrintModal
-        isOpen={isTicketModalOpen}
-        onClose={() => setIsTicketModalOpen(false)}
-        ticketData={ticketData}
-      />
     </div>
   );
 }

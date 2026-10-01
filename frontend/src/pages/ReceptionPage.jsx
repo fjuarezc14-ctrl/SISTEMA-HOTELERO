@@ -6,7 +6,8 @@ import { CheckInModal } from '../components/CheckInModal';
 import { CheckOutModal } from '../components/CheckOutModal';
 import { ConsumptionModal } from '../components/ConsumptionModal';
 import { ExtraHoursModal } from '../components/ExtraHoursModal';
-import { CreateReservationModal } from '../components/CreateReservationModal';
+import { ReservationModal } from '../components/ReservationModal';
+import { isArrivalAlert, arrivalLabel } from '../utils/reservationAlerts';
 import { RoomFormModal } from '../components/RoomFormModal';
 import {
   BedDouble,
@@ -127,19 +128,10 @@ export function ReceptionPage() {
     return matchFloor && matchStatus;
   });
 
-  // Reservas próximas (Pendientes de llegada: hoy o en los próximos 1-2 días)
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const upcomingReservations = reservations.filter((res) => {
-    if (res.status !== 'confirmed') return false;
-    const start = new Date(res.start_date);
-    start.setHours(0, 0, 0, 0);
-
-    const diffMs = start.getTime() - today.getTime();
-    const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
-    return diffDays >= 0 && diffDays <= 2; // Hoy, mañana (1d) o pasado mañana (2d)
-  });
+  // Reservas próximas: solo los últimos días antes de la llegada (ver utils/reservationAlerts)
+  const upcomingReservations = reservations
+    .filter((res) => isArrivalAlert(res))
+    .sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
 
   // Mapear reservas por habitación
   const reservationMapByRoom = {};
@@ -466,17 +458,12 @@ export function ReceptionPage() {
                           </p>
                         </div>
                       ) : upcomingRes ? (() => {
-                        const start = new Date(upcomingRes.start_date);
-                        start.setHours(0,0,0,0);
-                        const tDay = new Date();
-                        tDay.setHours(0,0,0,0);
-                        const diffDays = Math.round((start.getTime() - tDay.getTime()) / (1000 * 60 * 60 * 24));
-                        const labelDays = diffDays === 0 ? 'LLEGA HOY' : diffDays === 1 ? 'LLEGA MAÑANA (1d)' : 'LLEGA EN 2 DÍAS';
+                        const labelDays = arrivalLabel(upcomingRes);
 
                         return (
                           <div className="p-2.5 bg-violet-100/90 border border-violet-300 rounded-xl text-left space-y-1 shadow-2xs">
                             <div className="flex items-center justify-between">
-                              <span className="px-1.5 py-0.5 bg-violet-600 text-white text-[9px] font-black rounded-md uppercase">
+                              <span className="inline-flex items-center justify-center text-center leading-tight align-middle px-1.5 py-0.5 bg-violet-600 text-white text-[9px] font-black rounded-md uppercase">
                                 🔔 {labelDays}
                               </span>
                               <strong className="text-violet-900 font-mono text-[10px]">{formatPEN(upcomingRes.deposit_amount_pen)}</strong>
@@ -561,12 +548,7 @@ export function ReceptionPage() {
             ) : (
               <div className="space-y-3 mt-3">
                 {upcomingReservations.map((res) => {
-                  const start = new Date(res.start_date);
-                  start.setHours(0,0,0,0);
-                  const tDay = new Date();
-                  tDay.setHours(0,0,0,0);
-                  const diffDays = Math.round((start.getTime() - tDay.getTime()) / (1000 * 60 * 60 * 24));
-                  const labelDays = diffDays === 0 ? 'LLEGA HOY' : diffDays === 1 ? 'MAÑANA' : 'EN 2 DÍAS';
+                  const labelDays = arrivalLabel(res);
 
                   return (
                     <div
@@ -578,7 +560,7 @@ export function ReceptionPage() {
                           <span className="font-extrabold text-slate-900 block text-sm">{res.customer_name}</span>
                           <span className="text-slate-500 font-semibold text-[11px]">Habitación {res.room_number}</span>
                         </div>
-                        <span className="px-2 py-0.5 bg-violet-600 text-white text-[10px] font-black rounded-lg">
+                        <span className="inline-flex items-center justify-center text-center leading-tight align-middle px-2 py-0.5 bg-violet-600 text-white text-[10px] font-black rounded-lg">
                           {labelDays}
                         </span>
                       </div>
@@ -649,7 +631,7 @@ export function ReceptionPage() {
         onSuccess={fetchData}
       />
 
-      <CreateReservationModal
+      <ReservationModal
         isOpen={isReservationModalOpen}
         onClose={() => setIsReservationModalOpen(false)}
         rooms={rooms.filter(r => r.status !== 'maintenance')}

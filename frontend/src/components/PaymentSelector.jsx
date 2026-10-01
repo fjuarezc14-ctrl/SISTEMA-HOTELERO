@@ -11,7 +11,9 @@ export function PaymentSelector({
   referenceNumber,
   setReferenceNumber,
   splitPayments,
-  setSplitPayments
+  setSplitPayments,
+  amountLabel = 'Monto a Cobrar (S/)',
+  amountReadOnly = false
 }) {
   const targetTotal = Number(totalAmount || 0);
 
@@ -109,14 +111,17 @@ export function PaymentSelector({
       {paymentMethod !== 'MIXED' && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
           <div>
-            <label className="block text-[11px] font-semibold text-slate-600 mb-1">Monto a Cobrar (S/)</label>
+            <label className="block text-[11px] font-semibold text-slate-600 mb-1">{amountLabel}</label>
             <input
               type="number"
               step="0.50"
               min="0"
               value={singleAmount}
+              readOnly={amountReadOnly}
               onChange={(e) => setSingleAmount(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs font-mono font-bold text-slate-900 focus:outline-none focus:border-emerald-600"
+              className={`w-full border border-slate-300 rounded-xl p-2.5 text-xs font-mono font-bold text-slate-900 focus:outline-none focus:border-emerald-600 ${
+                amountReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-slate-50'
+              }`}
             />
           </div>
 

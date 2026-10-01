@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useShift } from '../context/ShiftContext';
 import { api } from '../api/apiClient';
 import { formatPEN, formatDatePeru } from '../utils/formatters';
-import { getCurrentSequenceNumber } from '../utils/ticketCounter';
-import { TicketPrintModal } from '../components/TicketPrintModal';
+import { Pagination, usePagination } from '../components/Pagination';
+import { useReceipt } from '../context/ReceiptContext';
+import { shiftClosureReceipt } from '../utils/receipts';
 import {
   Clock,
   Wallet,
@@ -27,14 +28,12 @@ export function ShiftsPage() {
   const [activeTransactions, setActiveTransactions] = useState([]);
   const [loadingTransactions, setLoadingTransactions] = useState(false);
 
-  // Ticket Modal de Arqueo
-  const [isTicketOpen, setIsTicketOpen] = useState(false);
-  const [ticketData, setTicketData] = useState(null);
+  const { printReceipt } = useReceipt();
 
   const fetchHistory = async () => {
     try {
       setLoadingHistory(true);
-      const res = await api.get('/shifts/history');
+      const res = await api.get('/shifts/history?limit=500');
       setHistory(res.data || []);
     } catch (err) {
       console.error('Error cargando historial de turnos:', err.message);
@@ -63,26 +62,10 @@ export function ShiftsPage() {
     }
   }, [activeShift, hasActiveShift]);
 
-  const handlePrintShiftTicket = (shiftInfo) => {
-    const data = {
-      ticket_number: shiftInfo.ticket_number || `ARQ-${String(shiftInfo.id || 1).padStart(6, '0')}`,
-      date: shiftInfo.closed_at || new Date(),
-      customer_name: `Cajero: ${shiftInfo.user_full_name}`,
-      room_number: `RELEVO CAJA`,
-      total_amount: Number(shiftInfo.total_revenue_pen || 0),
-      payment_method: 'Resumen de Arqueo',
-      items: [
-        { name: 'Fondo Inicial', quantity: 1, unit_price: Number(shiftInfo.initial_cash_pen || 0), total_price: Number(shiftInfo.initial_cash_pen || 0) },
-        { name: 'Efectivo Esperado', quantity: 1, unit_price: Number(shiftInfo.expected_cash_pen || 0), total_price: Number(shiftInfo.expected_cash_pen || 0) },
-        { name: 'Efectivo Real Contado', quantity: 1, unit_price: Number(shiftInfo.actual_cash_pen || 0), total_price: Number(shiftInfo.actual_cash_pen || 0) },
-        { name: 'Yape / Plin Total', quantity: 1, unit_price: Number(shiftInfo.total_yape_plin_pen || 0), total_price: Number(shiftInfo.total_yape_plin_pen || 0) },
-        { name: 'Tarjetas POS Total', quantity: 1, unit_price: Number(shiftInfo.total_card_pen || 0), total_price: Number(shiftInfo.total_card_pen || 0) },
-        { name: 'Diferencia de Cierre', quantity: 1, unit_price: Number(shiftInfo.difference_pen || 0), total_price: Number(shiftInfo.difference_pen || 0) }
-      ]
-    };
-    setTicketData(data);
-    setIsTicketOpen(true);
-  };
+  const handlePrintShiftTicket = (shiftInfo) => printReceipt(shiftClosureReceipt(shiftInfo));
+
+  const activeTxPage = usePagination(activeTransactions, { resetKey: activeTransactions.length });
+  const historyPage = usePagination(history, { resetKey: history.length });
 
   return (
     <div className="space-y-6">
@@ -243,12 +226,12 @@ export function ShiftsPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {activeTransactions.map((t) => (
+                    {activeTxPage.pageItems.map((t) => (
                       <tr key={t.id} className="hover:bg-slate-50">
                         <td className="py-2 px-2 font-mono text-slate-500">{formatDatePeru(t.created_at)}</td>
                         <td className="py-2 px-2 font-semibold text-slate-800">{t.concept}</td>
                         <td className="py-2 px-2">
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                          <span className={`inline-flex items-center justify-center text-center leading-tight align-middle px-2 py-0.5 rounded text-[10px] font-bold ${
                             t.payment_method === 'YAPE_PLIN' ? 'bg-violet-100 text-violet-800' :
                             t.payment_method === 'CARD' ? 'bg-blue-100 text-blue-800' : 'bg-emerald-100 text-emerald-800'
                           }`}>
@@ -262,6 +245,7 @@ export function ShiftsPage() {
                     ))}
                   </tbody>
                 </table>
+                <Pagination page={activeTxPage.page} totalPages={activeTxPage.totalPages} totalItems={activeTxPage.totalItems} onChange={activeTxPage.setPage} label="movimientos" />
               </div>
             )}
           </div>
@@ -313,7 +297,7 @@ export function ShiftsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {history.map((s) => {
+                {historyPage.pageItems.map((s) => {
                   const diff = Number(s.difference_cash_pen || s.difference_pen || 0);
                   return (
                     <tr key={s.id} className="hover:bg-slate-50 transition-colors">
@@ -327,15 +311,15 @@ export function ShiftsPage() {
                       <td className="py-3 px-3 text-right font-mono font-bold text-slate-900">{formatPEN(s.actual_cash_pen)}</td>
                       <td className="py-3 px-3 text-right font-mono font-bold">
                         {diff === 0 ? (
-                          <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded font-black text-[10px]">
+                          <span className="inline-flex items-center justify-center text-center leading-tight align-middle px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded font-black text-[10px]">
                             Cuadre Exacto
                           </span>
                         ) : diff > 0 ? (
-                          <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded font-black text-[10px]">
+                          <span className="inline-flex items-center justify-center text-center leading-tight align-middle px-2 py-0.5 bg-blue-100 text-blue-800 rounded font-black text-[10px]">
                             +{formatPEN(diff)} (Sobrante)
                           </span>
                         ) : (
-                          <span className="px-2 py-0.5 bg-rose-100 text-rose-800 rounded font-black text-[10px]">
+                          <span className="inline-flex items-center justify-center text-center leading-tight align-middle px-2 py-0.5 bg-rose-100 text-rose-800 rounded font-black text-[10px]">
                             {formatPEN(diff)} (Faltante)
                           </span>
                         )}
@@ -355,16 +339,11 @@ export function ShiftsPage() {
                 })}
               </tbody>
             </table>
+            <Pagination page={historyPage.page} totalPages={historyPage.totalPages} totalItems={historyPage.totalItems} onChange={historyPage.setPage} label="turnos" />
           </div>
         )}
       </div>
 
-      {/* Ticket Modal para Impresión de Arqueo */}
-      <TicketPrintModal
-        isOpen={isTicketOpen}
-        onClose={() => setIsTicketOpen(false)}
-        ticketData={ticketData}
-      />
     </div>
   );
 }

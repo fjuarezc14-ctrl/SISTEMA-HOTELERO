@@ -37,6 +37,21 @@ CREATE TABLE IF NOT EXISTS users (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Logo del hotel (URL http(s) o imagen subida como data URL)
+ALTER TABLE hotel_info ADD COLUMN IF NOT EXISTS logo_url TEXT;
+
+-- Margen para desocupar y limpiar la habitación entre una ocupación y la siguiente (reservas / check-in)
+ALTER TABLE hotel_info ADD COLUMN IF NOT EXISTS cleaning_buffer_minutes INT NOT NULL DEFAULT 60;
+
+-- Abono mínimo para reservar: porcentaje del total o monto fijo
+ALTER TABLE hotel_info ADD COLUMN IF NOT EXISTS reservation_deposit_type VARCHAR(10) NOT NULL DEFAULT 'percent';
+ALTER TABLE hotel_info ADD COLUMN IF NOT EXISTS reservation_deposit_value NUMERIC(10, 2) NOT NULL DEFAULT 30;
+
+-- Horarios: pernocte (se vende desde / sale a) y estadía por días (ingreso sugerido; la salida es overnight_checkout_time)
+ALTER TABLE hotel_info ADD COLUMN IF NOT EXISTS pernocte_start_time VARCHAR(5) NOT NULL DEFAULT '20:00';
+ALTER TABLE hotel_info ADD COLUMN IF NOT EXISTS pernocte_checkout_time VARCHAR(5) NOT NULL DEFAULT '09:00';
+ALTER TABLE hotel_info ADD COLUMN IF NOT EXISTS standard_checkin_time VARCHAR(5) NOT NULL DEFAULT '14:00';
+
 -- Módulos permitidos por usuario (NULL = todos los módulos operativos). Los administradores siempre tienen todos.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS allowed_modules TEXT[];
 
@@ -264,3 +279,111 @@ CREATE INDEX IF NOT EXISTS idx_stays_work_shift ON stays(work_shift_id);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_user ON audit_logs(user_id);
 
 
+
+-- 17. Ventas de tienda con detalle por producto (precio congelado al momento de la venta)
+CREATE TABLE IF NOT EXISTS store_sales (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    work_shift_id UUID NOT NULL REFERENCES work_shifts(id) ON DELETE CASCADE,
+    stay_id UUID REFERENCES stays(id) ON DELETE SET NULL,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    total_pen NUMERIC(10, 2) NOT NULL,
+    payment_method VARCHAR(20) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS store_sale_items (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    sale_id UUID NOT NULL REFERENCES store_sales(id) ON DELETE CASCADE,
+    product_id UUID NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
+    product_name VARCHAR(100) NOT NULL,
+    quantity INT NOT NULL,
+    unit_price_pen NUMERIC(10, 2) NOT NULL,
+    total_price_pen NUMERIC(10, 2) NOT NULL
+);
+
+ALTER TABLE cash_transactions ADD COLUMN IF NOT EXISTS store_sale_id UUID REFERENCES store_sales(id) ON DELETE SET NULL;
+-- Nombre del producto congelado en los consumos (si luego se renombra, el histórico no cambia)
+ALTER TABLE room_consumptions ADD COLUMN IF NOT EXISTS product_name VARCHAR(100);
+
+CREATE INDEX IF NOT EXISTS idx_store_sales_shift ON store_sales(work_shift_id);
+CREATE INDEX IF NOT EXISTS idx_store_sale_items_sale ON store_sale_items(sale_id);
+CREATE INDEX IF NOT EXISTS idx_cash_transactions_store_sale ON cash_transactions(store_sale_id);
+
+-- 18. Numeración correlativa de comprobantes por serie (B001 boletas, F001 facturas, T001 tickets)
+CREATE TABLE IF NOT EXISTS voucher_sequences (
+    series VARCHAR(10) PRIMARY KEY,
+    last_number INT NOT NULL DEFAULT 0
+);
+
+-- 19. Gestión de textiles y lavandería (módulo independiente)
+CREATE TABLE IF NOT EXISTS textile_items (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(120) UNIQUE NOT NULL,
+    category VARCHAR(20) NOT NULL DEFAULT 'bedding', -- bedding (ropa de cama), bath (ropa de baño)
+    min_stock INT NOT NULL DEFAULT 0,             -- mínimo de piezas limpias en almacén
+    clean_qty INT NOT NULL DEFAULT 0 CHECK (clean_qty >= 0),       -- limpias en almacén
+    in_use_qty INT NOT NULL DEFAULT 0 CHECK (in_use_qty >= 0),     -- en habitaciones
+    dirty_qty INT NOT NULL DEFAULT 0 CHECK (dirty_qty >= 0),       -- usadas, por lavar
+    laundry_qty INT NOT NULL DEFAULT 0 CHECK (laundry_qty >= 0),   -- en lavandería
+    discarded_qty INT NOT NULL DEFAULT 0 CHECK (discarded_qty >= 0), -- dadas de baja
+    is_active BOOLEAN NOT NULL DEFAULT true,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS laundry_batches (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    code VARCHAR(20) UNIQUE NOT NULL,
+    provider VARCHAR(150) NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'sent', -- sent (en lavado), returned (entregado)
+    sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    expected_return_at TIMESTAMPTZ,
+    returned_at TIMESTAMPTZ,
+    notes TEXT,
+    user_id UUID REFERENCES users(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS laundry_batch_items (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    batch_id UUID NOT NULL REFERENCES laundry_batches(id) ON DELETE CASCADE,
+    item_id UUID NOT NULL REFERENCES textile_items(id) ON DELETE RESTRICT,
+    quantity INT NOT NULL CHECK (quantity > 0),
+    returned_qty INT NOT NULL DEFAULT 0,
+    damaged_qty INT NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS textile_movements (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    item_id UUID NOT NULL REFERENCES textile_items(id) ON DELETE CASCADE,
+    movement_type VARCHAR(30) NOT NULL, -- purchase, assign, swap, collect, discard, laundry_send, laundry_return, adjustment
+    quantity INT NOT NULL,
+    batch_id UUID REFERENCES laundry_batches(id) ON DELETE SET NULL,
+    notes TEXT,
+    user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_laundry_batch_items_batch ON laundry_batch_items(batch_id);
+CREATE INDEX IF NOT EXISTS idx_textile_movements_item ON textile_movements(item_id);
+
+-- 20. Precio del alojamiento cotizado al reservar (se respeta en el check-in aunque cambien las tarifas)
+ALTER TABLE reservations ADD COLUMN IF NOT EXISTS quoted_price_pen NUMERIC(10, 2);
+-- Duración elegida al reservar (mismo selector que el check-in): modalidad y cantidad (noches/días u horas)
+ALTER TABLE reservations ADD COLUMN IF NOT EXISTS stay_type VARCHAR(20);
+ALTER TABLE reservations ADD COLUMN IF NOT EXISTS stay_units INT;
+
+-- 21. Migraciones de datos que deben ejecutarse una sola vez
+CREATE TABLE IF NOT EXISTS schema_migrations (
+    name VARCHAR(100) PRIMARY KEY,
+    applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- "Por noche" pasa a ser pernocte (1 noche): las reservas creadas antes eran estadías de hotel,
+-- así que pasan a "Por días" conservando su precio cotizado
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM schema_migrations WHERE name = '2026_10_pernocte_por_dias') THEN
+    UPDATE reservations SET stay_type = 'full_day' WHERE stay_type = 'overnight';
+    INSERT INTO schema_migrations (name) VALUES ('2026_10_pernocte_por_dias');
+  END IF;
+END $$;

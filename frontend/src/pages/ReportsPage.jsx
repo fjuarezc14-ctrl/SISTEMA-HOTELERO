@@ -1,6 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api/apiClient';
-import { formatPEN, formatDatePeru, PAYMENT_METHOD_LABELS, printElectronicVoucherTicket } from '../utils/formatters';
+import { escapeHtml } from '../utils/escapeHtml';
+import { Pagination, usePagination } from '../components/Pagination';
+import { formatPEN, formatDatePeru, PAYMENT_METHOD_LABELS } from '../utils/formatters';
+import { VoucherCell, TransactionActions } from '../components/VoucherCell';
+import { useReceipt } from '../context/ReceiptContext';
+import { cashReceipt } from '../utils/receipts';
 import { EmitVoucherModal } from '../components/EmitVoucherModal';
 import { ShiftsPage } from './ShiftsPage';
 import { exportToExcel } from '../utils/exportExcel';
@@ -23,8 +28,6 @@ import {
   ShoppingBag,
   ArrowDownCircle,
   Building2,
-  Printer,
-  FileText,
   Clock
 } from 'lucide-react';
 
@@ -60,6 +63,7 @@ export function ReportsPage() {
 }
 
 function KpiReports() {
+  const { printReceipt } = useReceipt();
   const [period, setPeriod] = useState('today'); // 'today' | 'yesterday' | 'week' | 'month' | 'custom'
   const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10));
   const [endDate, setEndDate] = useState(new Date().toISOString().slice(0, 10));
@@ -158,11 +162,11 @@ function KpiReports() {
         <td style="text-align: center;">${idx + 1}</td>
         <td>${formatDatePeru(s.start_time)}</td>
         <td>${s.actual_end_time ? formatDatePeru(s.actual_end_time) : 'En estadía'}</td>
-        <td><strong>${s.customer_name}</strong></td>
-        <td>${s.document_type}: ${s.document_number}</td>
-        <td>${s.phone || 'Sin teléfono'}</td>
-        <td style="text-align: center; font-weight: bold;">Hab. ${s.room_number}</td>
-        <td style="text-align: uppercase;">${s.stay_type === 'hours' ? 'Por Horas' : s.stay_type === 'overnight' ? 'Pernocte' : 'Día Completo'}</td>
+        <td><strong>${escapeHtml(s.customer_name)}</strong></td>
+        <td>${escapeHtml(s.document_type)}: ${escapeHtml(s.document_number)}</td>
+        <td>${escapeHtml(s.phone || 'Sin teléfono')}</td>
+        <td style="text-align: center; font-weight: bold;">Hab. ${escapeHtml(s.room_number)}</td>
+        <td style="text-align: uppercase;">${s.stay_type === 'hours' ? 'Por Horas' : s.stay_type === 'overnight' ? 'Pernocte' : 'Por Días'}</td>
       </tr>
     `).join('');
 
@@ -225,6 +229,8 @@ function KpiReports() {
     `);
     printWindow.document.close();
   };
+
+  const reportTxPage = usePagination(kpis?.transactions || [], { resetKey: `${startDate}|${endDate}` });
 
   return (
     <div className="space-y-6">
@@ -512,23 +518,23 @@ function KpiReports() {
                       <th className="py-3 px-3">Concepto</th>
                       <th className="py-3 px-3">Categoría</th>
                       <th className="py-3 px-3">Medio Pago</th>
-                      <th className="py-3 px-3">Comprobante SUNAT</th>
+                      <th className="py-3 px-3">Comprobante</th>
                       <th className="py-3 px-3">Registrado Por</th>
                       <th className="py-3 px-3 text-right">Monto (S/)</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {kpis.transactions.map((t) => (
+                    {reportTxPage.pageItems.map((t) => (
                       <tr key={t.id} className="hover:bg-slate-50 transition-colors">
                         <td className="py-3 px-3 font-mono text-slate-500">{formatDatePeru(t.created_at)}</td>
                         <td className="py-3 px-3 font-semibold text-slate-900">{t.concept}</td>
                         <td className="py-3 px-3">
-                          <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700 capitalize border border-slate-200">
+                          <span className="inline-flex items-center justify-center text-center leading-tight align-middle px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700 capitalize border border-slate-200">
                             {t.category}
                           </span>
                         </td>
                         <td className="py-3 px-3">
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                          <span className={`inline-flex items-center justify-center text-center leading-tight align-middle px-2 py-0.5 rounded text-[10px] font-bold ${
                             t.payment_method === 'YAPE_PLIN' ? 'bg-violet-100 text-violet-800' :
                             t.payment_method === 'CARD' ? 'bg-blue-100 text-blue-800' : 'bg-emerald-100 text-emerald-800'
                           }`}>
@@ -536,44 +542,17 @@ function KpiReports() {
                           </span>
                         </td>
                         <td className="py-3 px-3">
-                          {t.voucher_type && t.voucher_type !== 'NONE' ? (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const isFactura = t.voucher_type === 'FACTURA';
-                                printElectronicVoucherTicket({
-                                  voucherType: t.voucher_type,
-                                  voucherSeries: (t.voucher_number || '').split('-')[0] || (isFactura ? 'F001' : 'B001'),
-                                  voucherNumber: (t.voucher_number || '').split('-')[1] || '000001',
-                                  customerDocType: isFactura ? 'RUC' : 'DNI',
-                                  customerDocNumber: isFactura ? t.customer_ruc : '',
-                                  customerName: isFactura ? t.customer_business_name : t.concept,
-                                  paymentMethod: t.payment_method,
-                                  totalAmount: t.amount_pen,
-                                  items: [{ qty: 1, description: t.concept, price: t.amount_pen }]
-                                });
-                              }}
-                              className="px-2 py-0.5 rounded text-[10px] font-extrabold bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 flex items-center gap-1 transition-colors"
-                              title="Re-imprimir comprobante electrónico 80mm"
-                            >
-                              <Printer className="w-3 h-3 text-indigo-600" />
-                              <span>{t.voucher_type === 'FACTURA' ? '🏢 FACTURA' : '📄 BOLETA'} {t.voucher_number || 'E-001'}</span>
-                            </button>
-                          ) : t.transaction_type === 'income' && !t.is_cancelled ? (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setSelectedVoucherTx(t);
+                          <div className="flex items-center gap-2">
+                            <VoucherCell tx={t} />
+                            <TransactionActions
+                              tx={t}
+                              onReprint={(tx) => printReceipt(cashReceipt(tx, kpis.transactions))}
+                              onEmit={(tx) => {
+                                setSelectedVoucherTx(tx);
                                 setIsVoucherModalOpen(true);
                               }}
-                              className="px-2 py-0.5 rounded text-[10px] font-extrabold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1 transition-colors"
-                            >
-                              <FileText className="w-3 h-3 text-emerald-600" />
-                              <span>Emitir Comprobante</span>
-                            </button>
-                          ) : (
-                            <span className="text-[10px] text-slate-400 font-mono">Ticket Interno</span>
-                          )}
+                            />
+                          </div>
                         </td>
                         <td className="py-3 px-3 text-slate-600">{t.user_full_name || 'Sistema'}</td>
                         <td className={`py-3 px-3 text-right font-mono font-bold ${t.transaction_type === 'expense' ? 'text-rose-600' : 'text-emerald-700'}`}>
@@ -583,6 +562,7 @@ function KpiReports() {
                     ))}
                   </tbody>
                 </table>
+                <Pagination page={reportTxPage.page} totalPages={reportTxPage.totalPages} totalItems={reportTxPage.totalItems} onChange={reportTxPage.setPage} label="movimientos" />
               </div>
             )}
           </div>

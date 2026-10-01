@@ -4,8 +4,73 @@ import { roomRepository } from '../repositories/roomRepository.js';
 import { cashRepository } from '../repositories/cashRepository.js';
 import { shiftRepository } from '../repositories/shiftRepository.js';
 import { stayService } from './stayService.js';
+import { pricingService } from './pricingService.js';
+import { occupancyService } from './occupancyService.js';
+import { issueVoucher } from './voucherService.js';
+import { normalizePayment } from '../utils/payments.js';
+import * as v from '../utils/validate.js';
+
+function badRequest(message) {
+  const error = new Error(message);
+  error.statusCode = 400;
+  error.isOperational = true;
+  return error;
+}
+
+const MAX_RESERVATION_DAYS = 60;
+
+/** Valida el rango de fechas de una reserva y devuelve las fechas como Date */
+function parseReservationRange(start_date, end_date, { allowPastStart = false } = {}) {
+  const start = new Date(start_date);
+  const end = new Date(end_date);
+  if (isNaN(start.getTime()) || isNaN(end.getTime())) throw badRequest('Las fechas de la reserva no son válidas.');
+  if (start >= end) throw badRequest('La fecha de salida debe ser posterior a la fecha de llegada.');
+  if (!allowPastStart && start.getTime() < Date.now() - 60 * 60 * 1000) {
+    throw badRequest('La fecha de llegada no puede ser en el pasado.');
+  }
+  if (end.getTime() - start.getTime() > MAX_RESERVATION_DAYS * 86400000) {
+    throw badRequest(`Una reserva no puede durar más de ${MAX_RESERVATION_DAYS} días.`);
+  }
+  return { start, end };
+}
+
+/**
+ * Cotiza una reserva con el mismo selector que el check-in (modalidad + cantidad + llegada).
+ * Compatibilidad: si no llega `stay_type`, se cotiza por rango de fechas (start_date → end_date).
+ */
+async function quoteFor(room, { start_date, stay_type, units, end_date }) {
+  if (!start_date || isNaN(new Date(start_date).getTime())) throw badRequest('La fecha de llegada no es válida.');
+  if (stay_type) {
+    const q = await pricingService.quoteStay(room, { stay_type, units, start: new Date(start_date) });
+    return { stay_type: q.stay_type, units: q.units, price: q.price, end_date: q.expected_end_time, breakdown: q.breakdown };
+  }
+  if (!end_date) throw badRequest('Indica la modalidad y la cantidad de noches u horas.');
+  const q = pricingService.quoteRange(room, start_date, end_date);
+  return { stay_type: null, units: null, price: q.price, end_date: new Date(end_date), breakdown: q.breakdown };
+}
 
 export const reservationService = {
+  /** Cotización para el modal de reserva: precio, salida, abono mínimo y conflictos */
+  async quoteReservation({ room_id, start_date, stay_type, units, end_date, exclude_reservation_id = null }) {
+    const room = await roomRepository.findRoomById(room_id);
+    if (!room) {
+      const error = new Error('Habitación no encontrada.');
+      error.statusCode = 404;
+      error.isOperational = true;
+      throw error;
+    }
+    const quote = await quoteFor(room, { start_date, stay_type, units, end_date });
+    const deposit = await pricingService.minDeposit(quote.price);
+    let conflict = null;
+    try {
+      await occupancyService.assertRoomFree({ roomId: room.id, start: start_date, end: quote.end_date, excludeReservationId: exclude_reservation_id });
+    } catch (err) {
+      if (err.statusCode !== 409) throw err;
+      conflict = err.message;
+    }
+    return { ...quote, ...deposit, conflict };
+  },
+
   async getAllReservations(status) {
     return await reservationRepository.findAll({ status });
   },
@@ -15,18 +80,25 @@ export const reservationService = {
     customer_data, // { document_type, document_number, full_name, phone }
     start_date,
     end_date,
+    stay_type,
+    units,
     deposit_amount_pen = 0,
     payment_method = 'YAPE_PLIN',
     reference_number = '',
     split_payments = null,
     notes = '',
+    voucher_type,
+    customer_ruc,
+    customer_business_name,
     user_id
   }) {
-    if (!room_id || !customer_data?.document_number || !start_date || !end_date) {
-      const error = new Error('Habitación, cliente, fecha de inicio y fin son obligatorios.');
-      error.statusCode = 400;
-      error.isOperational = true;
-      throw error;
+    if (!room_id || !customer_data?.document_number || !customer_data?.full_name || !start_date) {
+      throw badRequest('Habitación, cliente y fecha de llegada son obligatorios.');
+    }
+
+    const deposit = Number(deposit_amount_pen || 0);
+    if (!Number.isFinite(deposit) || deposit < 0) {
+      throw badRequest('El abono inicial debe ser un monto válido (cero o mayor).');
     }
 
     const room = await roomRepository.findRoomById(room_id);
@@ -36,9 +108,30 @@ export const reservationService = {
       error.isOperational = true;
       throw error;
     }
+    if (room.status === 'maintenance') {
+      throw badRequest('La habitación está en mantenimiento y no se puede reservar.');
+    }
+
+    // Salida y precio con el mismo selector que el check-in
+    const quote = await quoteFor(room, { start_date, stay_type, units, end_date });
+    end_date = quote.end_date;
+    parseReservationRange(start_date, end_date);
+
+    // Abono: entre el mínimo configurado y el total del alojamiento
+    const { min_deposit } = await pricingService.minDeposit(quote.price);
+    if (deposit + 0.001 < min_deposit) {
+      throw badRequest(`El abono mínimo para esta reserva es S/ ${min_deposit.toFixed(2)}.`);
+    }
+    if (deposit > quote.price + 0.01) {
+      throw badRequest(`El abono (S/ ${deposit.toFixed(2)}) no puede superar el total del alojamiento (S/ ${quote.price.toFixed(2)}).`);
+    }
+
+    // Anti-overbooking: rango ocupado + margen de limpieza (reservas y estadías activas)
+    await occupancyService.assertRoomFree({ roomId: room.id, start: start_date, end: end_date });
 
     // Registrar o actualizar cliente
-    let customer = await customerRepository.findByDocument(customer_data.document_number.trim());
+    const custData = v.customerData(customer_data);
+    let customer = await customerRepository.findByDocument(custData.document_number);
     if (customer) {
       if (customer.is_blacklisted) {
         const error = new Error(`El cliente ${customer.full_name} se encuentra VETADO del hotel (Lista Negra). Motivo: ${customer.blacklist_reason || 'Sin especificar'}. No se pueden realizar reservas.`);
@@ -48,20 +141,11 @@ export const reservationService = {
       }
     } else {
       customer = await customerRepository.create({
-        document_type: customer_data.document_type || 'DNI',
-        document_number: customer_data.document_number.trim(),
-        full_name: customer_data.full_name.trim(),
-        phone: customer_data.phone ? customer_data.phone.trim() : ''
+        document_type: custData.document_type,
+        document_number: custData.document_number,
+        full_name: custData.full_name,
+        phone: custData.phone
       });
-    }
-
-    // Validar anticolisión (Anti-Overbooking)
-    const collisions = await reservationRepository.findCollisions(room.id, start_date, end_date);
-    if (collisions.length > 0) {
-      const error = new Error('Conflicto de reserva: La habitación ya se encuentra reservada en el rango de fechas seleccionado.');
-      error.statusCode = 400;
-      error.isOperational = true;
-      throw error;
     }
 
     // Buscar turno activo para registrar la seña en caja si aplica
@@ -69,6 +153,12 @@ export const reservationService = {
     if (!activeShift) {
       activeShift = await shiftRepository.findAnyActiveShift();
     }
+    if (deposit > 0 && !activeShift) {
+      throw badRequest('Para registrar un abono inicial debe haber un turno de caja abierto.');
+    }
+    // El abono (simple o mixto) debe sumar exactamente el monto indicado
+    const depositPayments = deposit > 0 ? normalizePayment({ amount: deposit, payment_method, reference_number, split_payments }, deposit) : [];
+    const voucher = deposit > 0 ? await issueVoucher({ voucher_type: voucher_type || 'TICKET', customer_ruc, customer_business_name }) : null;
 
     const reservation = await reservationRepository.create({
       room_id: room.id,
@@ -76,48 +166,36 @@ export const reservationService = {
       work_shift_id: activeShift ? activeShift.id : null,
       start_date,
       end_date,
-      deposit_amount_pen: Number(deposit_amount_pen || 0),
+      deposit_amount_pen: deposit,
       payment_method,
-      notes: notes.trim()
+      notes: String(notes || '').trim().slice(0, 250),
+      quoted_price_pen: quote.price,
+      stay_type: quote.stay_type,
+      stay_units: quote.units
     });
 
-    // Si hubo abono/seña, registrarlo en caja (con soporte para Pago Mixto)
-    if (activeShift && Number(deposit_amount_pen) > 0) {
-      if (payment_method === 'MIXED' && Array.isArray(split_payments) && split_payments.length > 0) {
-        for (const item of split_payments) {
-          const itemAmt = Number(item.amount || 0);
-          if (itemAmt > 0) {
-            const methodLabel = item.payment_method === 'YAPE_PLIN' ? 'Yape/Plin' : item.payment_method === 'CARD' ? 'Tarjeta' : 'Efectivo';
-            await cashRepository.create({
-              work_shift_id: activeShift.id,
-              user_id,
-              transaction_type: 'income',
-              concept: `Abono de Reserva Hab. ${room.room_number} - ${customer.full_name} (${methodLabel})`,
-              category: 'stay',
-              amount_pen: itemAmt,
-              payment_method: item.payment_method,
-              reference_number: item.reference_number || ''
-            });
-          }
-        }
-      } else {
-        await cashRepository.create({
-          work_shift_id: activeShift.id,
-          user_id,
-          transaction_type: 'income',
-          concept: `Abono de Reserva Hab. ${room.room_number} - ${customer.full_name}`,
-          category: 'stay',
-          amount_pen: Number(deposit_amount_pen),
-          payment_method: payment_method || 'CASH',
-          reference_number: reference_number || ''
-        });
-      }
+    // Abono inicial en caja (un comprobante para todo el abono)
+    for (const p of depositPayments) {
+      const methodLabel = p.payment_method === 'YAPE_PLIN' ? 'Yape/Plin' : p.payment_method === 'CARD' ? 'Tarjeta' : 'Efectivo';
+      await cashRepository.create({
+        work_shift_id: activeShift.id,
+        user_id,
+        transaction_type: 'income',
+        concept: `Abono de Reserva Hab. ${room.room_number} - ${customer.full_name}${depositPayments.length > 1 ? ` (${methodLabel})` : ''}`.slice(0, 150),
+        category: 'stay',
+        amount_pen: p.amount,
+        payment_method: p.payment_method,
+        reference_number: p.reference_number,
+        ...voucher
+      });
     }
 
-    return reservation;
+    return { ...reservation, voucher };
   },
 
-  async updateReservation(id, { room_id, start_date, end_date, deposit_amount_pen, notes, status }) {
+  // Reprogramar: habitación, fechas y notas. El abono y el estado no se cambian por aquí
+  // (el abono ya está registrado en caja; el estado tiene sus propias acciones).
+  async updateReservation(id, { room_id, start_date, stay_type, units, end_date, notes }) {
     const existing = await reservationRepository.findById(id);
     if (!existing) {
       const error = new Error('Reserva no encontrada.');
@@ -125,31 +203,52 @@ export const reservationService = {
       error.isOperational = true;
       throw error;
     }
+    if (existing.status !== 'confirmed') {
+      throw badRequest('Solo se pueden reprogramar reservas confirmadas.');
+    }
 
     const targetRoomId = room_id || existing.room_id;
-    const targetStartDate = start_date || existing.start_date;
-    const targetEndDate = end_date || existing.end_date;
+    const room = await roomRepository.findRoomById(targetRoomId);
+    if (!room) throw badRequest('Habitación no encontrada.');
 
-    // Verificar anticolisión si cambian fechas o habitación
-    const collisions = await reservationRepository.findCollisions(targetRoomId, targetStartDate, targetEndDate, id);
-    if (collisions.length > 0) {
-      const error = new Error('Conflicto de fecha: La habitación seleccionada ya está reservada para ese horario.');
-      error.statusCode = 400;
-      error.isOperational = true;
-      throw error;
+    const targetStart = start_date || existing.start_date;
+    const changesStay = Boolean(room_id || start_date || stay_type || units || end_date);
+
+    let quote = null;
+    if (changesStay) {
+      quote = await quoteFor(room, {
+        start_date: targetStart,
+        stay_type: stay_type || existing.stay_type || undefined,
+        units: units ?? existing.stay_units ?? undefined,
+        end_date: stay_type || existing.stay_type ? undefined : end_date || existing.end_date
+      });
+    }
+    const targetEnd = quote ? quote.end_date : existing.end_date;
+
+    // Mantener la llegada original (aunque ya haya pasado) está permitido
+    const sameStart = new Date(targetStart).getTime() === new Date(existing.start_date).getTime();
+    parseReservationRange(targetStart, targetEnd, { allowPastStart: sameStart });
+
+    await occupancyService.assertRoomFree({ roomId: targetRoomId, start: targetStart, end: targetEnd, excludeReservationId: id });
+
+    // El abono ya pagado no cambia; el nuevo precio no puede quedar por debajo de él
+    if (quote && Number(existing.deposit_amount_pen) > quote.price + 0.01) {
+      throw badRequest(`El nuevo total (S/ ${quote.price.toFixed(2)}) es menor al abono ya pagado (S/ ${Number(existing.deposit_amount_pen).toFixed(2)}).`);
     }
 
     return await reservationRepository.update(id, {
       room_id: targetRoomId,
-      start_date: targetStartDate,
-      end_date: targetEndDate,
-      deposit_amount_pen: deposit_amount_pen !== undefined ? Number(deposit_amount_pen) : undefined,
-      notes: notes !== undefined ? notes.trim() : undefined,
-      status
+      start_date: targetStart,
+      end_date: targetEnd,
+      notes: notes !== undefined ? String(notes).trim().slice(0, 250) : undefined,
+      quoted_price_pen: quote ? quote.price : undefined,
+      stay_type: quote?.stay_type || undefined,
+      stay_units: quote?.units || undefined
     });
   },
 
-  async convertToCheckIn(reservationId, { user_id, stay_type = 'hours', hours_count = 3, custom_price = null }) {
+  // Check-in desde una reserva: respeta la salida reservada y cobra solo el saldo (total − abono)
+  async convertToCheckIn(reservationId, { user_id, initial_payment = null, companion_name = '' }) {
     const reservation = await reservationRepository.findById(reservationId);
     if (!reservation) {
       const error = new Error('Reserva no encontrada.');
@@ -159,31 +258,15 @@ export const reservationService = {
     }
 
     if (reservation.status !== 'confirmed') {
-      const error = new Error('Esta reserva ya fue procesada o cancelada.');
-      error.statusCode = 400;
-      error.isOperational = true;
-      throw error;
+      throw badRequest('Esta reserva ya fue procesada o cancelada.');
     }
 
-    // Ejecutar Check-in pasando el abono previo como initial_payment si existía
     const stay = await stayService.checkIn({
       room_id: reservation.room_id,
-      customer_data: {
-        document_type: reservation.document_type || 'DNI',
-        document_number: reservation.customer_document,
-        full_name: reservation.customer_name,
-        phone: reservation.customer_phone
-      },
-      stay_type,
-      hours_count,
-      custom_price,
-      initial_payment: reservation.deposit_amount_pen > 0 ? {
-        amount: Number(reservation.deposit_amount_pen),
-        payment_method: reservation.payment_method,
-        reference_number: 'ABONO_RESERVA',
-        skip_cash_transaction: true // El abono ya fue registrado en caja al crear la reserva
-      } : null,
-      user_id
+      companion_name,
+      initial_payment,
+      user_id,
+      reservation
     });
 
     // Actualizar estado de reserva a checked_in

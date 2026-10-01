@@ -148,7 +148,7 @@ export function CustomerSearchAutocomplete({ onSelectCustomer, onClearCustomer, 
                         {c.document_type || 'DNI'}: {c.document_number} {c.phone ? `• Tel: ${c.phone}` : ''}
                       </span>
                     </div>
-                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100/70 px-2 py-1 rounded-lg shrink-0">
+                    <span className="inline-flex items-center justify-center text-center leading-tight align-middle text-[10px] font-bold text-emerald-700 bg-emerald-100/70 px-2 py-1 rounded-lg shrink-0">
                       Seleccionar →
                     </span>
                   </button>

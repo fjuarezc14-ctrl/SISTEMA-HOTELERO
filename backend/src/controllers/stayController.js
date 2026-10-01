@@ -29,10 +29,35 @@ export const stayController = {
     }
   },
 
+  async quoteCheckIn(req, res, next) {
+    try {
+      const { room_id, stay_type, units, hours_count, reservation_id } = req.query;
+      const quote = await stayService.quoteCheckIn({
+        room_id,
+        stay_type,
+        units: units !== undefined && units !== '' ? Number(units) : undefined,
+        hours_count: hours_count !== undefined ? Number(hours_count) : undefined,
+        reservation_id: reservation_id || null
+      });
+      res.json({ success: true, data: quote });
+    } catch (error) {
+      next(error);
+    }
+  },
+
   async checkIn(req, res, next) {
     try {
+      // Solo campos permitidos (el precio lo calcula el servidor)
+      const { room_id, customer_data, stay_type, units, hours_count, companion_name, companions, initial_payment } = req.body;
       const stay = await stayService.checkIn({
-        ...req.body,
+        room_id,
+        customer_data,
+        stay_type,
+        units,
+        hours_count,
+        companion_name,
+        companions,
+        initial_payment,
         user_id: req.user.id
       });
       res.status(201).json({
@@ -40,6 +65,17 @@ export const stayController = {
         message: 'Check-in realizado exitosamente.',
         data: stay
       });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async quoteCheckOut(req, res, next) {
+    try {
+      const quote = await stayService.quoteCheckOut(req.params.id, {
+        penalty_amount_pen: req.query.penalty_amount_pen !== undefined ? Number(req.query.penalty_amount_pen) : 0
+      });
+      res.json({ success: true, data: quote });
     } catch (error) {
       next(error);
     }
@@ -72,6 +108,9 @@ export const stayController = {
         payment_method: req.body.payment_method,
         reference_number: req.body.reference_number,
         split_payments: req.body.split_payments || null,
+        voucher_type: req.body.voucher_type,
+        customer_ruc: req.body.customer_ruc,
+        customer_business_name: req.body.customer_business_name,
         user_id: req.user.id
       });
       res.json({

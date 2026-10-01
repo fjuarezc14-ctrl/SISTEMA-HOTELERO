@@ -3,6 +3,8 @@ import { Modal } from './Modal';
 import { api } from '../api/apiClient';
 import { formatPEN } from '../utils/formatters';
 import { PaymentSelector } from './PaymentSelector';
+import { useReceipt } from '../context/ReceiptContext';
+import { extraHoursReceipt } from '../utils/receipts';
 import { validateQuantity } from '../utils/validators';
 import { AlertCircle, Plus } from 'lucide-react';
 
@@ -14,6 +16,7 @@ export function ExtraHoursModal({ isOpen, onClose, room, onSuccess }) {
   const [splitPayments, setSplitPayments] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const { printReceipt } = useReceipt();
 
   const activeStayId = room?.active_stay_id || room?.stay_id;
 
@@ -39,13 +42,14 @@ export function ExtraHoursModal({ isOpen, onClose, room, onSuccess }) {
 
     try {
       setSubmitting(true);
-      await api.post(`/stays/${activeStayId}/extra-hours`, {
+      const res = await api.post(`/stays/${activeStayId}/extra-hours`, {
         hours_count: Number(hoursCount),
         payment_method: paymentMethod,
         reference_number: referenceNumber.trim(),
         split_payments: paymentMethod === 'MIXED' ? splitPayments : null
       });
 
+      printReceipt(extraHoursReceipt({ result: res.data, room, customer: { name: room.customer_name } }));
       onSuccess();
       onClose();
     } catch (err) {

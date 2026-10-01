@@ -106,7 +106,7 @@ export function ProductCardGrid({ products = [], selectedProductId, onSelectProd
                     {getProductIcon(p.name)}
                   </div>
                   {isSelected && cartQuantities ? (
-                    <span className="px-1.5 py-0.5 bg-emerald-600 text-white font-black text-[10px] rounded-md">
+                    <span className="inline-flex items-center justify-center text-center leading-tight align-middle px-1.5 py-0.5 bg-emerald-600 text-white font-black text-[10px] rounded-md">
                       x{inCart}
                     </span>
                   ) : isSelected ? (
@@ -114,7 +114,7 @@ export function ProductCardGrid({ products = [], selectedProductId, onSelectProd
                       <Check className="w-3 h-3" />
                     </span>
                   ) : isOutOfStock ? (
-                    <span className="px-1.5 py-0.5 bg-rose-100 text-rose-800 font-bold text-[9px] rounded-md">
+                    <span className="inline-flex items-center justify-center text-center leading-tight align-middle px-1.5 py-0.5 bg-rose-100 text-rose-800 font-bold text-[9px] rounded-md">
                       Agotado
                     </span>
                   ) : isLowStock ? (

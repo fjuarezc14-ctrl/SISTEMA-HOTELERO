@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs';
 import { settingsRepository } from '../repositories/settingsRepository.js';
 import { userRepository } from '../repositories/userRepository.js';
 import { ROLES, ASSIGNABLE_MODULES } from '../constants/index.js';
+import * as v from '../utils/validate.js';
 
 function forbidden(message) {
   const error = new Error(message);
@@ -32,7 +33,71 @@ export const settingsService = {
   },
 
   async updateHotelInfo(infoData) {
-    return await settingsRepository.updateHotelInfo(infoData);
+    const checkRange = (value, field, min, max) => {
+      if (value === undefined || value === null || value === '') return undefined;
+      const n = Number(value);
+      if (!Number.isInteger(n) || n < min || n > max) {
+        const error = new Error(`${field} debe ser un número entero entre ${min} y ${max}.`);
+        error.statusCode = 400;
+        error.isOperational = true;
+        throw error;
+      }
+      return n;
+    };
+    const opt = (value, field, opts) => (value === undefined || value === null ? undefined : v.text(value, field, opts));
+    const ruc = opt(infoData.ruc, 'El RUC', { required: false, max: 11 });
+    if (ruc && !/^(10|15|17|20)\d{9}$/.test(ruc)) throw v.badRequest('El RUC del hotel debe tener 11 dígitos.');
+    const time = (value, field) => {
+      const t = opt(value, field, { max: 5 });
+      if (t && !/^([01]\d|2[0-3]):[0-5]\d$/.test(t)) throw v.badRequest(`${field} debe tener formato HH:MM.`);
+      return t;
+    };
+    const checkout = time(infoData.overnight_checkout_time, 'La hora de salida de la estadía por días');
+    const pernocteStart = time(infoData.pernocte_start_time, 'La hora desde la que se vende el pernocte');
+    const pernocteCheckout = time(infoData.pernocte_checkout_time, 'La hora de salida del pernocte');
+    const standardCheckin = time(infoData.standard_checkin_time, 'La hora de ingreso');
+
+    // Logo: URL http(s) o imagen subida (png, jpg, webp o gif) de hasta ~500 KB
+    let logo = infoData.logo_url;
+    if (logo !== undefined && logo !== null) {
+      logo = String(logo).trim();
+      const isUrl = /^https?:\/\/\S+$/i.test(logo) && logo.length <= 1000;
+      const isImage = /^data:image\/(png|jpeg|jpg|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(logo) && logo.length <= 700000;
+      if (logo && !isUrl && !isImage) {
+        throw v.badRequest('El logo debe ser una URL http(s) o una imagen PNG, JPG, WEBP o GIF de hasta 500 KB.');
+      }
+    }
+
+    // Regla del abono mínimo para reservar
+    let depositType;
+    let depositValue;
+    if (infoData.reservation_deposit_type !== undefined || infoData.reservation_deposit_value !== undefined) {
+      const current = await settingsRepository.getHotelInfo();
+      depositType = v.oneOf(infoData.reservation_deposit_type ?? current.reservation_deposit_type, 'El tipo de abono mínimo', ['percent', 'fixed']);
+      depositValue =
+        depositType === 'percent'
+          ? v.money(infoData.reservation_deposit_value ?? current.reservation_deposit_value, 'El porcentaje de abono', { min: 0, max: 100 })
+          : v.money(infoData.reservation_deposit_value ?? current.reservation_deposit_value, 'El abono mínimo fijo', { min: 0, max: 10000 });
+    }
+
+    return await settingsRepository.updateHotelInfo({
+      reservation_deposit_type: depositType,
+      reservation_deposit_value: depositValue,
+      business_name: opt(infoData.business_name, 'La razón social', { min: 2, max: 150 }),
+      trade_name: opt(infoData.trade_name, 'El nombre comercial', { min: 2, max: 150 }),
+      ruc,
+      address: opt(infoData.address, 'La dirección', { max: 255, required: false }),
+      phone: opt(infoData.phone, 'El teléfono', { max: 30, required: false }),
+      email: opt(infoData.email, 'El correo', { max: 100, required: false }),
+      overnight_checkout_time: checkout,
+      pernocte_start_time: pernocteStart,
+      pernocte_checkout_time: pernocteCheckout,
+      standard_checkin_time: standardCheckin,
+      ticket_footer_legend: opt(infoData.ticket_footer_legend, 'La leyenda del ticket', { max: 500, required: false }),
+      logo_url: logo,
+      grace_period_minutes: checkRange(infoData.grace_period_minutes, 'La tolerancia de salida (minutos)', 0, 240),
+      cleaning_buffer_minutes: checkRange(infoData.cleaning_buffer_minutes, 'El margen de limpieza (minutos)', 0, 720)
+    });
   },
 
   async getAuditLogs({ limit, offset }) {

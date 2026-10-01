@@ -58,7 +58,7 @@ export const shiftRepository = {
       ORDER BY s.opened_at DESC
       LIMIT $1 OFFSET $2
     `;
-    const res = await query(sql, [limit, offset]);
+    const res = await query(sql, [Math.min(Number(limit) || 50, 1000), Math.max(0, Number(offset) || 0)]);
     return res.rows;
   },
 

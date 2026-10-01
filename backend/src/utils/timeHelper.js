@@ -40,27 +40,6 @@ export function getCurrentDateTimePeru() {
 }
 
 /**
- * Calcula la fecha y hora estimada de finalización según la modalidad
- * @param {Date|string} startDate Fecha de inicio
- * @param {string} stayType Tipo de estadía ('hours', 'overnight', 'full_day')
- * @param {number} hoursCount Cantidad de horas si es por modalidad 'hours'
- */
-export function calculateExpectedEndTime(startDate = new Date(), stayType = 'hours', hoursCount = 3) {
-  const start = new Date(startDate);
-  const result = new Date(start);
-
-  if (stayType === 'hours') {
-    result.setHours(result.getHours() + Number(hoursCount || 3));
-  } else if (stayType === 'overnight' || stayType === 'full_day') {
-    // Pernocte / Día Completo (Estándar Perú): Salida al día siguiente a las 12:00 PM (Mediodía)
-    result.setDate(result.getDate() + 1);
-    result.setHours(12, 0, 0, 0);
-  }
-
-  return result.toISOString();
-}
-
-/**
  * Formatea un monto numérico a formato de moneda peruana (S/ 0.00)
  */
 export function formatCurrencyPEN(amount = 0) {

@@ -6,22 +6,28 @@ export const settingsRepository = {
     return res.rows[0] || null;
   },
 
-  async updateHotelInfo({ business_name, trade_name, logo_url, ruc, address, phone, email, overnight_checkout_time, grace_period_minutes, ticket_footer_legend }) {
+  async updateHotelInfo({ business_name, trade_name, ruc, address, phone, email, overnight_checkout_time, grace_period_minutes, ticket_footer_legend, cleaning_buffer_minutes, logo_url, reservation_deposit_type, reservation_deposit_value, pernocte_start_time, pernocte_checkout_time, standard_checkin_time }) {
     const res = await query(
       `UPDATE hotel_info
        SET business_name = COALESCE($1, business_name),
            trade_name = COALESCE($2, trade_name),
-           logo_url = COALESCE($3, logo_url),
-           ruc = COALESCE($4, ruc),
-           address = COALESCE($5, address),
-           phone = COALESCE($6, phone),
-           email = COALESCE($7, email),
-           overnight_checkout_time = COALESCE($8, overnight_checkout_time),
-           grace_period_minutes = COALESCE($9, grace_period_minutes),
-           ticket_footer_legend = COALESCE($10, ticket_footer_legend),
+           ruc = COALESCE($3, ruc),
+           address = COALESCE($4, address),
+           phone = COALESCE($5, phone),
+           email = COALESCE($6, email),
+           overnight_checkout_time = COALESCE($7, overnight_checkout_time),
+           grace_period_minutes = COALESCE($8, grace_period_minutes),
+           ticket_footer_legend = COALESCE($9, ticket_footer_legend),
+           cleaning_buffer_minutes = COALESCE($10, cleaning_buffer_minutes),
+           logo_url = COALESCE($11, logo_url),
+           reservation_deposit_type = COALESCE($12, reservation_deposit_type),
+           reservation_deposit_value = COALESCE($13, reservation_deposit_value),
+           pernocte_start_time = COALESCE($14, pernocte_start_time),
+           pernocte_checkout_time = COALESCE($15, pernocte_checkout_time),
+           standard_checkin_time = COALESCE($16, standard_checkin_time),
            updated_at = NOW()
        RETURNING *`,
-      [business_name, trade_name, logo_url, ruc, address, phone, email, overnight_checkout_time, grace_period_minutes, ticket_footer_legend]
+      [business_name, trade_name, ruc, address, phone, email, overnight_checkout_time, grace_period_minutes, ticket_footer_legend, cleaning_buffer_minutes, logo_url, reservation_deposit_type, reservation_deposit_value, pernocte_start_time, pernocte_checkout_time, standard_checkin_time]
     );
     return res.rows[0] || null;
   },

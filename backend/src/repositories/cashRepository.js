@@ -14,11 +14,12 @@ export const cashRepository = {
     voucher_type = 'NONE',
     voucher_number = '',
     customer_ruc = '',
-    customer_business_name = ''
+    customer_business_name = '',
+    store_sale_id = null
   }) {
     const res = await query(
-      `INSERT INTO cash_transactions (work_shift_id, stay_id, user_id, transaction_type, concept, category, amount_pen, payment_method, reference_number, voucher_type, voucher_number, customer_ruc, customer_business_name)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+      `INSERT INTO cash_transactions (work_shift_id, stay_id, user_id, transaction_type, concept, category, amount_pen, payment_method, reference_number, voucher_type, voucher_number, customer_ruc, customer_business_name, store_sale_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
        RETURNING *`,
       [
         work_shift_id,
@@ -33,7 +34,8 @@ export const cashRepository = {
         voucher_type,
         voucher_number,
         customer_ruc,
-        customer_business_name
+        customer_business_name,
+        store_sale_id
       ]
     );
     return res.rows[0];
@@ -84,7 +86,17 @@ export const cashRepository = {
         t.*,
         u.full_name AS user_full_name,
         r.room_number,
-        c.full_name AS customer_name
+        c.full_name AS customer_name,
+        (
+          SELECT json_agg(json_build_object(
+                   'product_name', i.product_name,
+                   'quantity', i.quantity,
+                   'unit_price_pen', i.unit_price_pen,
+                   'total_price_pen', i.total_price_pen
+                 ))
+            FROM store_sale_items i
+           WHERE i.sale_id = t.store_sale_id
+        ) AS sale_items
       FROM cash_transactions t
       JOIN users u ON t.user_id = u.id
       LEFT JOIN stays s ON t.stay_id = s.id

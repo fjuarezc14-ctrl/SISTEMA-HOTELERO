@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { canAccessModule, ASSIGNABLE_MODULES } from './utils/modules';
 import { ShiftProvider } from './context/ShiftContext';
 import { GlobalStoreProvider } from './context/GlobalStoreContext';
+import { ReceiptProvider } from './context/ReceiptContext';
 import { Sidebar } from './components/Sidebar';
 import { Navbar } from './components/Navbar';
 import { LoginPage } from './pages/LoginPage';
@@ -18,7 +19,6 @@ import { UsersPage } from './pages/UsersPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { OpenShiftModal } from './components/OpenShiftModal';
 import { CloseShiftModal } from './components/CloseShiftModal';
-import { TicketPrintModal } from './components/TicketPrintModal';
 
 function MainLayout() {
   const { user, isAuthenticated } = useAuth();
@@ -27,9 +27,6 @@ function MainLayout() {
   const [isCloseShiftModalOpen, setIsCloseShiftModalOpen] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
-  // Ticket Cierre Global
-  const [isClosureTicketOpen, setIsClosureTicketOpen] = useState(false);
-  const [closureTicketData, setClosureTicketData] = useState(null);
 
   if (!isAuthenticated) {
     return <LoginPage />;
@@ -107,16 +104,6 @@ function MainLayout() {
       <CloseShiftModal
         isOpen={isCloseShiftModalOpen}
         onClose={() => setIsCloseShiftModalOpen(false)}
-        onShiftClosed={(ticketData) => {
-          setClosureTicketData(ticketData);
-          setIsClosureTicketOpen(true);
-        }}
-      />
-
-      <TicketPrintModal
-        isOpen={isClosureTicketOpen}
-        onClose={() => setIsClosureTicketOpen(false)}
-        ticketData={closureTicketData}
       />
     </div>
   );
@@ -127,7 +114,9 @@ export default function App() {
     <AuthProvider>
       <ShiftProvider>
         <GlobalStoreProvider>
-          <MainLayout />
+          <ReceiptProvider>
+            <MainLayout />
+          </ReceiptProvider>
         </GlobalStoreProvider>
       </ShiftProvider>
     </AuthProvider>

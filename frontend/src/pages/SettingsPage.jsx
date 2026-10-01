@@ -44,6 +44,16 @@ export function SettingsPage() {
   const [phone, setPhone] = useState('');
   const [overnightCheckoutTime, setOvernightCheckoutTime] = useState('12:00');
   const [gracePeriodMinutes, setGracePeriodMinutes] = useState(10);
+  const [cleaningBufferMinutes, setCleaningBufferMinutes] = useState(60);
+  const [pernocteStart, setPernocteStart] = useState('20:00');
+  const [pernocteCheckout, setPernocteCheckout] = useState('09:00');
+  const [standardCheckin, setStandardCheckin] = useState('14:00');
+  const [scheduleMsg, setScheduleMsg] = useState('');
+  const [savingSchedule, setSavingSchedule] = useState(false);
+  const [depositType, setDepositType] = useState('percent');
+  const [depositValue, setDepositValue] = useState('30');
+  const [depositMsg, setDepositMsg] = useState('');
+  const [savingDeposit, setSavingDeposit] = useState(false);
   const [ticketFooterLegend, setTicketFooterLegend] = useState('');
   const [savingHotel, setSavingHotel] = useState(false);
   const [hotelSuccess, setHotelSuccess] = useState('');
@@ -81,6 +91,12 @@ export function SettingsPage() {
         setPhone(infoData.phone || '');
         setOvernightCheckoutTime(infoData.overnight_checkout_time || '12:00');
         setGracePeriodMinutes(infoData.grace_period_minutes !== undefined ? infoData.grace_period_minutes : 10);
+        setCleaningBufferMinutes(infoData.cleaning_buffer_minutes !== undefined ? infoData.cleaning_buffer_minutes : 60);
+        setPernocteStart(String(infoData.pernocte_start_time || '20:00').slice(0, 5));
+        setPernocteCheckout(String(infoData.pernocte_checkout_time || '09:00').slice(0, 5));
+        setStandardCheckin(String(infoData.standard_checkin_time || '14:00').slice(0, 5));
+        setDepositType(infoData.reservation_deposit_type || 'percent');
+        setDepositValue(String(Number(infoData.reservation_deposit_value ?? 30)));
         setTicketFooterLegend(infoData.ticket_footer_legend || '¡Gracias por su preferencia en Hotel Zafiro! Conserve sus objetos de valor.');
       }
     } catch (err) {
@@ -245,6 +261,48 @@ export function SettingsPage() {
     }
   };
 
+  const handleSaveSchedule = async (e) => {
+    e.preventDefault();
+    setScheduleMsg('');
+    try {
+      setSavingSchedule(true);
+      await api.put('/settings/hotel-info', {
+        pernocte_start_time: pernocteStart,
+        pernocte_checkout_time: pernocteCheckout,
+        standard_checkin_time: standardCheckin,
+        overnight_checkout_time: overnightCheckoutTime,
+        grace_period_minutes: parseInt(gracePeriodMinutes, 10) || 0,
+        cleaning_buffer_minutes: parseInt(cleaningBufferMinutes, 10) || 0
+      });
+      invalidateCache('hotel_info');
+      setScheduleMsg('✅ Horarios guardados.');
+    } catch (err) {
+      setScheduleMsg(`❌ ${err.message || 'No se pudieron guardar los horarios.'}`);
+    } finally {
+      setSavingSchedule(false);
+    }
+  };
+
+  const handleSaveDepositRule = async (e) => {
+    e.preventDefault();
+    setDepositMsg('');
+    const value = Number(depositValue);
+    if (!Number.isFinite(value) || value < 0 || (depositType === 'percent' && value > 100)) {
+      setDepositMsg(depositType === 'percent' ? '❌ El porcentaje debe estar entre 0 y 100.' : '❌ Ingresa un monto válido (0 o mayor).');
+      return;
+    }
+    try {
+      setSavingDeposit(true);
+      await api.put('/settings/hotel-info', { reservation_deposit_type: depositType, reservation_deposit_value: value });
+      invalidateCache?.('hotel_info');
+      setDepositMsg('✅ Abono mínimo guardado.');
+    } catch (err) {
+      setDepositMsg(`❌ ${err.message || 'No se pudo guardar.'}`);
+    } finally {
+      setSavingDeposit(false);
+    }
+  };
+
   const handleSaveHotelInfo = async (e) => {
     e.preventDefault();
     setHotelError('');
@@ -268,8 +326,6 @@ export function SettingsPage() {
         ruc: ruc.trim(),
         address: address.trim(),
         phone: phone.trim(),
-        overnight_checkout_time: overnightCheckoutTime,
-        grace_period_minutes: parseInt(gracePeriodMinutes, 10) || 0,
         ticket_footer_legend: ticketFooterLegend.trim()
       };
       const res = await api.put('/settings/hotel-info', payload);
@@ -327,6 +383,16 @@ export function SettingsPage() {
         >
           Datos de la Empresa / RUC
         </button>
+        <button
+          onClick={() => setActiveTab('schedule')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+            activeTab === 'schedule'
+              ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20'
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          Horarios
+        </button>
       </div>
 
       {/* TAB 1: TARIFAS EDITABLES */}
@@ -380,11 +446,11 @@ export function SettingsPage() {
                     <span className="font-bold text-emerald-700 text-sm">{formatPEN(type.price_hours_default)}</span>
                   </div>
                   <div className="p-2 bg-white rounded-lg border border-slate-100">
-                    <span className="text-[10px] text-slate-500 block">Por Noche</span>
+                    <span className="text-[10px] text-slate-500 block">Pernocte (1 noche)</span>
                     <span className="font-bold text-indigo-700 text-sm">{formatPEN(type.price_overnight_default)}</span>
                   </div>
                   <div className="p-2 bg-white rounded-lg border border-slate-100">
-                    <span className="text-[10px] text-slate-500 block">Día Completo</span>
+                    <span className="text-[10px] text-slate-500 block">Por Día</span>
                     <span className="font-bold text-amber-700 text-sm">{formatPEN(type.price_full_day_default)}</span>
                   </div>
                   <div className="p-2 bg-white rounded-lg border border-slate-100">
@@ -395,7 +461,164 @@ export function SettingsPage() {
               </div>
             ))}
           </div>
+
+          {/* Abono mínimo para reservar */}
+          <form onSubmit={handleSaveDepositRule} className="p-4 bg-violet-50/60 border border-violet-200 rounded-2xl space-y-3">
+            <div>
+              <h4 className="text-xs font-bold text-violet-900 uppercase tracking-wider">Abono mínimo para reservar</h4>
+              <p className="text-[11px] text-slate-600">
+                Monto mínimo que se cobra al reservar. El cliente puede abonar más o pagar el total.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Tipo</label>
+                <select
+                  value={depositType}
+                  onChange={(e) => setDepositType(e.target.value)}
+                  className="w-full bg-white border border-slate-300 rounded-xl p-2 text-xs font-bold text-slate-900 focus:outline-none focus:border-violet-500"
+                >
+                  <option value="percent">Porcentaje del total (%)</option>
+                  <option value="fixed">Monto fijo (S/)</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">{depositType === 'percent' ? 'Porcentaje (%)' : 'Monto (S/)'}</label>
+                <input
+                  type="number"
+                  min="0"
+                  max={depositType === 'percent' ? '100' : undefined}
+                  step={depositType === 'percent' ? '1' : '0.50'}
+                  value={depositValue}
+                  onChange={(e) => setDepositValue(e.target.value)}
+                  className="w-full bg-white border border-slate-300 rounded-xl p-2 text-xs font-bold font-mono text-slate-900 focus:outline-none focus:border-violet-500"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={savingDeposit}
+                className="px-4 py-2 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-sm"
+              >
+                {savingDeposit ? 'Guardando...' : 'Guardar abono mínimo'}
+              </button>
+            </div>
+            <p className="text-[11px] text-slate-500">
+              {depositType === 'percent'
+                ? `Ejemplo: en una reserva de S/ 200.00 el abono mínimo será S/ ${((200 * (Number(depositValue) || 0)) / 100).toFixed(2)}.`
+                : `Si la reserva cuesta menos de S/ ${(Number(depositValue) || 0).toFixed(2)}, el mínimo será el total.`}
+            </p>
+            {depositMsg && <p className="text-xs font-semibold text-slate-700">{depositMsg}</p>}
+          </form>
         </div>
+      )}
+
+      {/* TAB: HORARIOS */}
+      {activeTab === 'schedule' && (
+        <form onSubmit={handleSaveSchedule} className="p-6 bg-white border border-slate-200 rounded-3xl space-y-5 shadow-sm">
+          <div>
+            <h3 className="text-sm font-bold text-slate-900">Horarios de Hospedaje</h3>
+            <p className="text-xs text-slate-500">Definen la hora de salida de cada modalidad, cuándo se vende el pernocte y los márgenes de tolerancia y limpieza.</p>
+          </div>
+
+          <div className="p-4 bg-indigo-50/60 border border-indigo-200 rounded-2xl space-y-3">
+            <h4 className="text-xs font-bold text-indigo-900 uppercase tracking-wider">Por Noche (pernocte · 1 noche)</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Se vende desde</label>
+                <input
+                  type="time"
+                  required
+                  value={pernocteStart}
+                  onChange={(e) => setPernocteStart(e.target.value)}
+                  className="w-full bg-white border border-slate-300 rounded-xl p-2 text-xs font-bold font-mono text-slate-900 focus:outline-none focus:border-emerald-600"
+                />
+                <span className="text-[10px] text-slate-500">A partir de esta hora se ofrece la tarifa de pernocte</span>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Hora de salida</label>
+                <input
+                  type="time"
+                  required
+                  value={pernocteCheckout}
+                  onChange={(e) => setPernocteCheckout(e.target.value)}
+                  className="w-full bg-white border border-slate-300 rounded-xl p-2 text-xs font-bold font-mono text-slate-900 focus:outline-none focus:border-emerald-600"
+                />
+                <span className="text-[10px] text-slate-500">Al día siguiente (o el mismo día si llegó de madrugada)</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-4 bg-amber-50/60 border border-amber-200 rounded-2xl space-y-3">
+            <h4 className="text-xs font-bold text-amber-900 uppercase tracking-wider">Por Días (estadía)</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Hora de ingreso</label>
+                <input
+                  type="time"
+                  required
+                  value={standardCheckin}
+                  onChange={(e) => setStandardCheckin(e.target.value)}
+                  className="w-full bg-white border border-slate-300 rounded-xl p-2 text-xs font-bold font-mono text-slate-900 focus:outline-none focus:border-emerald-600"
+                />
+                <span className="text-[10px] text-slate-500">Hora de llegada que se sugiere al crear una reserva</span>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Hora de salida</label>
+                <input
+                  type="time"
+                  required
+                  value={overnightCheckoutTime}
+                  onChange={(e) => setOvernightCheckoutTime(e.target.value)}
+                  className="w-full bg-white border border-slate-300 rounded-xl p-2 text-xs font-bold font-mono text-slate-900 focus:outline-none focus:border-emerald-600"
+                />
+                <span className="text-[10px] text-slate-500">El último día de la estadía</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-4 bg-emerald-50/60 border border-emerald-200 rounded-2xl space-y-3">
+            <h4 className="text-xs font-bold text-emerald-900 uppercase tracking-wider">Tolerancia y limpieza</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Tolerancia de salida (minutos)</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="240"
+                  step="1"
+                  value={gracePeriodMinutes}
+                  onChange={(e) => setGracePeriodMinutes(e.target.value)}
+                  className="w-full bg-white border border-slate-300 rounded-xl p-2 text-xs font-bold font-mono text-slate-900 focus:outline-none focus:border-emerald-600"
+                />
+                <span className="text-[10px] text-slate-500">Minutos después de la hora de salida antes de cobrar horas extra</span>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Margen de limpieza (minutos)</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="720"
+                  step="5"
+                  value={cleaningBufferMinutes}
+                  onChange={(e) => setCleaningBufferMinutes(e.target.value)}
+                  className="w-full bg-white border border-slate-300 rounded-xl p-2 text-xs font-bold font-mono text-slate-900 focus:outline-none focus:border-emerald-600"
+                />
+                <span className="text-[10px] text-slate-500">Tiempo para desocupar y limpiar entre una ocupación y la siguiente</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between gap-3 pt-2 border-t border-slate-200">
+            <span className="text-xs font-semibold text-slate-700">{scheduleMsg}</span>
+            <button
+              type="submit"
+              disabled={savingSchedule}
+              className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-md"
+            >
+              {savingSchedule ? 'Guardando...' : 'Guardar Horarios'}
+            </button>
+          </div>
+        </form>
       )}
 
       {/* TAB 2: HABITACIONES */}
@@ -597,37 +820,6 @@ export function SettingsPage() {
               />
             </div>
 
-            {/* Parámetros de Operación & Tolerancia */}
-            <div className="p-4 bg-emerald-50/60 border border-emerald-200 rounded-2xl space-y-3">
-              <h4 className="text-xs font-bold text-emerald-900 uppercase tracking-wider">
-                Tiempos de Check-out & Tolerancia de Gracia
-              </h4>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Hora Salida Pernocte</label>
-                  <input
-                    type="time"
-                    value={overnightCheckoutTime}
-                    onChange={(e) => setOvernightCheckoutTime(e.target.value)}
-                    className="w-full bg-white border border-slate-300 rounded-xl p-2 text-xs font-bold font-mono text-slate-900 focus:outline-none focus:border-emerald-600"
-                  />
-                  <span className="text-[10px] text-slate-500">Ej: 12:00 PM del día siguiente</span>
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Minutos de Gracia (Sobrestadía)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="60"
-                    value={gracePeriodMinutes}
-                    onChange={(e) => setGracePeriodMinutes(e.target.value)}
-                    className="w-full bg-white border border-slate-300 rounded-xl p-2 text-xs font-bold font-mono text-slate-900 focus:outline-none focus:border-emerald-600"
-                  />
-                  <span className="text-[10px] text-slate-500">Margen libre sin cobro extra</span>
-                </div>
-              </div>
-            </div>
-
             {/* Leyenda y Pie de Ticket Personalizado */}
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Leyenda al Pie del Ticket Térmico (80mm)</label>
@@ -697,7 +889,7 @@ export function SettingsPage() {
 
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Por Noche (S/)</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Pernocte (1 noche) (S/)</label>
               <input
                 type="number"
                 step="1"
@@ -709,7 +901,7 @@ export function SettingsPage() {
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Día Completo (S/)</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Por Día (S/)</label>
               <input
                 type="number"
                 step="1"
@@ -802,7 +994,7 @@ export function SettingsPage() {
             >
               {roomTypes.map((t) => (
                 <option key={t.id} value={t.id}>
-                  {t.name} (3h: S/{t.price_hours_default} | Por Noche: S/{t.price_overnight_default})
+                  {t.name} (3h: S/{t.price_hours_default} | Pernocte: S/{t.price_overnight_default} | Día: S/{t.price_full_day_default})
                 </option>
               ))}
             </select>
@@ -909,7 +1101,7 @@ export function SettingsPage() {
 
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Por Noche (S/)</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Pernocte (1 noche) (S/)</label>
               <input
                 type="number"
                 step="1"
@@ -921,7 +1113,7 @@ export function SettingsPage() {
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Día Completo (S/)</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Por Día (S/)</label>
               <input
                 type="number"
                 step="1"

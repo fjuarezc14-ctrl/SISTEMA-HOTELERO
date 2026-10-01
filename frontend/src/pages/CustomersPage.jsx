@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api/apiClient';
+import { Pagination, usePagination } from '../components/Pagination';
 import { formatPEN, formatDatePeru } from '../utils/formatters';
 import {
   Users,
@@ -40,7 +41,7 @@ export function CustomersPage() {
   const fetchCustomers = async () => {
     try {
       setLoading(true);
-      const res = await api.get(`/customers?search=${encodeURIComponent(search)}`);
+      const res = await api.get(`/customers?limit=500&search=${encodeURIComponent(search)}`);
       setCustomers(res.data || []);
     } catch (err) {
       console.error('Error cargando clientes:', err.message);
@@ -166,6 +167,8 @@ export function CustomersPage() {
     return true;
   });
 
+  const customersPage = usePagination(filteredCustomers, { resetKey: filteredCustomers.length });
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -261,7 +264,7 @@ export function CustomersPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredCustomers.map((c) => {
+                {customersPage.pageItems.map((c) => {
                   const stays = Number(c.stay_count || c.total_visits || 0);
                   const isVIP = stays >= 3;
                   const hasIncidents = Number(c.incident_count || 0) > 0;
@@ -314,7 +317,7 @@ export function CustomersPage() {
                             <span>{c.incident_count} Incidencia(s)</span>
                           </span>
                         ) : (
-                          <span className="px-2.5 py-1 rounded-lg text-[10px] font-black bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          <span className="inline-flex items-center justify-center text-center leading-tight align-middle px-2.5 py-1 rounded-lg text-[10px] font-black bg-emerald-50 text-emerald-700 border border-emerald-200">
                             Cliente Limpio
                           </span>
                         )}
@@ -364,6 +367,7 @@ export function CustomersPage() {
                 })}
               </tbody>
             </table>
+            <Pagination page={customersPage.page} totalPages={customersPage.totalPages} totalItems={customersPage.totalItems} onChange={customersPage.setPage} label="clientes" />
           </div>
         )}
       </div>

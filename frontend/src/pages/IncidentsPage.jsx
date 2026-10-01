@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api/apiClient';
+import { escapeHtml } from '../utils/escapeHtml';
+import { Pagination, usePagination } from '../components/Pagination';
 import { formatPEN, formatDatePeru } from '../utils/formatters';
 import {
   AlertTriangle,
@@ -38,7 +40,7 @@ export function IncidentsPage() {
   const fetchInitialData = async () => {
     try {
       setLoading(true);
-      let query = '/incidents?limit=100';
+      let query = '/incidents?limit=500';
       if (typeFilter) query += `&incident_type=${typeFilter}`;
       if (statusFilter) query += `&status=${statusFilter}`;
 
@@ -104,7 +106,7 @@ export function IncidentsPage() {
         if (window.confirm(`¿Deseas ingresar el cobro de la penalidad por ${formatPEN(inc.penalty_amount_pen)} a la Caja Chica del turno?`)) {
           await api.post('/cash/transaction', {
             transaction_type: 'income',
-            concept: `Cobro de Incidente Hab. ${inc.room_number}: ${inc.description.slice(0, 40)}`,
+            concept: `Cobro de Incidente Hab. ${escapeHtml(inc.room_number)}: ${inc.description.slice(0, 40)}`,
             category: 'incident',
             amount_pen: Number(inc.penalty_amount_pen),
             payment_method: 'CASH'
@@ -165,15 +167,15 @@ export function IncidentsPage() {
 
           <div class="card">
             <div class="row"><span class="label">Fecha y Hora de Emisión:</span><span class="value">${nowStr}</span></div>
-            <div class="row"><span class="label">Habitación Afectada:</span><span class="value">Hab. ${inc.room_number}</span></div>
-            <div class="row"><span class="label">Huésped Responsable:</span><span class="value">${inc.customer_name || 'Huésped Registrado'} ${inc.customer_document ? `(Doc: ${inc.customer_document})` : ''}</span></div>
-            <div class="row"><span class="label">Registrado Por:</span><span class="value">${inc.registered_by_user || 'Recepción'}</span></div>
+            <div class="row"><span class="label">Habitación Afectada:</span><span class="value">Hab. ${escapeHtml(inc.room_number)}</span></div>
+            <div class="row"><span class="label">Huésped Responsable:</span><span class="value">${escapeHtml(inc.customer_name || 'Huésped Registrado')} ${inc.customer_document ? `(Doc: ${escapeHtml(inc.customer_document)})` : ''}</span></div>
+            <div class="row"><span class="label">Registrado Por:</span><span class="value">${escapeHtml(inc.registered_by_user || 'Recepción')}</span></div>
             <div class="row"><span class="label">Monto de Penalidad / Daño:</span><span class="value" style="color: #e11d48; font-size: 14px;">${formatPEN(inc.penalty_amount_pen)}</span></div>
           </div>
 
           <div class="box-desc">
             <strong>Descripción Detallada del Incidente / Ocurrencia:</strong><br/>
-            "${inc.description}"
+            "${escapeHtml(inc.description)}"
           </div>
 
           <p style="margin-top: 25px; font-size: 11px; color: #334155;">
@@ -204,17 +206,19 @@ export function IncidentsPage() {
   const getIncidentTypeBadge = (type) => {
     switch (type) {
       case 'damage':
-        return <span className="px-2.5 py-1 bg-rose-100 text-rose-800 text-xs font-black rounded-lg">Rotura / Daño</span>;
+        return <span className="inline-flex items-center justify-center text-center leading-tight align-middle px-2.5 py-1 bg-rose-100 text-rose-800 text-xs font-black rounded-lg">Rotura / Daño</span>;
       case 'loss':
-        return <span className="px-2.5 py-1 bg-amber-100 text-amber-800 text-xs font-black rounded-lg">Faltante / Pérdida</span>;
+        return <span className="inline-flex items-center justify-center text-center leading-tight align-middle px-2.5 py-1 bg-amber-100 text-amber-800 text-xs font-black rounded-lg">Faltante / Pérdida</span>;
       case 'unpaid_debt':
-        return <span className="px-2.5 py-1 bg-violet-100 text-violet-800 text-xs font-black rounded-lg">Deuda Sin Pagar</span>;
+        return <span className="inline-flex items-center justify-center text-center leading-tight align-middle px-2.5 py-1 bg-violet-100 text-violet-800 text-xs font-black rounded-lg">Deuda Sin Pagar</span>;
       case 'disturbance':
-        return <span className="px-2.5 py-1 bg-orange-100 text-orange-800 text-xs font-black rounded-lg">Disturbio / Ruidos</span>;
+        return <span className="inline-flex items-center justify-center text-center leading-tight align-middle px-2.5 py-1 bg-orange-100 text-orange-800 text-xs font-black rounded-lg">Disturbio / Ruidos</span>;
       default:
-        return <span className="px-2.5 py-1 bg-slate-100 text-slate-800 text-xs font-black rounded-lg">Otro Incidente</span>;
+        return <span className="inline-flex items-center justify-center text-center leading-tight align-middle px-2.5 py-1 bg-slate-100 text-slate-800 text-xs font-black rounded-lg">Otro Incidente</span>;
     }
   };
+
+  const incidentsPage = usePagination(incidents, { resetKey: incidents.length });
 
   return (
     <div className="space-y-6">
@@ -284,8 +288,9 @@ export function IncidentsPage() {
           <p className="text-slate-400">Todas las habitaciones y estadías operan sin novedades.</p>
         </div>
       ) : (
+        <>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {incidents.map((inc) => (
+          {incidentsPage.pageItems.map((inc) => (
             <div
               key={inc.id}
               className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm space-y-3 flex flex-col justify-between hover:border-rose-300 transition-all"
@@ -371,6 +376,8 @@ export function IncidentsPage() {
             </div>
           ))}
         </div>
+        <Pagination page={incidentsPage.page} totalPages={incidentsPage.totalPages} totalItems={incidentsPage.totalItems} onChange={incidentsPage.setPage} label="incidentes" />
+        </>
       )}
   
       {/* PUNTO 1: Modal + Registrar Incidente Manual */}

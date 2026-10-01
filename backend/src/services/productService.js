@@ -4,6 +4,9 @@ import { cashRepository } from '../repositories/cashRepository.js';
 import { shiftRepository } from '../repositories/shiftRepository.js';
 import { kardexRepository } from '../repositories/kardexRepository.js';
 import { withTransaction } from '../config/db.js';
+import { normalizePayment } from '../utils/payments.js';
+import * as v from '../utils/validate.js';
+import { issueVoucher } from './voucherService.js';
 
 function operationalError(message, statusCode) {
   const error = new Error(message);
@@ -57,17 +60,20 @@ export const productService = {
   },
 
   async createProduct(productData) {
-    if (!productData.name || !productData.sale_price_pen) {
-      const error = new Error('El nombre y el precio de venta son obligatorios.');
-      error.statusCode = 400;
-      error.isOperational = true;
-      throw error;
-    }
-    return await productRepository.create(productData);
+    return await productRepository.create({
+      ...productData,
+      name: v.text(productData.name, 'El nombre del producto', { min: 2, max: 100 }),
+      sale_price_pen: v.money(productData.sale_price_pen, 'El precio de venta', { allowZero: false, max: 10000 }),
+      stock: v.integer(productData.stock ?? 0, 'El stock', { min: 0, max: 99999 })
+    });
   },
 
   async updateProduct(id, productData) {
-    return await productRepository.update(id, productData);
+    const data = { ...productData };
+    if (data.name !== undefined) data.name = v.text(data.name, 'El nombre del producto', { min: 2, max: 100 });
+    if (data.sale_price_pen !== undefined) data.sale_price_pen = v.money(data.sale_price_pen, 'El precio de venta', { allowZero: false, max: 10000 });
+    if (data.stock !== undefined) data.stock = v.integer(data.stock, 'El stock', { min: 0, max: 99999 });
+    return await productRepository.update(id, data);
   },
 
   // Cargar consumo a la habitación (TRANSACCIÓN ATÓMICA, uno o varios productos)
@@ -88,9 +94,9 @@ export const productService = {
       for (const l of lines) {
         // 1. Registrar consumo
         const consumeRes = await txQuery(
-          `INSERT INTO room_consumptions (stay_id, product_id, quantity, unit_price_pen, total_price_pen)
-           VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-          [stay.id, l.product.id, l.qty, l.unitPrice, l.totalPrice]
+          `INSERT INTO room_consumptions (stay_id, product_id, product_name, quantity, unit_price_pen, total_price_pen)
+           VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+          [stay.id, l.product.id, l.product.name, l.qty, l.unitPrice, l.totalPrice]
         );
         created.push(consumeRes.rows[0]);
 
@@ -111,7 +117,7 @@ export const productService = {
   },
 
   // Venta directa en recepción / mostrador (varios productos, Pago Mixto y Vínculo a Habitación)
-  async directSale({ items = null, product_id, quantity = 1, payment_method = 'CASH', reference_number = '', split_payments = null, stay_id = null, user_id }) {
+  async directSale({ items = null, product_id, quantity = 1, payment_method = 'CASH', reference_number = '', split_payments = null, stay_id = null, voucher_type, customer_ruc, customer_business_name, user_id }) {
     // Compatibilidad: venta de un solo producto
     const saleItems = Array.isArray(items) && items.length > 0 ? items : [{ product_id, quantity }];
     const lines = await resolveSaleItems(saleItems);
@@ -124,7 +130,11 @@ export const productService = {
       throw operationalError('No hay un turno de caja abierto para registrar la venta.', 400);
     }
 
-    const totalAmount = lines.reduce((sum, l) => sum + l.totalPrice, 0);
+    const totalAmount = Math.round(lines.reduce((sum, l) => sum + l.totalPrice, 0) * 100) / 100;
+
+    // El pago (simple o mixto) debe cubrir exactamente el total de la venta
+    normalizePayment({ amount: totalAmount, payment_method, reference_number, split_payments }, totalAmount);
+    const voucher = await issueVoucher({ voucher_type, customer_ruc, customer_business_name });
 
     // Verificar si viene una habitación vinculada
     let stayInfo = null;
@@ -132,11 +142,27 @@ export const productService = {
       stayInfo = await stayRepository.findById(stay_id);
     }
 
-    // Descontar stock de todos los productos (todo o nada)
-    await withTransaction(async (txQuery) => {
+    const paymentLabel = payment_method === 'MIXED' && Array.isArray(split_payments) && split_payments.length > 0 ? 'MIXED' : payment_method || 'CASH';
+
+    // Descontar stock y guardar el detalle de la venta con el precio de este momento (todo o nada)
+    const sale = await withTransaction(async (txQuery) => {
       for (const l of lines) {
         await decrementStockTx(txQuery, l);
       }
+      const saleRes = await txQuery(
+        `INSERT INTO store_sales (work_shift_id, stay_id, user_id, total_pen, payment_method)
+         VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+        [activeShift.id, stayInfo ? stayInfo.id : null, user_id, totalAmount, paymentLabel]
+      );
+      const saleRow = saleRes.rows[0];
+      for (const l of lines) {
+        await txQuery(
+          `INSERT INTO store_sale_items (sale_id, product_id, product_name, quantity, unit_price_pen, total_price_pen)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [saleRow.id, l.product.id, l.product.name, l.qty, l.unitPrice, l.totalPrice]
+        );
+      }
+      return saleRow;
     });
 
     const itemsLabel = lines.map((l) => `${l.product.name} (x${l.qty})`).join(', ');
@@ -161,7 +187,9 @@ export const productService = {
             category: 'store',
             amount_pen: itemAmt,
             payment_method: item.payment_method,
-            reference_number: item.reference_number || reference_number || ''
+            reference_number: item.reference_number || reference_number || '',
+            store_sale_id: sale.id,
+            ...voucher
           });
         }
       }
@@ -176,7 +204,9 @@ export const productService = {
         category: 'store',
         amount_pen: totalAmount,
         payment_method: payment_method || 'CASH',
-        reference_number: reference_number || ''
+        reference_number: reference_number || '',
+        store_sale_id: sale.id,
+        ...voucher
       });
     }
   },
@@ -191,9 +221,10 @@ export const productService = {
       throw error;
     }
 
-    const qty = Number(quantity);
-    const unitCost = Number(unit_cost_pen);
-    const totalCost = qty * unitCost;
+    const qty = v.integer(quantity, 'La cantidad comprada', { min: 1, max: 99999 });
+    const unitCost = v.money(unit_cost_pen, 'El costo unitario', { max: 10000 });
+    const totalCost = Math.round(qty * unitCost * 100) / 100;
+    supplier_name = v.text(supplier_name, 'El proveedor', { max: 150, required: false });
 
     // Incrementar stock en productos
     const currentStock = Number(product.stock || 0);

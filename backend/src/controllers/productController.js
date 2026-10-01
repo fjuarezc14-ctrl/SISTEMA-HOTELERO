@@ -53,8 +53,18 @@ export const productController = {
 
   async directSale(req, res, next) {
     try {
+      const { items, product_id, quantity, payment_method, reference_number, split_payments, stay_id, voucher_type, customer_ruc, customer_business_name } = req.body;
       const sale = await productService.directSale({
-        ...req.body,
+        items,
+        product_id,
+        quantity,
+        payment_method,
+        reference_number,
+        split_payments,
+        stay_id,
+        voucher_type,
+        customer_ruc,
+        customer_business_name,
         user_id: req.user.id
       });
       res.status(201).json({

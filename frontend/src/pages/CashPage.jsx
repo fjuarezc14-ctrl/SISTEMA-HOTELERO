@@ -1,20 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api/apiClient';
-import { formatPEN, formatDatePeru, PAYMENT_METHOD_LABELS, printElectronicVoucherTicket } from '../utils/formatters';
+import { formatPEN, formatTimePeru, PAYMENT_METHOD_LABELS } from '../utils/formatters';
 import { useShift } from '../context/ShiftContext';
 import { EmitVoucherModal } from '../components/EmitVoucherModal';
 import { CashMovementModal } from '../components/CashMovementModal';
 import { CancelTransactionModal } from '../components/CancelTransactionModal';
+import { VoucherCell, TransactionActions } from '../components/VoucherCell';
+import { useReceipt } from '../context/ReceiptContext';
+import { cashReceipt } from '../utils/receipts';
+import { Pagination } from '../components/Pagination';
 import {
   Wallet,
   Plus,
   AlertCircle,
-  Ban,
-  FileText,
-  Printer,
   Lock,
   Unlock,
-  ChevronLeft,
   ChevronRight,
   ChevronDown,
   ChevronUp,
@@ -25,6 +25,9 @@ import {
 } from 'lucide-react';
 
 const PAGE_SIZE = 15;
+
+const formatDateOnly = (iso) =>
+  new Intl.DateTimeFormat('es-PE', { timeZone: 'America/Lima', day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(iso));
 
 // Fecha de hoy en Lima como YYYY-MM-DD
 const todayLima = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date());
@@ -80,6 +83,14 @@ export function CashPage({ onOpenShiftModal = () => {}, onCloseShiftModal = () =
     fetchTransactions();
   }, [scope, dateFrom, dateTo, activeShift?.id]);
 
+  // Reimprimir comprobante / emitir boleta o factura
+  const { printReceipt } = useReceipt();
+  const handleReprint = (tx) => printReceipt(cashReceipt(tx, transactions));
+  const handleEmitVoucher = (tx) => {
+    setSelectedVoucherTx(tx);
+    setIsVoucherModalOpen(true);
+  };
+
   // Modal de anulación (requiere autorización de administrador)
   const [cancelingTx, setCancelingTx] = useState(null);
   const handleCancelTransaction = (t) => setCancelingTx(t);
@@ -103,18 +114,21 @@ export function CashPage({ onOpenShiftModal = () => {}, onCloseShiftModal = () =
 
   const renderTxRow = (t, nested = false) => (
     <tr key={t.id} className={`hover:bg-slate-50 transition-colors ${t.is_cancelled ? 'bg-rose-50/30' : nested ? 'bg-slate-50/60' : ''}`}>
-      <td className={`py-3 px-3 text-slate-600 font-mono ${nested ? 'pl-8' : ''}`}>{formatDatePeru(t.created_at)}</td>
+      <td className={`py-3 px-3 whitespace-nowrap ${nested ? 'pl-8' : ''}`}>
+        <span className="block font-mono font-bold text-slate-700">{formatTimePeru(t.created_at)}</span>
+        <span className="block text-[10px] text-slate-400">{formatDateOnly(t.created_at)}</span>
+      </td>
       <td className="py-3 px-3">
         {t.is_cancelled ? (
-          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-200 text-slate-700 line-through border border-slate-300">
+          <span className="inline-flex items-center justify-center text-center leading-tight align-middle px-2 py-0.5 rounded text-[10px] font-bold bg-slate-200 text-slate-700 line-through border border-slate-300">
             Anulado
           </span>
         ) : t.transaction_type === 'income' ? (
-          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+          <span className="inline-flex items-center justify-center text-center leading-tight align-middle px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
             Ingreso
           </span>
         ) : (
-          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+          <span className="inline-flex items-center justify-center text-center leading-tight align-middle px-2 py-0.5 rounded text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
             Egreso
           </span>
         )}
@@ -137,44 +151,7 @@ export function CashPage({ onOpenShiftModal = () => {}, onCloseShiftModal = () =
 
       {/* Columna Comprobante SUNAT */}
       <td className="py-3 px-3">
-        {t.voucher_type && t.voucher_type !== 'NONE' ? (
-          <button
-            type="button"
-            onClick={() => {
-              const isFactura = t.voucher_type === 'FACTURA';
-              printElectronicVoucherTicket({
-                voucherType: t.voucher_type,
-                voucherSeries: (t.voucher_number || '').split('-')[0] || (isFactura ? 'F001' : 'B001'),
-                voucherNumber: (t.voucher_number || '').split('-')[1] || '000001',
-                customerDocType: isFactura ? 'RUC' : 'DNI',
-                customerDocNumber: isFactura ? t.customer_ruc : '',
-                customerName: isFactura ? t.customer_business_name : t.concept,
-                paymentMethod: t.payment_method,
-                totalAmount: t.amount_pen,
-                items: [{ qty: 1, description: t.concept, price: t.amount_pen }]
-              });
-            }}
-            className="px-2.5 py-1 rounded-lg text-[10px] font-extrabold bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 flex items-center gap-1 transition-colors"
-            title="Re-imprimir comprobante electrónico 80mm"
-          >
-            <Printer className="w-3 h-3 text-indigo-600" />
-            <span>{t.voucher_type === 'FACTURA' ? '🏢 FACTURA' : '📄 BOLETA'} {t.voucher_number || 'E-001'}</span>
-          </button>
-        ) : t.transaction_type === 'income' && !t.is_cancelled ? (
-          <button
-            type="button"
-            onClick={() => {
-              setSelectedVoucherTx(t);
-              setIsVoucherModalOpen(true);
-            }}
-            className="px-2.5 py-1 rounded-lg text-[10px] font-extrabold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1 transition-colors shadow-2xs"
-          >
-            <FileText className="w-3 h-3 text-emerald-600" />
-            <span>Emitir Comprobante</span>
-          </button>
-        ) : (
-          <span className="text-[10px] text-slate-400 font-mono">Ticket Interno</span>
-        )}
+        <VoucherCell tx={t} />
       </td>
 
       <td className={`py-3 px-3 text-right font-mono font-bold ${t.is_cancelled ? 'line-through text-slate-400' : 'text-slate-900'}`}>
@@ -182,18 +159,7 @@ export function CashPage({ onOpenShiftModal = () => {}, onCloseShiftModal = () =
       </td>
 
       <td className="py-3 px-3 text-center">
-        {!t.is_cancelled ? (
-          <button
-            onClick={() => handleCancelTransaction(t)}
-            className="px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-lg text-[10px] border border-rose-200 transition-colors inline-flex items-center gap-1"
-            title="Anular movimiento y revertir de caja/hospedaje"
-          >
-            <Ban className="w-3 h-3 text-rose-600" />
-            <span>Anular</span>
-          </button>
-        ) : (
-          <span className="text-[10px] text-slate-400 font-medium">Anulado</span>
-        )}
+        <TransactionActions tx={t} onReprint={handleReprint} onEmit={handleEmitVoucher} onCancel={handleCancelTransaction} />
       </td>
     </tr>
   );
@@ -333,7 +299,7 @@ export function CashPage({ onOpenShiftModal = () => {}, onCloseShiftModal = () =
                     <th className="py-3 px-3">Tipo</th>
                     <th className="py-3 px-3">Concepto</th>
                     <th className="py-3 px-3">Medio Pago</th>
-                    <th className="py-3 px-3">Comprobante SUNAT</th>
+                    <th className="py-3 px-3">Comprobante</th>
                     <th className="py-3 px-3 text-right">Monto</th>
                     <th className="py-3 px-3 text-center">Acciones</th>
                   </tr>
@@ -348,18 +314,21 @@ export function CashPage({ onOpenShiftModal = () => {}, onCloseShiftModal = () =
                           onClick={() => toggleGroup(g.key)}
                           className="cursor-pointer bg-white hover:bg-emerald-50/40 transition-colors"
                         >
-                          <td className="py-3 px-3 text-slate-600 font-mono">
+                          <td className="py-3 px-3 whitespace-nowrap">
                             <span className="inline-flex items-center gap-1">
                               {expandedGroups[g.key] ? (
                                 <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
                               ) : (
                                 <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
                               )}
-                              {formatDatePeru(g.lastAt)}
+                              <span>
+                                <span className="block font-mono font-bold text-slate-700">{formatTimePeru(g.lastAt)}</span>
+                                <span className="block text-[10px] text-slate-400">{formatDateOnly(g.lastAt)}</span>
+                              </span>
                             </span>
                           </td>
                           <td className="py-3 px-3">
-                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                            <span className="inline-flex items-center justify-center text-center leading-tight align-middle px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
                               Estadía
                             </span>
                           </td>
@@ -508,31 +477,4 @@ function groupByStay(transactions) {
   }
   // Una estadía con un solo movimiento se muestra como fila normal
   return groups.map((g) => (g.type === 'stay' && g.items.length === 1 ? { type: 'single', key: g.items[0].id, tx: g.items[0] } : g));
-}
-
-function Pagination({ page, totalPages, totalItems, onChange }) {
-  if (totalPages <= 1) return null;
-  return (
-    <div className="flex items-center justify-between pt-3 mt-2 border-t border-slate-100 text-xs text-slate-500">
-      <span>
-        {totalItems} registros · Página {page} de {totalPages}
-      </span>
-      <div className="flex items-center gap-1">
-        <button
-          onClick={() => onChange(page - 1)}
-          disabled={page <= 1}
-          className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          <ChevronLeft className="w-3.5 h-3.5" />
-        </button>
-        <button
-          onClick={() => onChange(page + 1)}
-          disabled={page >= totalPages}
-          className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          <ChevronRight className="w-3.5 h-3.5" />
-        </button>
-      </div>
-    </div>
-  );
 }
