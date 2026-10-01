@@ -3,9 +3,7 @@ import jwt from 'jsonwebtoken';
 import { userRepository } from '../repositories/userRepository.js';
 import { settingsRepository } from '../repositories/settingsRepository.js';
 import { loginGuard } from '../utils/loginGuard.js';
-
-const JWT_SECRET = process.env.JWT_SECRET || 'valetec_hotel_peru_jwt_secret_key_2026_secure';
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '24h';
+import { JWT_SECRET, JWT_EXPIRES_IN } from '../config/jwt.js';
 
 export const authService = {
   async login({ username, password, ipAddress = '' }) {

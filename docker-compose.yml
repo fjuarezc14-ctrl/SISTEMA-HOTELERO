@@ -25,7 +25,7 @@ services:
     ports:
       - "4020:4020"
     environment:
-      - NODE_ENV=development
+      - NODE_ENV=${NODE_ENV:-development}
       - PORT=4020
       - TZ=America/Lima
       - DB_HOST=postgres

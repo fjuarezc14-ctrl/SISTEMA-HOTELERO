@@ -93,7 +93,7 @@ export const roomRepository = {
       JOIN room_types rt ON r.room_type_id = rt.id
       WHERE r.id = $1
     `;
-    const res = await query(sql, [id]);
+    const res = await (runQuery || query)(sql, [id]);
     return res.rows[0] || null;
   },
 
@@ -112,8 +112,8 @@ export const roomRepository = {
     return res.rows[0];
   },
 
-  async updateRoomStatus(id, status, observations = null) {
-    const res = await query(
+  async updateRoomStatus(id, status, observations = null, runQuery = query) {
+    const res = await runQuery(
       `UPDATE rooms 
        SET status = $2,
            observations = COALESCE($3, observations),

@@ -106,6 +106,10 @@ export function CheckOutModal({ isOpen, onClose, room, onSuccess }) {
     const amountToPay = Number(quote.amount_due || 0);
 
     if (amountToPay > 0 && paymentMethod === 'MIXED') {
+      if (splitPayments.some((p) => parseFloat(p.amount) < 0)) {
+        setError('Los montos del pago mixto no pueden ser negativos.');
+        return;
+      }
       const splitSum = splitPayments.reduce((acc, curr) => acc + (parseFloat(curr.amount) || 0), 0);
       if (Math.abs(splitSum - amountToPay) > 0.01) {
         setError(`El desglose de Pago Mixto (${formatPEN(splitSum)}) debe ser igual al saldo a cobrar (${formatPEN(amountToPay)}).`);
@@ -249,6 +253,12 @@ export function CheckOutModal({ isOpen, onClose, room, onSuccess }) {
                 {quote ? formatPEN(amountDue) : '—'}
               </span>
             </div>
+            {quote?.overpayment > 0 && (
+              <div className="flex justify-between items-center bg-blue-50 text-blue-900 px-3 py-2 rounded-xl border border-blue-200 font-bold text-xs mt-2">
+                <span>Saldo a favor del huésped (sobrepago previo):</span>
+                <span className="font-mono text-blue-800 font-black">{formatPEN(quote.overpayment)}</span>
+              </div>
+            )}
           </div>
 
           {/* Sección Opcional: Registrar Incidente en Salida */}
@@ -296,6 +306,7 @@ export function CheckOutModal({ isOpen, onClose, room, onSuccess }) {
                   <label className="block text-[11px] font-semibold text-slate-700 mb-1">Detalle del Incidente</label>
                   <textarea
                     rows={2}
+                    maxLength={500}
                     required={hasIncident}
                     value={incidentDescription}
                     onChange={(e) => setIncidentDescription(e.target.value)}

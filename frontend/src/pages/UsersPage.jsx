@@ -44,9 +44,6 @@ export function UsersPage() {
   const [resetSuccessMsg, setResetSuccessMsg] = useState('');
   const [copied, setCopied] = useState(false);
 
-  // Visibilidad de clave por fila para el administrador
-  const [visibleRowPasswords, setVisibleRowPasswords] = useState({});
-
   // Función para generar contraseña aleatoria visible de 1-clic
   const generateRandomPassword = () => {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!';
@@ -255,7 +252,6 @@ export function UsersPage() {
                   <th className="py-3 px-3">Usuario</th>
                   <th className="py-3 px-3">Nombre Completo</th>
                   <th className="py-3 px-3">Rol / Nivel Acceso</th>
-                  <th className="py-3 px-3">Contraseña Actual</th>
                   <th className="py-3 px-3 text-center">Estado</th>
                   <th className="py-3 px-3 text-right">Acciones</th>
                 </tr>
@@ -264,7 +260,6 @@ export function UsersPage() {
                 {usersPage.pageItems.map((u) => {
                   const isAdmin = u.role === 'super_admin' || u.role === 'admin';
                   const isHousekeeper = u.role === 'housekeeper';
-                  const isPassVisible = visibleRowPasswords[u.id];
 
                   return (
                     <tr key={u.id} className="hover:bg-slate-50 transition-colors">
@@ -287,36 +282,6 @@ export function UsersPage() {
                             <span>Recepcionista / Cajero</span>
                           </span>
                         )}
-                      </td>
-
-                      {/* Columna Ver Contraseña Actual (1-Clic) */}
-                      <td className="py-3 px-3">
-                        <div className="flex items-center gap-2">
-                          <span className={`inline-flex items-center justify-center text-center leading-tight align-middle font-mono text-xs font-bold px-2 py-1 rounded-lg border transition-all ${
-                            isPassVisible
-                              ? 'bg-amber-50 text-slate-900 border-amber-300 shadow-2xs font-mono font-black'
-                              : 'bg-slate-100 text-slate-400 border-slate-200'
-                          }`}>
-                            {isPassVisible ? (u.plain_password || 'admin123') : '••••••••'}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setVisibleRowPasswords((prev) => ({
-                                ...prev,
-                                [u.id]: !prev[u.id]
-                              }));
-                            }}
-                            className="p-1 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-emerald-700 transition-colors"
-                            title={isPassVisible ? 'Ocultar clave' : 'Ver clave del usuario en 1-clic'}
-                          >
-                            {isPassVisible ? (
-                              <EyeOff className="w-4 h-4 text-emerald-600" />
-                            ) : (
-                              <Eye className="w-4 h-4 text-slate-400 hover:text-emerald-600" />
-                            )}
-                          </button>
-                        </div>
                       </td>
 
                       <td className="py-3 px-3 text-center">
@@ -621,7 +586,7 @@ export function UsersPage() {
               </button>
             </div>
             <p className="text-[10px] text-slate-500 mt-1">
-              El administrador puede hacer visible la clave presionando el ojo <Eye className="w-3 h-3 inline text-emerald-600" />.
+              Puedes alternar la visibilidad de la nueva clave con el icono del ojo.
             </p>
           </div>
 

@@ -1,8 +1,8 @@
 import { query } from '../config/db.js';
 
 export const incidentRepository = {
-  async create({ stay_id = null, room_id, customer_id = null, user_id, incident_type = 'damage', description, penalty_amount_pen = 0.00, status = 'reported' }) {
-    const res = await query(
+  async create({ stay_id = null, room_id, customer_id = null, user_id, incident_type = 'damage', description, penalty_amount_pen = 0.00, status = 'reported' }, runQuery = query) {
+    const res = await runQuery(
       `INSERT INTO stay_incidents (stay_id, room_id, customer_id, user_id, incident_type, description, penalty_amount_pen, status)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING *`,

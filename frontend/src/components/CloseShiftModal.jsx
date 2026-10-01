@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { Modal } from './Modal';
 import { useShift } from '../context/ShiftContext';
 import { formatPEN } from '../utils/formatters';
-import { getNextSequenceNumber } from '../utils/ticketCounter';
 import { CashCounter, CashCounterToggle } from './CashCounter';
 import { useReceipt } from '../context/ReceiptContext';
 import { shiftClosureReceipt } from '../utils/receipts';

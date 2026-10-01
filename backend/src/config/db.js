@@ -96,6 +96,9 @@ export async function initDatabase() {
         const schemaSql = fs.readFileSync(schemaPath, 'utf8');
         await client.query(schemaSql);
         await client.query("ALTER TABLE hotel_info ADD COLUMN IF NOT EXISTS logo_url TEXT DEFAULT '';");
+        await client.query("ALTER TABLE users DROP COLUMN IF EXISTS plain_password;");
+        await client.query("CREATE INDEX IF NOT EXISTS idx_stays_expected_end ON stays(expected_end_time);");
+        await client.query("CREATE INDEX IF NOT EXISTS idx_cash_transactions_user ON cash_transactions(user_id);");
         console.log('✅ Esquema de base de datos PostgreSQL verificado / creado con éxito.');
       }
 
@@ -111,7 +114,7 @@ export async function initDatabase() {
         const salt = await bcrypt.genSalt(10);
         const defaultHash = await bcrypt.hash('admin123', salt);
         await client.query(
-          "INSERT INTO users (username, password_hash, plain_password, full_name, role) VALUES ('admin', $1, 'admin123', 'Administrador General', 'super_admin')",
+          "INSERT INTO users (username, password_hash, full_name, role) VALUES ('admin', $1, 'Administrador General', 'super_admin')",
           [defaultHash]
         );
         console.log('✅ Usuario inicial admin creado con clave default (admin123).');

@@ -138,7 +138,6 @@ export const userService = {
     return await userRepository.create({
       username: username.trim().toLowerCase(),
       password_hash,
-      plain_password: password,
       full_name: full_name.trim(),
       role,
       is_active,
@@ -196,6 +195,6 @@ export const userService = {
     }
     const salt = await bcrypt.genSalt(10);
     const password_hash = await bcrypt.hash(newPassword, salt);
-    return await userRepository.updatePassword(id, password_hash, newPassword);
+    return await userRepository.updatePassword(id, password_hash);
   }
 };

@@ -77,8 +77,29 @@ export function StorePage() {
   }, [getProducts]);
 
   useEffect(() => {
-    fetchProducts();
-  }, [fetchProducts]);
+    let cancelled = false;
+    async function load() {
+      try {
+        setLoading(true);
+        const [data, staysRes] = await Promise.all([
+          getProducts(false),
+          api.get('/stays/active').catch(() => ({ data: [] }))
+        ]);
+        if (!cancelled) {
+          setProducts(data || []);
+          setActiveStays(staysRes.data || []);
+        }
+      } catch (err) {
+        if (!cancelled) console.error('Error cargando datos de tienda:', err.message);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [getProducts]);
 
   const handleRegisterPurchase = async (e) => {
     e.preventDefault();
@@ -143,6 +164,10 @@ export function StorePage() {
     const totalSaleCost = cartTotal;
 
     if (paymentMethod === 'MIXED') {
+      if (splitPayments.some((p) => parseFloat(p.amount) < 0)) {
+        setSellError('Los montos del pago mixto no pueden ser negativos.');
+        return;
+      }
       const splitSum = splitPayments.reduce((acc, curr) => acc + (parseFloat(curr.amount) || 0), 0);
       if (Math.abs(splitSum - totalSaleCost) > 0.01) {
         setSellError(`El desglose de Pago Mixto (${formatPEN(splitSum)}) debe ser igual al total de la venta (${formatPEN(totalSaleCost)}).`);
@@ -150,9 +175,16 @@ export function StorePage() {
       }
     }
 
-    if (cashReceived !== '' && Number(cashReceived) < cashDue - 0.001) {
-      setSellError(`El efectivo recibido (${formatPEN(cashReceived)}) es menor al monto en efectivo (${formatPEN(cashDue)}).`);
-      return;
+    if (cashReceived !== '') {
+      const rec = Number(cashReceived);
+      if (rec < 0) {
+        setSellError('El efectivo recibido no puede ser negativo.');
+        return;
+      }
+      if (rec < cashDue - 0.001) {
+        setSellError(`El efectivo recibido (${formatPEN(cashReceived)}) es menor al monto en efectivo (${formatPEN(cashDue)}).`);
+        return;
+      }
     }
 
     try {

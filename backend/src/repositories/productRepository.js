@@ -26,8 +26,8 @@ export const productRepository = {
     return res.rows[0];
   },
 
-  async update(id, { name, sale_price_pen, stock, is_active }) {
-    const res = await query(
+  async update(id, { name, sale_price_pen, stock, is_active }, runQuery = query) {
+    const res = await runQuery(
       `UPDATE products
        SET name = COALESCE($2, name),
            sale_price_pen = COALESCE($3, sale_price_pen),

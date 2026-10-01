@@ -11,9 +11,9 @@ import { occupancyService } from './occupancyService.js';
 import { normalizePayment } from '../utils/payments.js';
 import { issueVoucher } from './voucherService.js';
 import * as v from '../utils/validate.js';
-import { query } from '../config/db.js';
+import { query, withTransaction } from '../config/db.js';
 
-const round2 = (n) => Math.round(Number(n) * 100) / 100;
+const round2 = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
 
 function badRequest(message) {
   const error = new Error(message);
@@ -180,63 +180,74 @@ export const stayService = {
     const amountDue = round2(Math.max(0, quote.price - deposit));
     const payments = normalizePayment(initial_payment, amountDue);
 
-    // 7. Crear la estadía
-    const stay = await stayRepository.create({
-      room_id: room.id,
-      customer_id: customer.id,
-      work_shift_id: activeShift.id,
-      stay_type: quote.stay_type,
-      start_time: startTime.toISOString(),
-      expected_end_time: new Date(quote.expected_end_time).toISOString(),
-      companion_name: companion_name ? String(companion_name).trim().slice(0, 150) : '',
-      total_stay_price_pen: quote.price
-    });
-    await customerRepository.incrementVisits(customer.id);
-
-    // 8. Habitación ocupada
-    await roomRepository.updateRoomStatus(room.id, 'occupied', `Huésped: ${customer.full_name}`);
-
-    // 9. Registrar en caja lo cobrado ahora (el abono de la reserva ya está en caja), con un solo comprobante
+    // 7. Voucher (si hay cobro)
     const paidNow = payments.reduce((sum, p) => sum + p.amount, 0);
     const voucher = payments.length > 0 ? await issueVoucher(initial_payment) : null;
-    for (const p of payments) {
-      const methodLabel = p.payment_method === 'YAPE_PLIN' ? 'Yape/Plin' : p.payment_method === 'CARD' ? 'Tarjeta' : 'Efectivo';
-      await cashRepository.create({
+
+    // 8. Ejecutar todas las escrituras dentro de una transacción atómica
+    return await withTransaction(async (txQuery) => {
+      // Bloquear habitación para verificar que sigue disponible antes de asignar
+      const lockRes = await txQuery('SELECT id, status FROM rooms WHERE id = $1 FOR UPDATE', [room.id]);
+      if (lockRes.rows[0]?.status !== 'available') {
+        throw badRequest(`La habitación ya no está disponible (Estado actual: ${lockRes.rows[0]?.status}).`);
+      }
+
+      // Crear la estadía
+      const stay = await stayRepository.create({
+        room_id: room.id,
+        customer_id: customer.id,
         work_shift_id: activeShift.id,
-        stay_id: stay.id,
-        user_id,
-        transaction_type: 'income',
-        concept: `Hospedaje Hab. ${room.room_number} - ${customer.full_name}${payments.length > 1 ? ` (${methodLabel})` : ''}`.slice(0, 150),
-        category: 'stay',
-        amount_pen: p.amount,
-        payment_method: p.payment_method,
-        reference_number: p.reference_number,
-        ...voucher
-      });
-    }
+        stay_type: quote.stay_type,
+        start_time: startTime.toISOString(),
+        expected_end_time: new Date(quote.expected_end_time).toISOString(),
+        companion_name: companion_name ? String(companion_name).trim().slice(0, 150) : '',
+        total_stay_price_pen: quote.price
+      }, txQuery);
+      await customerRepository.incrementVisits(customer.id);
 
-    const updated = await stayRepository.updateStayPrices(stay.id, { total_paid_pen: round2(deposit + paidNow) });
+      // Habitación ocupada
+      await roomRepository.updateRoomStatus(room.id, 'occupied', `Huésped: ${customer.full_name}`, txQuery);
 
-    // 10. Acompañantes (Ficha Registral MINCETUR / PNP)
-    if (Array.isArray(companions) && companions.length > 0) {
-      for (const comp of companions) {
-        if (comp.full_name && comp.document_number) {
-          await companionRepository.addCompanion({
-            stay_id: stay.id,
-            document_type: comp.document_type || 'DNI',
-            document_number: String(comp.document_number).trim(),
-            full_name: String(comp.full_name).trim(),
-            age: comp.age ? Number(comp.age) : null,
-            nationality: comp.nationality || 'Peruana',
-            origin_city: comp.origin_city || 'Lima',
-            destination_city: comp.destination_city || 'Lima',
-            travel_reason: comp.travel_reason || 'Turismo / Vacaciones'
-          });
+      // Registrar en caja lo cobrado ahora
+      for (const p of payments) {
+        const methodLabel = p.payment_method === 'YAPE_PLIN' ? 'Yape/Plin' : p.payment_method === 'CARD' ? 'Tarjeta' : 'Efectivo';
+        await cashRepository.create({
+          work_shift_id: activeShift.id,
+          stay_id: stay.id,
+          user_id,
+          transaction_type: 'income',
+          concept: `Hospedaje Hab. ${room.room_number} - ${customer.full_name}${payments.length > 1 ? ` (${methodLabel})` : ''}`.slice(0, 150),
+          category: 'stay',
+          amount_pen: p.amount,
+          payment_method: p.payment_method,
+          reference_number: p.reference_number,
+          ...voucher
+        }, txQuery);
+      }
+
+      const updated = await stayRepository.updateStayPrices(stay.id, { total_paid_pen: round2(deposit + paidNow) }, txQuery);
+
+      // Acompañantes (Ficha Registral MINCETUR / PNP)
+      if (Array.isArray(companions) && companions.length > 0) {
+        for (const comp of companions) {
+          if (comp.full_name && comp.document_number) {
+            await companionRepository.addCompanion({
+              stay_id: stay.id,
+              document_type: comp.document_type || 'DNI',
+              document_number: String(comp.document_number).trim(),
+              full_name: String(comp.full_name).trim(),
+              age: comp.age ? Number(comp.age) : null,
+              nationality: comp.nationality || 'Peruana',
+              origin_city: comp.origin_city || 'Lima',
+              destination_city: comp.destination_city || 'Lima',
+              travel_reason: comp.travel_reason || 'Turismo / Vacaciones'
+            }, txQuery);
+          }
         }
       }
-    }
 
-    return { ...(updated || stay), voucher, paid_now: round2(paidNow), payments };
+      return { ...(updated || stay), voucher, paid_now: round2(paidNow), payments };
+    });
   },
 
   /**
@@ -268,7 +279,7 @@ export const stayService = {
     const stayPrice = round2(stay.total_stay_price_pen);
     const consumptions = round2(stay.total_consumptions_price_pen);
     const paid = round2(stay.total_paid_pen);
-    const total = round2(stayPrice + overstayCost + consumptions + penalty);
+    const balance = round2(total - paid);
 
     return {
       stay_price: stayPrice,
@@ -278,165 +289,177 @@ export const stayService = {
       penalty,
       total,
       paid,
-      amount_due: round2(Math.max(0, total - paid))
+      balance,
+      overpayment: balance < 0 ? Math.abs(balance) : 0,
+      amount_due: round2(Math.max(0, balance))
     };
   },
 
   /**
    * Check-out: exige cobrar el saldo pendiente completo (estadía + horas extra + consumos + penalidad − pagado).
+   * Ejecutado dentro de una transacción atómica con bloqueo a nivel de fila (FOR UPDATE).
    */
   async checkOut({ stay_id, user_id, final_payment = null, incident_data = null }) {
-    const stay = await stayRepository.findById(stay_id);
-    if (!stay) throw notFound('Estadía no encontrada.');
-    if (stay.status !== 'active') throw badRequest('Esta estadía ya fue finalizada.');
+    return await withTransaction(async (txQuery) => {
+      // Bloqueo exclusivo a nivel de fila para evitar double check-out simultáneo
+      const stay = await stayRepository.findByIdForUpdate(stay_id, txQuery);
+      if (!stay) throw notFound('Estadía no encontrada.');
+      if (stay.status !== 'active') throw badRequest('Esta estadía ya fue finalizada o cancelada.');
 
-    const hasIncident = Boolean(incident_data?.description && String(incident_data.description).trim());
-    const penalty = hasIncident ? round2(incident_data.penalty_amount_pen || 0) : 0;
-    const quote = await this.quoteCheckOut(stay_id, { penalty_amount_pen: penalty });
+      const hasIncident = Boolean(incident_data?.description && String(incident_data.description).trim());
+      const penalty = hasIncident ? round2(incident_data.penalty_amount_pen || 0) : 0;
+      const quote = await this.quoteCheckOut(stay_id, { penalty_amount_pen: penalty });
 
-    // El cobro debe cubrir exactamente el saldo pendiente
-    const payments = normalizePayment(final_payment, quote.amount_due);
-    const paidNow = round2(payments.reduce((sum, p) => sum + p.amount, 0));
-    if (Math.abs(paidNow - quote.amount_due) > 0.01) {
-      throw badRequest(`Saldo pendiente de S/ ${quote.amount_due.toFixed(2)}: se debe cobrar el monto completo antes del check-out.`);
-    }
-
-    let activeShift = null;
-    if (paidNow > 0) {
-      activeShift = await shiftRepository.findActiveShiftByUserId(user_id);
-      if (!activeShift) activeShift = await shiftRepository.findAnyActiveShift();
-      if (!activeShift) throw badRequest('No hay un turno de caja abierto para registrar el cobro del check-out.');
-    }
-
-    // Horas extra por sobrestadía al precio de la estadía
-    if (quote.overstay_cost > 0) {
-      await stayRepository.updateStayPrices(stay.id, { total_stay_price_pen: round2(quote.stay_price + quote.overstay_cost) });
-    }
-
-    // Registrar en caja: primero la penalidad (categoría incidente) y luego el resto (estadía), con un solo comprobante
-    const voucher = payments.length > 0 ? await issueVoucher(final_payment) : null;
-    let penaltyLeft = quote.penalty;
-    for (const p of payments) {
-      const methodLabel = p.payment_method === 'YAPE_PLIN' ? 'Yape/Plin' : p.payment_method === 'CARD' ? 'Tarjeta' : 'Efectivo';
-      const suffix = payments.length > 1 ? ` (${methodLabel})` : '';
-      const penaltyPart = round2(Math.min(penaltyLeft, p.amount));
-      const stayPart = round2(p.amount - penaltyPart);
-      penaltyLeft = round2(penaltyLeft - penaltyPart);
-
-      if (penaltyPart > 0) {
-        await cashRepository.create({
-          work_shift_id: activeShift.id,
-          stay_id: stay.id,
-          user_id,
-          transaction_type: 'income',
-          concept: `Penalidad Check-out Hab. ${stay.room_number} - ${stay.customer_name}${suffix}`.slice(0, 150),
-          category: 'incident',
-          amount_pen: penaltyPart,
-          payment_method: p.payment_method,
-          reference_number: p.reference_number,
-          ...voucher
-        });
+      // El cobro debe cubrir exactamente el saldo pendiente
+      const payments = normalizePayment(final_payment, quote.amount_due);
+      const paidNow = round2(payments.reduce((sum, p) => sum + p.amount, 0));
+      if (Math.abs(paidNow - quote.amount_due) > 0.01) {
+        throw badRequest(`Saldo pendiente de S/ ${quote.amount_due.toFixed(2)}: se debe cobrar el monto completo antes del check-out.`);
       }
-      if (stayPart > 0) {
-        await cashRepository.create({
-          work_shift_id: activeShift.id,
-          stay_id: stay.id,
-          user_id,
-          transaction_type: 'income',
-          concept: `Pago Check-out Hab. ${stay.room_number} - ${stay.customer_name}${suffix}`.slice(0, 150),
-          category: 'stay',
-          amount_pen: stayPart,
-          payment_method: p.payment_method,
-          reference_number: p.reference_number,
-          ...voucher
-        });
+
+      let activeShift = null;
+      if (paidNow > 0) {
+        activeShift = await shiftRepository.findActiveShiftByUserId(user_id);
+        if (!activeShift) activeShift = await shiftRepository.findAnyActiveShift();
+        if (!activeShift) throw badRequest('No hay un turno de caja abierto para registrar el cobro del check-out.');
       }
-    }
 
-    if (paidNow > 0) {
-      // Lo pagado de la estadía (sin la penalidad, que se registra en el incidente)
-      await stayRepository.updateStayPrices(stay.id, {
-        total_paid_pen: round2(quote.paid + paidNow - quote.penalty)
-      });
-    }
+      // Horas extra por sobrestadía al precio de la estadía
+      if (quote.overstay_cost > 0) {
+        await stayRepository.updateStayPrices(stay.id, { total_stay_price_pen: round2(quote.stay_price + quote.overstay_cost) }, txQuery);
+      }
 
-    // Incidente reportado en el check-out: si tuvo penalidad, ya quedó cobrada
-    if (hasIncident) {
-      await incidentRepository.create({
-        stay_id: stay.id,
-        room_id: stay.room_id,
-        customer_id: stay.customer_id,
-        user_id,
-        incident_type: incident_data.incident_type || 'damage',
-        description: String(incident_data.description).trim().slice(0, 1000),
-        penalty_amount_pen: quote.penalty,
-        status: quote.penalty > 0 ? 'resolved' : 'reported'
-      });
-    }
+      // Registrar en caja: primero la penalidad (categoría incidente) y luego el resto (estadía), con un solo comprobante
+      const voucher = payments.length > 0 ? await issueVoucher(final_payment) : null;
+      let penaltyLeft = quote.penalty;
+      for (const p of payments) {
+        const methodLabel = p.payment_method === 'YAPE_PLIN' ? 'Yape/Plin' : p.payment_method === 'CARD' ? 'Tarjeta' : 'Efectivo';
+        const suffix = payments.length > 1 ? ` (${methodLabel})` : '';
+        const penaltyPart = round2(Math.min(penaltyLeft, p.amount));
+        const stayPart = round2(p.amount - penaltyPart);
+        penaltyLeft = round2(penaltyLeft - penaltyPart);
 
-    // Completar estadía y pasar la habitación a limpieza
-    const completedStay = await stayRepository.completeStay(stay.id);
-    await roomRepository.updateRoomStatus(stay.room_id, 'cleaning', 'Pendiente de limpieza tras check-out');
+        if (penaltyPart > 0) {
+          await cashRepository.create({
+            work_shift_id: activeShift.id,
+            stay_id: stay.id,
+            user_id,
+            transaction_type: 'income',
+            concept: `Penalidad Check-out Hab. ${stay.room_number} - ${stay.customer_name}${suffix}`.slice(0, 150),
+            category: 'incident',
+            amount_pen: penaltyPart,
+            payment_method: p.payment_method,
+            reference_number: p.reference_number,
+            ...voucher
+          }, txQuery);
+        }
+        if (stayPart > 0) {
+          await cashRepository.create({
+            work_shift_id: activeShift.id,
+            stay_id: stay.id,
+            user_id,
+            transaction_type: 'income',
+            concept: `Pago Check-out Hab. ${stay.room_number} - ${stay.customer_name}${suffix}`.slice(0, 150),
+            category: 'stay',
+            amount_pen: stayPart,
+            payment_method: p.payment_method,
+            reference_number: p.reference_number,
+            ...voucher
+          }, txQuery);
+        }
+      }
 
-    return { ...completedStay, voucher, payments, checkout_summary: { ...quote, paid_now: paidNow } };
+      if (paidNow > 0) {
+        // Lo pagado de la estadía (sin la penalidad, que se registra en el incidente)
+        await stayRepository.updateStayPrices(stay.id, {
+          total_paid_pen: round2(quote.paid + paidNow - quote.penalty)
+        }, txQuery);
+      }
+
+      // Incidente reportado en el check-out: si tuvo penalidad, ya quedó cobrada
+      if (hasIncident) {
+        await incidentRepository.create({
+          stay_id: stay.id,
+          room_id: stay.room_id,
+          customer_id: stay.customer_id,
+          user_id,
+          incident_type: incident_data.incident_type || 'damage',
+          description: String(incident_data.description).trim().slice(0, 1000),
+          penalty_amount_pen: quote.penalty,
+          status: quote.penalty > 0 ? 'resolved' : 'reported'
+        }, txQuery);
+      }
+
+      // Completar estadía y pasar la habitación a limpieza
+      const completedStay = await stayRepository.completeStay(stay.id, new Date(), txQuery);
+      await roomRepository.updateRoomStatus(stay.room_id, 'cleaning', 'Pendiente de limpieza tras check-out', txQuery);
+
+      return { ...completedStay, voucher, payments, checkout_summary: { ...quote, paid_now: paidNow } };
+    });
   },
 
   /** Extender la estadía N horas, cobrando cada hora a la tarifa de hora extra (se cobra al momento). */
   async addExtraHours({ stay_id, hours_count = 1, payment_method = 'CASH', reference_number = '', split_payments = null, voucher_type, customer_ruc, customer_business_name, user_id }) {
-    const stay = await stayRepository.findById(stay_id);
-    if (!stay || stay.status !== 'active') throw notFound('Estadía activa no encontrada.');
+    // Validar medio de pago antes de procesar
+    v.oneOf(payment_method, 'Medio de pago', ['CASH', 'YAPE_PLIN', 'CARD', 'MIXED']);
 
     const hours = Number(hours_count);
     if (!Number.isInteger(hours) || hours < 1 || hours > 24) {
       throw badRequest('Las horas extra deben ser un número entero entre 1 y 24.');
     }
 
-    const room = await roomRepository.findRoomById(stay.room_id);
-    const extraHoursCost = round2(hours * Number(room?.price_extra_hour_default || 0));
+    return await withTransaction(async (txQuery) => {
+      // Bloqueo a nivel de fila para evitar operaciones concurrentes en la misma estadía
+      const stay = await stayRepository.findByIdForUpdate(stay_id, txQuery);
+      if (!stay || stay.status !== 'active') throw notFound('Estadía activa no encontrada.');
 
-    // 1. Nueva hora de salida: no puede pisar una reserva (con margen de limpieza)
-    const newExpectedEnd = new Date(new Date(stay.expected_end_time).getTime() + hours * 3600000);
-    await occupancyService.assertRoomFree({
-      roomId: stay.room_id,
-      start: stay.expected_end_time,
-      end: newExpectedEnd,
-      excludeStayId: stay.id
-    });
+      const room = await roomRepository.findRoomById(stay.room_id, txQuery);
+      const extraHoursCost = round2(hours * Number(room?.price_extra_hour_default || 0));
 
-    // 2. Turno de caja activo
-    let activeShift = await shiftRepository.findActiveShiftByUserId(user_id);
-    if (!activeShift) activeShift = await shiftRepository.findAnyActiveShift();
-    if (!activeShift) throw badRequest('No hay un turno de caja abierto para registrar el cobro de horas extras.');
-
-    // 3. Cobro exacto del costo de las horas extra
-    const payments = normalizePayment({ amount: extraHoursCost, payment_method, reference_number, split_payments }, extraHoursCost);
-    const voucher = await issueVoucher({ voucher_type, customer_ruc, customer_business_name });
-    for (const p of payments) {
-      const methodLabel = p.payment_method === 'YAPE_PLIN' ? 'Yape/Plin' : p.payment_method === 'CARD' ? 'Tarjeta' : 'Efectivo';
-      await cashRepository.create({
-        work_shift_id: activeShift.id,
-        stay_id: stay.id,
-        user_id,
-        transaction_type: 'income',
-        concept: `Hora Extra (x${hours}) Hab. ${stay.room_number} - ${stay.customer_name}${payments.length > 1 ? ` (${methodLabel})` : ''}`.slice(0, 150),
-        category: 'stay',
-        amount_pen: p.amount,
-        payment_method: p.payment_method,
-        reference_number: p.reference_number,
-        ...voucher
+      // 1. Nueva hora de salida: no puede pisar una reserva (con margen de limpieza)
+      const newExpectedEnd = new Date(new Date(stay.expected_end_time).getTime() + hours * 3600000);
+      await occupancyService.assertRoomFree({
+        roomId: stay.room_id,
+        start: stay.expected_end_time,
+        end: newExpectedEnd,
+        excludeStayId: stay.id
       });
-    }
 
-    // 4. Total de la estadía y total pagado
-    await stayRepository.updateStayPrices(stay.id, {
-      total_stay_price_pen: round2(Number(stay.total_stay_price_pen) + extraHoursCost),
-      total_paid_pen: round2(Number(stay.total_paid_pen) + extraHoursCost)
+      // 2. Turno de caja activo
+      let activeShift = await shiftRepository.findActiveShiftByUserId(user_id);
+      if (!activeShift) activeShift = await shiftRepository.findAnyActiveShift();
+      if (!activeShift) throw badRequest('No hay un turno de caja abierto para registrar el cobro de horas extras.');
+
+      // 3. Cobro exacto del costo de las horas extra
+      const payments = normalizePayment({ amount: extraHoursCost, payment_method, reference_number, split_payments }, extraHoursCost);
+      const voucher = await issueVoucher({ voucher_type, customer_ruc, customer_business_name });
+      for (const p of payments) {
+        const methodLabel = p.payment_method === 'YAPE_PLIN' ? 'Yape/Plin' : p.payment_method === 'CARD' ? 'Tarjeta' : 'Efectivo';
+        await cashRepository.create({
+          work_shift_id: activeShift.id,
+          stay_id: stay.id,
+          user_id,
+          transaction_type: 'income',
+          concept: `Hora Extra (x${hours}) Hab. ${stay.room_number} - ${stay.customer_name}${payments.length > 1 ? ` (${methodLabel})` : ''}`.slice(0, 150),
+          category: 'stay',
+          amount_pen: p.amount,
+          payment_method: p.payment_method,
+          reference_number: p.reference_number,
+          ...voucher
+        }, txQuery);
+      }
+
+      // 4. Total de la estadía y total pagado
+      await stayRepository.updateStayPrices(stay.id, {
+        total_stay_price_pen: round2(Number(stay.total_stay_price_pen) + extraHoursCost),
+        total_paid_pen: round2(Number(stay.total_paid_pen) + extraHoursCost)
+      }, txQuery);
+
+      // 5. Nueva fecha límite
+      await stayRepository.updateExpectedEndTime(stay.id, newExpectedEnd.toISOString(), txQuery);
+
+      const activeStay = await this.getActiveStayByRoom(stay.room_id);
+      return { ...activeStay, voucher, payments, extra_hours: hours, extra_cost: extraHoursCost };
     });
-
-    // 5. Nueva fecha límite
-    await stayRepository.updateExpectedEndTime(stay.id, newExpectedEnd.toISOString());
-
-    const activeStay = await this.getActiveStayByRoom(stay.room_id);
-    return { ...activeStay, voucher, payments, extra_hours: hours, extra_cost: extraHoursCost };
   }
 };

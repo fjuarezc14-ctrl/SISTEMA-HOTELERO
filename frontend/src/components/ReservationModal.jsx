@@ -200,9 +200,13 @@ export function ReservationModal({ isOpen, onClose, reservation = null, preselec
       validatePhone(customer.phone, false);
     if (err) return err;
 
+    if (deposit < 0) return 'El abono inicial no puede ser negativo.';
     if (deposit + 0.001 < minDeposit) return `El abono mínimo para esta reserva es ${formatPEN(minDeposit)}.`;
     if (deposit > total + 0.01) return `El abono no puede superar el total del alojamiento (${formatPEN(total)}).`;
     if (deposit > 0 && paymentMethod === 'MIXED') {
+      if (splitPayments.some((p) => parseFloat(p.amount) < 0)) {
+        return 'Los montos del pago mixto no pueden ser negativos.';
+      }
       const splitSum = splitPayments.reduce((acc, curr) => acc + (parseFloat(curr.amount) || 0), 0);
       if (Math.abs(splitSum - deposit) > 0.01) {
         return `El desglose de Pago Mixto (${formatPEN(splitSum)}) debe ser igual al abono inicial (${formatPEN(deposit)}).`;

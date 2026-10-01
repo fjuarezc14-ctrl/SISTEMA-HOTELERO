@@ -1,7 +1,7 @@
 // Validación de pagos (simple o mixto) compartida por check-in, checkout, horas extra y tienda.
 
 const PAYMENT_METHODS = ['CASH', 'YAPE_PLIN', 'CARD'];
-const round2 = (n) => Math.round(Number(n) * 100) / 100;
+const round2 = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
 
 function badRequest(message) {
   const error = new Error(message);

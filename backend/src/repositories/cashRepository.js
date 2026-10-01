@@ -16,8 +16,8 @@ export const cashRepository = {
     customer_ruc = '',
     customer_business_name = '',
     store_sale_id = null
-  }) {
-    const res = await query(
+  }, runQuery = query) {
+    const res = await runQuery(
       `INSERT INTO cash_transactions (work_shift_id, stay_id, user_id, transaction_type, concept, category, amount_pen, payment_method, reference_number, voucher_type, voucher_number, customer_ruc, customer_business_name, store_sale_id)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
        RETURNING *`,

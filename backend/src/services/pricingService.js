@@ -15,7 +15,7 @@ function badRequest(message) {
   return error;
 }
 
-const round2 = (n) => Math.round(Number(n) * 100) / 100;
+const round2 = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
 
 const parseTime = (value, fallback) => {
   const [h, m] = String(value || fallback).split(':').map((n) => parseInt(n, 10));

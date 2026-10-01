@@ -1,8 +1,8 @@
 import { query } from '../config/db.js';
 
 export const kardexRepository = {
-  async addPurchase({ product_id, user_id, quantity, unit_cost_pen, total_cost_pen, supplier_name = 'Proveedor General' }) {
-    const res = await query(
+  async addPurchase({ product_id, user_id, quantity, unit_cost_pen, total_cost_pen, supplier_name = 'Proveedor General' }, runQuery = query) {
+    const res = await runQuery(
       `INSERT INTO product_purchases (product_id, user_id, quantity, unit_cost_pen, total_cost_pen, supplier_name)
        VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING *`,

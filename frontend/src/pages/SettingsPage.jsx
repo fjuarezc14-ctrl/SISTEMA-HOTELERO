@@ -107,8 +107,47 @@ export function SettingsPage() {
   }, [getRoomTypes, getHotelInfo]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    let cancelled = false;
+    async function load() {
+      try {
+        setLoading(true);
+        const [typesData, roomsRes, infoData] = await Promise.all([
+          getRoomTypes(false),
+          api.get('/rooms'),
+          getHotelInfo(false)
+        ]);
+        if (cancelled) return;
+        setRoomTypes(typesData || []);
+        setRooms(roomsRes.data || []);
+        if (infoData) {
+          setHotelInfo(infoData);
+          setBusinessName(infoData.business_name || '');
+          setTradeName(infoData.trade_name || '');
+          setLogoUrl(infoData.logo_url || '');
+          setRuc(infoData.ruc || '');
+          setAddress(infoData.address || '');
+          setPhone(infoData.phone || '');
+          setOvernightCheckoutTime(infoData.overnight_checkout_time || '12:00');
+          setGracePeriodMinutes(infoData.grace_period_minutes !== undefined ? infoData.grace_period_minutes : 10);
+          setCleaningBufferMinutes(infoData.cleaning_buffer_minutes !== undefined ? infoData.cleaning_buffer_minutes : 60);
+          setPernocteStart(String(infoData.pernocte_start_time || '20:00').slice(0, 5));
+          setPernocteCheckout(String(infoData.pernocte_checkout_time || '09:00').slice(0, 5));
+          setStandardCheckin(String(infoData.standard_checkin_time || '14:00').slice(0, 5));
+          setDepositType(infoData.reservation_deposit_type || 'percent');
+          setDepositValue(String(Number(infoData.reservation_deposit_value ?? 30)));
+          setTicketFooterLegend(infoData.ticket_footer_legend || '¡Gracias por su preferencia en Hotel Zafiro! Conserve sus objetos de valor.');
+        }
+      } catch (err) {
+        if (!cancelled) console.error('Error cargando ajustes:', err.message);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [getRoomTypes, getHotelInfo]);
 
   const handleOpenEditRates = (type) => {
     setEditingType(type);
@@ -422,45 +461,51 @@ export function SettingsPage() {
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {roomTypes.map((type) => (
-              <div
-                key={type.id}
-                className="p-5 bg-slate-50 border border-slate-200 rounded-2xl space-y-3 relative group"
-              >
-                <div className="flex items-center justify-between">
-                  <h4 className="text-base font-bold text-slate-900">{type.name}</h4>
-                  <button
-                    onClick={() => handleOpenEditRates(type)}
-                    className="px-3 py-1.5 bg-white hover:bg-slate-100 border border-slate-200 text-emerald-700 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1.5 shadow-sm"
-                  >
-                    <Edit2 className="w-3.5 h-3.5" />
-                    <span>Modificar Precios</span>
-                  </button>
-                </div>
-                <p className="text-xs text-slate-500">{type.description || 'Sin descripción'}</p>
+          {roomTypes.length === 0 ? (
+            <div className="py-8 text-center text-xs text-slate-400 bg-slate-50 border border-slate-200 rounded-2xl">
+              No hay categorías de habitación configuradas. Crea una con el botón "+ Nueva Categoría".
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {roomTypes.map((type) => (
+                <div
+                  key={type.id}
+                  className="p-5 bg-slate-50 border border-slate-200 rounded-2xl space-y-3 relative group"
+                >
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-base font-bold text-slate-900">{type.name}</h4>
+                    <button
+                      onClick={() => handleOpenEditRates(type)}
+                      className="px-3 py-1.5 bg-white hover:bg-slate-100 border border-slate-200 text-emerald-700 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1.5 shadow-sm"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                      <span>Modificar Precios</span>
+                    </button>
+                  </div>
+                  <p className="text-xs text-slate-500">{type.description || 'Sin descripción'}</p>
 
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-slate-200 text-xs">
-                  <div className="p-2 bg-white rounded-lg border border-slate-100">
-                    <span className="text-[10px] text-slate-500 block">Horas ({type.hours_quantity_default}h)</span>
-                    <span className="font-bold text-emerald-700 text-sm">{formatPEN(type.price_hours_default)}</span>
-                  </div>
-                  <div className="p-2 bg-white rounded-lg border border-slate-100">
-                    <span className="text-[10px] text-slate-500 block">Pernocte (1 noche)</span>
-                    <span className="font-bold text-indigo-700 text-sm">{formatPEN(type.price_overnight_default)}</span>
-                  </div>
-                  <div className="p-2 bg-white rounded-lg border border-slate-100">
-                    <span className="text-[10px] text-slate-500 block">Por Día</span>
-                    <span className="font-bold text-amber-700 text-sm">{formatPEN(type.price_full_day_default)}</span>
-                  </div>
-                  <div className="p-2 bg-white rounded-lg border border-slate-100">
-                    <span className="text-[10px] text-slate-500 block">Hora Extra</span>
-                    <span className="font-bold text-slate-700 text-sm">{formatPEN(type.price_extra_hour_default)}</span>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-slate-200 text-xs">
+                    <div className="p-2 bg-white rounded-lg border border-slate-100">
+                      <span className="text-[10px] text-slate-500 block">Horas ({type.hours_quantity_default}h)</span>
+                      <span className="font-bold text-emerald-700 text-sm">{formatPEN(type.price_hours_default)}</span>
+                    </div>
+                    <div className="p-2 bg-white rounded-lg border border-slate-100">
+                      <span className="text-[10px] text-slate-500 block">Pernocte (1 noche)</span>
+                      <span className="font-bold text-indigo-700 text-sm">{formatPEN(type.price_overnight_default)}</span>
+                    </div>
+                    <div className="p-2 bg-white rounded-lg border border-slate-100">
+                      <span className="text-[10px] text-slate-500 block">Por Día</span>
+                      <span className="font-bold text-amber-700 text-sm">{formatPEN(type.price_full_day_default)}</span>
+                    </div>
+                    <div className="p-2 bg-white rounded-lg border border-slate-100">
+                      <span className="text-[10px] text-slate-500 block">Hora Extra</span>
+                      <span className="font-bold text-slate-700 text-sm">{formatPEN(type.price_extra_hour_default)}</span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
 
           {/* Abono mínimo para reservar */}
           <form onSubmit={handleSaveDepositRule} className="p-4 bg-violet-50/60 border border-violet-200 rounded-2xl space-y-3">
@@ -647,8 +692,15 @@ export function SettingsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {rooms.map((r) => (
-                  <tr key={r.id} className="hover:bg-slate-50 transition-colors">
+                {rooms.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="py-8 text-center text-xs text-slate-400">
+                      No hay habitaciones configuradas en el inventario. Añade una con el botón "+ Añadir Habitación".
+                    </td>
+                  </tr>
+                ) : (
+                  rooms.map((r) => (
+                    <tr key={r.id} className="hover:bg-slate-50 transition-colors">
                     <td className="py-3 px-3 font-mono font-black text-slate-900 text-sm">{r.room_number}</td>
                     <td className="py-3 px-3 text-slate-600">Piso {r.floor}</td>
                     <td className="py-3 px-3 font-semibold text-emerald-700">{r.room_type_name}</td>
@@ -670,7 +722,7 @@ export function SettingsPage() {
                       </button>
                     </td>
                   </tr>
-                ))}
+                )))}
               </tbody>
             </table>
           </div>

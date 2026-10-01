@@ -153,6 +153,10 @@ export function CheckInModal({ isOpen, onClose, room, reservationData = null, up
     }
 
     if (charging && paymentMethod === 'MIXED') {
+      if (splitPayments.some((p) => parseFloat(p.amount) < 0)) {
+        setError('Los montos del pago mixto no pueden ser negativos.');
+        return;
+      }
       const splitSum = splitPayments.reduce((acc, curr) => acc + (parseFloat(curr.amount) || 0), 0);
       if (Math.abs(splitSum - amountDue) > 0.01) {
         setError(`El desglose de Pago Mixto (${formatPEN(splitSum)}) debe ser igual al monto a cobrar (${formatPEN(amountDue)}).`);

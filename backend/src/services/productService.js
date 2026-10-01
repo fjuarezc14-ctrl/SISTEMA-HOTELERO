@@ -118,6 +118,7 @@ export const productService = {
 
   // Venta directa en recepción / mostrador (varios productos, Pago Mixto y Vínculo a Habitación)
   async directSale({ items = null, product_id, quantity = 1, payment_method = 'CASH', reference_number = '', split_payments = null, stay_id = null, voucher_type, customer_ruc, customer_business_name, user_id }) {
+    v.oneOf(payment_method, 'Medio de pago', ['CASH', 'YAPE_PLIN', 'CARD', 'MIXED']);
     // Compatibilidad: venta de un solo producto
     const saleItems = Array.isArray(items) && items.length > 0 ? items : [{ product_id, quantity }];
     const lines = await resolveSaleItems(saleItems);
@@ -211,14 +212,11 @@ export const productService = {
     }
   },
 
-  // Registrar compra de mercadería (Aumento de stock en Almacén)
-  async registerPurchase({ product_id, quantity = 1, unit_cost_pen, supplier_name, user_id }) {
+  // Registrar compra de mercadería (Aumento de stock en Almacén y egreso de caja)
+  async registerPurchase({ product_id, quantity = 1, unit_cost_pen, supplier_name, payment_method = 'CASH', reference_number = '', user_id }) {
     const product = await productRepository.findById(product_id);
     if (!product) {
-      const error = new Error('Producto no encontrado.');
-      error.statusCode = 404;
-      error.isOperational = true;
-      throw error;
+      throw operationalError('Producto no encontrado.', 404);
     }
 
     const qty = v.integer(quantity, 'La cantidad comprada', { min: 1, max: 99999 });
@@ -226,18 +224,45 @@ export const productService = {
     const totalCost = Math.round(qty * unitCost * 100) / 100;
     supplier_name = v.text(supplier_name, 'El proveedor', { max: 150, required: false });
 
-    // Incrementar stock en productos
-    const currentStock = Number(product.stock || 0);
-    await productRepository.update(product.id, { stock: currentStock + qty });
+    // Se requiere turno de caja abierto para registrar el egreso
+    let activeShift = await shiftRepository.findActiveShiftByUserId(user_id);
+    if (!activeShift) {
+      activeShift = await shiftRepository.findAnyActiveShift();
+    }
+    if (!activeShift) {
+      throw operationalError('No hay un turno de caja abierto para registrar el egreso de la compra de mercadería.', 400);
+    }
 
-    // Registrar compra en kardex
-    return await kardexRepository.addPurchase({
-      product_id: product.id,
-      user_id,
-      quantity: qty,
-      unit_cost_pen: unitCost,
-      total_cost_pen: totalCost,
-      supplier_name: supplier_name ? supplier_name.trim() : 'Proveedor General'
+    const safeMethod = ['CASH', 'YAPE_PLIN', 'CARD'].includes(payment_method) ? payment_method : 'CASH';
+
+    // Operación atómica: Stock + Kardex + Egreso de caja
+    return await withTransaction(async (txQuery) => {
+      // 1. Incrementar stock en productos
+      const currentStock = Number(product.stock || 0);
+      await productRepository.update(product.id, { stock: currentStock + qty }, txQuery);
+
+      // 2. Registrar egreso en caja
+      const concept = `Compra mercadería: ${product.name} (x${qty})`;
+      await cashRepository.create({
+        work_shift_id: activeShift.id,
+        user_id,
+        transaction_type: 'expense',
+        concept: truncate(concept, 150),
+        category: 'store',
+        amount_pen: totalCost,
+        payment_method: safeMethod,
+        reference_number: String(reference_number || '').trim().slice(0, 50)
+      }, txQuery);
+
+      // 3. Registrar compra en kardex
+      return await kardexRepository.addPurchase({
+        product_id: product.id,
+        user_id,
+        quantity: qty,
+        unit_cost_pen: unitCost,
+        total_cost_pen: totalCost,
+        supplier_name: supplier_name ? supplier_name.trim() : 'Proveedor General'
+      }, txQuery);
     });
   },
 

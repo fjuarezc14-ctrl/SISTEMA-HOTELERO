@@ -6,8 +6,8 @@ export const companionRepository = {
     return res.rows;
   },
 
-  async addCompanion({ stay_id, document_type = 'DNI', document_number, full_name, age = null, nationality = 'Peruana', origin_city = 'Lima', destination_city = 'Lima', travel_reason = 'Turismo / Vacaciones' }) {
-    const res = await query(
+  async addCompanion({ stay_id, document_type = 'DNI', document_number, full_name, age = null, nationality = 'Peruana', origin_city = 'Lima', destination_city = 'Lima', travel_reason = 'Turismo / Vacaciones' }, runQuery = query) {
+    const res = await runQuery(
       `INSERT INTO stay_companions (stay_id, document_type, document_number, full_name, age, nationality, origin_city, destination_city, travel_reason)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        RETURNING *`,

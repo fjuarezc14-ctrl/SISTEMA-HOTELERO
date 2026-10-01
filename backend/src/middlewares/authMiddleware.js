@@ -1,8 +1,7 @@
 import jwt from 'jsonwebtoken';
 import { query } from '../config/db.js';
 import { ROLES, ASSIGNABLE_MODULES } from '../constants/index.js';
-
-const JWT_SECRET = process.env.JWT_SECRET || 'valetec_hotel_peru_jwt_secret_key_2026_secure';
+import { JWT_SECRET } from '../config/jwt.js';
 
 export const isAdminRole = (role) => role === ROLES.SUPER_ADMIN || role === ROLES.ADMIN;
 

@@ -31,7 +31,6 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash VARCHAR(255) NOT NULL,
     full_name VARCHAR(100) NOT NULL,
     role VARCHAR(30) NOT NULL DEFAULT 'receptionist', -- super_admin, admin, receptionist, housekeeper
-    plain_password VARCHAR(255) DEFAULT 'admin123',
     is_active BOOLEAN NOT NULL DEFAULT true,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -276,6 +275,8 @@ CREATE INDEX IF NOT EXISTS idx_cash_transactions_stay ON cash_transactions(stay_
 CREATE INDEX IF NOT EXISTS idx_room_consumptions_stay ON room_consumptions(stay_id);
 CREATE INDEX IF NOT EXISTS idx_stays_customer ON stays(customer_id);
 CREATE INDEX IF NOT EXISTS idx_stays_work_shift ON stays(work_shift_id);
+CREATE INDEX IF NOT EXISTS idx_stays_expected_end ON stays(expected_end_time);
+CREATE INDEX IF NOT EXISTS idx_cash_transactions_user ON cash_transactions(user_id);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_user ON audit_logs(user_id);
 
 

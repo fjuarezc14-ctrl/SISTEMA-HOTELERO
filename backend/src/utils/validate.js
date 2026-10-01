@@ -28,7 +28,7 @@ export function money(value, field, { min = 0, max = 100000, allowZero = true } 
   if (value === '' || value === null || value === undefined || !Number.isFinite(n)) throw badRequest(`${field} debe ser un monto válido.`);
   if (n < min || (!allowZero && n === 0)) throw badRequest(`${field} debe ser ${allowZero ? `mayor o igual a ${min}` : 'mayor a 0'}.`);
   if (n > max) throw badRequest(`${field} no puede superar S/ ${max}.`);
-  return Math.round(n * 100) / 100;
+  return Math.round((n + Number.EPSILON) * 100) / 100;
 }
 
 /** Número entero en un rango */

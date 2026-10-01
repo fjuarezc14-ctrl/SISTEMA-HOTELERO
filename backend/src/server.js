@@ -4,7 +4,7 @@ import helmet from 'helmet';
 import dotenv from 'dotenv';
 import apiRouter from './routes/index.js';
 import { errorHandler } from './middlewares/errorHandler.js';
-import { initDatabase } from './config/db.js';
+import { initDatabase, pool } from './config/db.js';
 import { getCurrentDateTimePeru, getCurrentTimePeru, TIMEZONE } from './utils/timeHelper.js';
 
 dotenv.config();
@@ -12,9 +12,21 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 4000;
 
+const allowedOrigins = process.env.CORS_ORIGIN
+  ? process.env.CORS_ORIGIN.split(',').map((o) => o.trim())
+  : ['http://localhost:5185', 'http://127.0.0.1:5185'];
+
 // Middlewares de seguridad y parsing
 app.use(helmet({ crossOriginResourcePolicy: false }));
-app.use(cors({ origin: true, credentials: true }));
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
+      return callback(null, true);
+    }
+    return callback(new Error(`Origen ${origin} no permitido por política CORS.`));
+  },
+  credentials: true
+}));
 app.use(express.json({ limit: '20mb' }));
 app.use(express.urlencoded({ limit: '20mb', extended: true }));
 
@@ -50,5 +62,18 @@ async function startServer() {
     console.log(`=======================================================`);
   });
 }
+
+// Cierre ordenado (Graceful Shutdown)
+process.on('SIGTERM', async () => {
+  console.log('🛑 Recibida señal SIGTERM: cerrando servidor y pool PostgreSQL...');
+  await pool.end();
+  process.exit(0);
+});
+
+process.on('SIGINT', async () => {
+  console.log('🛑 Recibida señal SIGINT: cerrando servidor y pool PostgreSQL...');
+  await pool.end();
+  process.exit(0);
+});
 
 startServer();
