@@ -3,6 +3,7 @@ import { shiftRepository } from '../repositories/shiftRepository.js';
 import { stayRepository } from '../repositories/stayRepository.js';
 import { PAYMENT_METHODS, TRANSACTION_TYPES } from '../constants/index.js';
 import { requireAdminAuthorization } from './adminAuthorizationService.js';
+import { issueVoucher } from './voucherService.js';
 
 export const cashService = {
   async createTransaction({
@@ -129,6 +130,37 @@ export const cashService = {
       error.isOperational = true;
       throw error;
     }
-    return await cashRepository.updateVoucher(id, voucherData);
+    if (transaction.is_cancelled) {
+      const error = new Error('No se puede emitir comprobante de un movimiento anulado.');
+      error.statusCode = 400;
+      error.isOperational = true;
+      throw error;
+    }
+    if (transaction.transaction_type !== 'income') {
+      const error = new Error('Solo se emiten comprobantes para ingresos.');
+      error.statusCode = 400;
+      error.isOperational = true;
+      throw error;
+    }
+    if (transaction.voucher_type === 'BOLETA' || transaction.voucher_type === 'FACTURA') {
+      const error = new Error(`Este movimiento ya tiene ${transaction.voucher_type.toLowerCase()} ${transaction.voucher_number}.`);
+      error.statusCode = 400;
+      error.isOperational = true;
+      throw error;
+    }
+    const type = String(voucherData.voucher_type || '').toUpperCase();
+    if (type !== 'BOLETA' && type !== 'FACTURA') {
+      const error = new Error('Tipo de comprobante no válido (BOLETA o FACTURA).');
+      error.statusCode = 400;
+      error.isOperational = true;
+      throw error;
+    }
+    // El número lo asigna el servidor (correlativo), nunca el cliente
+    const voucher = await issueVoucher({
+      voucher_type: type,
+      customer_ruc: voucherData.customer_ruc,
+      customer_business_name: voucherData.customer_business_name
+    });
+    return await cashRepository.updateVoucher(id, voucher);
   }
 };

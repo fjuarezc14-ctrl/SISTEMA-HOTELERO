@@ -13,8 +13,13 @@ export const reservationController = {
 
   async create(req, res, next) {
     try {
+      const {
+        room_id, customer_data, start_date, end_date, deposit_amount_pen, payment_method,
+        reference_number, split_payments, notes, voucher_type, customer_ruc, customer_business_name
+      } = req.body;
       const reservation = await reservationService.createReservation({
-        ...req.body,
+        room_id, customer_data, start_date, end_date, deposit_amount_pen, payment_method,
+        reference_number, split_payments, notes, voucher_type, customer_ruc, customer_business_name,
         user_id: req.user.id
       });
       res.status(201).json({

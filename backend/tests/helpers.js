@@ -82,11 +82,25 @@ export async function closeOpenShift(token) {
   });
 }
 
-/** Primera habitación disponible (estado 'available') */
-export async function getAvailableRoom(token, exceptIds = []) {
+/**
+ * Primera habitación disponible (estado 'available') y, si se indica `freeDays`,
+ * sin reservas confirmadas ni estadías en los próximos N días (para check-in/reservas cercanas).
+ */
+export async function getAvailableRoom(token, exceptIds = [], { freeDays = 0 } = {}) {
   const rooms = await expectOk('GET', '/rooms', { token });
-  const room = rooms.find((r) => r.status === 'available' && !exceptIds.includes(r.id));
-  assert.ok(room, 'No hay habitaciones disponibles en la base de pruebas');
+  let busy = new Set();
+  if (freeDays > 0) {
+    const rows = await testDb(
+      `SELECT room_id FROM reservations
+        WHERE status = 'confirmed' AND end_date > NOW() - interval '1 day' AND start_date < NOW() + ($1 || ' days')::interval
+       UNION
+       SELECT room_id FROM stays WHERE status = 'active'`,
+      [String(freeDays)]
+    );
+    busy = new Set(rows.map((r) => r.room_id));
+  }
+  const room = rooms.find((r) => r.status === 'available' && !exceptIds.includes(r.id) && !busy.has(r.id));
+  assert.ok(room, 'No hay habitaciones libres en la base de pruebas');
   return room;
 }
 

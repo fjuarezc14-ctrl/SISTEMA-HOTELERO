@@ -106,6 +106,9 @@ export const stayController = {
         payment_method: req.body.payment_method,
         reference_number: req.body.reference_number,
         split_payments: req.body.split_payments || null,
+        voucher_type: req.body.voucher_type,
+        customer_ruc: req.body.customer_ruc,
+        customer_business_name: req.body.customer_business_name,
         user_id: req.user.id
       });
       res.json({

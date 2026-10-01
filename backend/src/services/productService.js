@@ -5,6 +5,7 @@ import { shiftRepository } from '../repositories/shiftRepository.js';
 import { kardexRepository } from '../repositories/kardexRepository.js';
 import { withTransaction } from '../config/db.js';
 import { normalizePayment } from '../utils/payments.js';
+import { issueVoucher } from './voucherService.js';
 
 function operationalError(message, statusCode) {
   const error = new Error(message);
@@ -112,7 +113,7 @@ export const productService = {
   },
 
   // Venta directa en recepción / mostrador (varios productos, Pago Mixto y Vínculo a Habitación)
-  async directSale({ items = null, product_id, quantity = 1, payment_method = 'CASH', reference_number = '', split_payments = null, stay_id = null, user_id }) {
+  async directSale({ items = null, product_id, quantity = 1, payment_method = 'CASH', reference_number = '', split_payments = null, stay_id = null, voucher_type, customer_ruc, customer_business_name, user_id }) {
     // Compatibilidad: venta de un solo producto
     const saleItems = Array.isArray(items) && items.length > 0 ? items : [{ product_id, quantity }];
     const lines = await resolveSaleItems(saleItems);
@@ -129,6 +130,7 @@ export const productService = {
 
     // El pago (simple o mixto) debe cubrir exactamente el total de la venta
     normalizePayment({ amount: totalAmount, payment_method, reference_number, split_payments }, totalAmount);
+    const voucher = await issueVoucher({ voucher_type, customer_ruc, customer_business_name });
 
     // Verificar si viene una habitación vinculada
     let stayInfo = null;
@@ -182,7 +184,8 @@ export const productService = {
             amount_pen: itemAmt,
             payment_method: item.payment_method,
             reference_number: item.reference_number || reference_number || '',
-            store_sale_id: sale.id
+            store_sale_id: sale.id,
+            ...voucher
           });
         }
       }
@@ -198,7 +201,8 @@ export const productService = {
         amount_pen: totalAmount,
         payment_method: payment_method || 'CASH',
         reference_number: reference_number || '',
-        store_sale_id: sale.id
+        store_sale_id: sale.id,
+        ...voucher
       });
     }
   },

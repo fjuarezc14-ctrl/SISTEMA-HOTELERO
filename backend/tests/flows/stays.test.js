@@ -22,7 +22,7 @@ async function cashForStay(stayId) {
 }
 
 async function freeRoom() {
-  const room = await getAvailableRoom(token, rooms.map((r) => r.id));
+  const room = await getAvailableRoom(token, rooms.map((r) => r.id), { freeDays: 4 });
   rooms.push(room);
   return room;
 }

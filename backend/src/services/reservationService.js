@@ -5,6 +5,8 @@ import { cashRepository } from '../repositories/cashRepository.js';
 import { shiftRepository } from '../repositories/shiftRepository.js';
 import { stayService } from './stayService.js';
 import { occupancyService } from './occupancyService.js';
+import { issueVoucher } from './voucherService.js';
+import { normalizePayment } from '../utils/payments.js';
 
 function badRequest(message) {
   const error = new Error(message);
@@ -45,6 +47,9 @@ export const reservationService = {
     reference_number = '',
     split_payments = null,
     notes = '',
+    voucher_type,
+    customer_ruc,
+    customer_business_name,
     user_id
   }) {
     if (!room_id || !customer_data?.document_number || !customer_data?.full_name || !start_date || !end_date) {
@@ -98,6 +103,9 @@ export const reservationService = {
     if (deposit > 0 && !activeShift) {
       throw badRequest('Para registrar un abono inicial debe haber un turno de caja abierto.');
     }
+    // El abono (simple o mixto) debe sumar exactamente el monto indicado
+    const depositPayments = deposit > 0 ? normalizePayment({ amount: deposit, payment_method, reference_number, split_payments }, deposit) : [];
+    const voucher = deposit > 0 ? await issueVoucher({ voucher_type: voucher_type || 'TICKET', customer_ruc, customer_business_name }) : null;
 
     const reservation = await reservationRepository.create({
       room_id: room.id,
@@ -110,40 +118,23 @@ export const reservationService = {
       notes: String(notes || '').trim().slice(0, 250)
     });
 
-    // Si hubo abono/seña, registrarlo en caja (con soporte para Pago Mixto)
-    if (activeShift && Number(deposit_amount_pen) > 0) {
-      if (payment_method === 'MIXED' && Array.isArray(split_payments) && split_payments.length > 0) {
-        for (const item of split_payments) {
-          const itemAmt = Number(item.amount || 0);
-          if (itemAmt > 0) {
-            const methodLabel = item.payment_method === 'YAPE_PLIN' ? 'Yape/Plin' : item.payment_method === 'CARD' ? 'Tarjeta' : 'Efectivo';
-            await cashRepository.create({
-              work_shift_id: activeShift.id,
-              user_id,
-              transaction_type: 'income',
-              concept: `Abono de Reserva Hab. ${room.room_number} - ${customer.full_name} (${methodLabel})`,
-              category: 'stay',
-              amount_pen: itemAmt,
-              payment_method: item.payment_method,
-              reference_number: item.reference_number || ''
-            });
-          }
-        }
-      } else {
-        await cashRepository.create({
-          work_shift_id: activeShift.id,
-          user_id,
-          transaction_type: 'income',
-          concept: `Abono de Reserva Hab. ${room.room_number} - ${customer.full_name}`,
-          category: 'stay',
-          amount_pen: Number(deposit_amount_pen),
-          payment_method: payment_method || 'CASH',
-          reference_number: reference_number || ''
-        });
-      }
+    // Abono inicial en caja (un comprobante para todo el abono)
+    for (const p of depositPayments) {
+      const methodLabel = p.payment_method === 'YAPE_PLIN' ? 'Yape/Plin' : p.payment_method === 'CARD' ? 'Tarjeta' : 'Efectivo';
+      await cashRepository.create({
+        work_shift_id: activeShift.id,
+        user_id,
+        transaction_type: 'income',
+        concept: `Abono de Reserva Hab. ${room.room_number} - ${customer.full_name}${depositPayments.length > 1 ? ` (${methodLabel})` : ''}`.slice(0, 150),
+        category: 'stay',
+        amount_pen: p.amount,
+        payment_method: p.payment_method,
+        reference_number: p.reference_number,
+        ...voucher
+      });
     }
 
-    return reservation;
+    return { ...reservation, voucher };
   },
 
   // Reprogramar: habitación, fechas y notas. El abono y el estado no se cambian por aquí

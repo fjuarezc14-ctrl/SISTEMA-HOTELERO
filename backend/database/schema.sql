@@ -295,3 +295,9 @@ ALTER TABLE room_consumptions ADD COLUMN IF NOT EXISTS product_name VARCHAR(100)
 CREATE INDEX IF NOT EXISTS idx_store_sales_shift ON store_sales(work_shift_id);
 CREATE INDEX IF NOT EXISTS idx_store_sale_items_sale ON store_sale_items(sale_id);
 CREATE INDEX IF NOT EXISTS idx_cash_transactions_store_sale ON cash_transactions(store_sale_id);
+
+-- 18. Numeración correlativa de comprobantes por serie (B001 boletas, F001 facturas, T001 tickets)
+CREATE TABLE IF NOT EXISTS voucher_sequences (
+    series VARCHAR(10) PRIMARY KEY,
+    last_number INT NOT NULL DEFAULT 0
+);

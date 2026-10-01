@@ -9,6 +9,7 @@ import { incidentRepository } from '../repositories/incidentRepository.js';
 import { pricingService } from './pricingService.js';
 import { occupancyService } from './occupancyService.js';
 import { normalizePayment } from '../utils/payments.js';
+import { issueVoucher } from './voucherService.js';
 import { query } from '../config/db.js';
 
 const round2 = (n) => Math.round(Number(n) * 100) / 100;
@@ -195,8 +196,9 @@ export const stayService = {
     // 8. Habitación ocupada
     await roomRepository.updateRoomStatus(room.id, 'occupied', `Huésped: ${customer.full_name}`);
 
-    // 9. Registrar en caja lo cobrado ahora (el abono de la reserva ya está en caja)
+    // 9. Registrar en caja lo cobrado ahora (el abono de la reserva ya está en caja), con un solo comprobante
     const paidNow = payments.reduce((sum, p) => sum + p.amount, 0);
+    const voucher = payments.length > 0 ? await issueVoucher(initial_payment) : null;
     for (const p of payments) {
       const methodLabel = p.payment_method === 'YAPE_PLIN' ? 'Yape/Plin' : p.payment_method === 'CARD' ? 'Tarjeta' : 'Efectivo';
       await cashRepository.create({
@@ -209,9 +211,7 @@ export const stayService = {
         amount_pen: p.amount,
         payment_method: p.payment_method,
         reference_number: p.reference_number,
-        voucher_type: initial_payment?.voucher_type || 'TICKET',
-        customer_ruc: initial_payment?.customer_ruc || '',
-        customer_business_name: initial_payment?.customer_business_name || ''
+        ...voucher
       });
     }
 
@@ -236,7 +236,7 @@ export const stayService = {
       }
     }
 
-    return updated || stay;
+    return { ...(updated || stay), voucher, paid_now: round2(paidNow), payments };
   },
 
   /**
@@ -313,7 +313,8 @@ export const stayService = {
       await stayRepository.updateStayPrices(stay.id, { total_stay_price_pen: round2(quote.stay_price + quote.overstay_cost) });
     }
 
-    // Registrar en caja: primero la penalidad (categoría incidente) y luego el resto (estadía)
+    // Registrar en caja: primero la penalidad (categoría incidente) y luego el resto (estadía), con un solo comprobante
+    const voucher = payments.length > 0 ? await issueVoucher(final_payment) : null;
     let penaltyLeft = quote.penalty;
     for (const p of payments) {
       const methodLabel = p.payment_method === 'YAPE_PLIN' ? 'Yape/Plin' : p.payment_method === 'CARD' ? 'Tarjeta' : 'Efectivo';
@@ -332,7 +333,8 @@ export const stayService = {
           category: 'incident',
           amount_pen: penaltyPart,
           payment_method: p.payment_method,
-          reference_number: p.reference_number
+          reference_number: p.reference_number,
+          ...voucher
         });
       }
       if (stayPart > 0) {
@@ -345,7 +347,8 @@ export const stayService = {
           category: 'stay',
           amount_pen: stayPart,
           payment_method: p.payment_method,
-          reference_number: p.reference_number
+          reference_number: p.reference_number,
+          ...voucher
         });
       }
     }
@@ -375,11 +378,11 @@ export const stayService = {
     const completedStay = await stayRepository.completeStay(stay.id);
     await roomRepository.updateRoomStatus(stay.room_id, 'cleaning', 'Pendiente de limpieza tras check-out');
 
-    return { ...completedStay, checkout_summary: { ...quote, paid_now: paidNow } };
+    return { ...completedStay, voucher, payments, checkout_summary: { ...quote, paid_now: paidNow } };
   },
 
   /** Extender la estadía N horas, cobrando cada hora a la tarifa de hora extra (se cobra al momento). */
-  async addExtraHours({ stay_id, hours_count = 1, payment_method = 'CASH', reference_number = '', split_payments = null, user_id }) {
+  async addExtraHours({ stay_id, hours_count = 1, payment_method = 'CASH', reference_number = '', split_payments = null, voucher_type, customer_ruc, customer_business_name, user_id }) {
     const stay = await stayRepository.findById(stay_id);
     if (!stay || stay.status !== 'active') throw notFound('Estadía activa no encontrada.');
 
@@ -407,6 +410,7 @@ export const stayService = {
 
     // 3. Cobro exacto del costo de las horas extra
     const payments = normalizePayment({ amount: extraHoursCost, payment_method, reference_number, split_payments }, extraHoursCost);
+    const voucher = await issueVoucher({ voucher_type, customer_ruc, customer_business_name });
     for (const p of payments) {
       const methodLabel = p.payment_method === 'YAPE_PLIN' ? 'Yape/Plin' : p.payment_method === 'CARD' ? 'Tarjeta' : 'Efectivo';
       await cashRepository.create({
@@ -418,7 +422,8 @@ export const stayService = {
         category: 'stay',
         amount_pen: p.amount,
         payment_method: p.payment_method,
-        reference_number: p.reference_number
+        reference_number: p.reference_number,
+        ...voucher
       });
     }
 
@@ -431,6 +436,7 @@ export const stayService = {
     // 5. Nueva fecha límite
     await stayRepository.updateExpectedEndTime(stay.id, newExpectedEnd.toISOString());
 
-    return await this.getActiveStayByRoom(stay.room_id);
+    const activeStay = await this.getActiveStayByRoom(stay.room_id);
+    return { ...activeStay, voucher, payments, extra_hours: hours, extra_cost: extraHoursCost };
   }
 };
