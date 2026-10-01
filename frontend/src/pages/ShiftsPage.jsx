@@ -247,7 +247,7 @@ export function ShiftsPage() {
                         <td className="py-2 px-2 font-mono text-slate-500">{formatDatePeru(t.created_at)}</td>
                         <td className="py-2 px-2 font-semibold text-slate-800">{t.concept}</td>
                         <td className="py-2 px-2">
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                          <span className={`inline-flex items-center justify-center text-center leading-tight align-middle px-2 py-0.5 rounded text-[10px] font-bold ${
                             t.payment_method === 'YAPE_PLIN' ? 'bg-violet-100 text-violet-800' :
                             t.payment_method === 'CARD' ? 'bg-blue-100 text-blue-800' : 'bg-emerald-100 text-emerald-800'
                           }`}>
@@ -326,15 +326,15 @@ export function ShiftsPage() {
                       <td className="py-3 px-3 text-right font-mono font-bold text-slate-900">{formatPEN(s.actual_cash_pen)}</td>
                       <td className="py-3 px-3 text-right font-mono font-bold">
                         {diff === 0 ? (
-                          <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded font-black text-[10px]">
+                          <span className="inline-flex items-center justify-center text-center leading-tight align-middle px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded font-black text-[10px]">
                             Cuadre Exacto
                           </span>
                         ) : diff > 0 ? (
-                          <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded font-black text-[10px]">
+                          <span className="inline-flex items-center justify-center text-center leading-tight align-middle px-2 py-0.5 bg-blue-100 text-blue-800 rounded font-black text-[10px]">
                             +{formatPEN(diff)} (Sobrante)
                           </span>
                         ) : (
-                          <span className="px-2 py-0.5 bg-rose-100 text-rose-800 rounded font-black text-[10px]">
+                          <span className="inline-flex items-center justify-center text-center leading-tight align-middle px-2 py-0.5 bg-rose-100 text-rose-800 rounded font-black text-[10px]">
                             {formatPEN(diff)} (Faltante)
                           </span>
                         )}

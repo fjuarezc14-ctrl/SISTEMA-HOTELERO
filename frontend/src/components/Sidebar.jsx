@@ -133,12 +133,12 @@ export function Sidebar({ currentTab, setCurrentTab, isMobileOpen = false, setIs
                   <span>{item.label}</span>
                 </div>
                 {item.id === 'incidents' && reportedIncidentsCount > 0 && (
-                  <span className="px-2 py-0.5 text-[10px] font-black uppercase tracking-wider rounded-full bg-rose-600 text-white animate-pulse shadow-sm shadow-rose-600/30">
+                  <span className="inline-flex items-center justify-center text-center leading-tight align-middle px-2 py-0.5 text-[10px] font-black uppercase tracking-wider rounded-full bg-rose-600 text-white animate-pulse shadow-sm shadow-rose-600/30">
                     🚨 {reportedIncidentsCount}
                   </span>
                 )}
                 {item.isTest && (
-                  <span className="px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider rounded bg-amber-500 text-white animate-pulse shadow-sm">
+                  <span className="inline-flex items-center justify-center text-center leading-tight align-middle px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider rounded bg-amber-500 text-white animate-pulse shadow-sm">
                     En Prueba
                   </span>
                 )}

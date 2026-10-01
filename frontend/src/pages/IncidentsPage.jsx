@@ -204,15 +204,15 @@ export function IncidentsPage() {
   const getIncidentTypeBadge = (type) => {
     switch (type) {
       case 'damage':
-        return <span className="px-2.5 py-1 bg-rose-100 text-rose-800 text-xs font-black rounded-lg">Rotura / Daño</span>;
+        return <span className="inline-flex items-center justify-center text-center leading-tight align-middle px-2.5 py-1 bg-rose-100 text-rose-800 text-xs font-black rounded-lg">Rotura / Daño</span>;
       case 'loss':
-        return <span className="px-2.5 py-1 bg-amber-100 text-amber-800 text-xs font-black rounded-lg">Faltante / Pérdida</span>;
+        return <span className="inline-flex items-center justify-center text-center leading-tight align-middle px-2.5 py-1 bg-amber-100 text-amber-800 text-xs font-black rounded-lg">Faltante / Pérdida</span>;
       case 'unpaid_debt':
-        return <span className="px-2.5 py-1 bg-violet-100 text-violet-800 text-xs font-black rounded-lg">Deuda Sin Pagar</span>;
+        return <span className="inline-flex items-center justify-center text-center leading-tight align-middle px-2.5 py-1 bg-violet-100 text-violet-800 text-xs font-black rounded-lg">Deuda Sin Pagar</span>;
       case 'disturbance':
-        return <span className="px-2.5 py-1 bg-orange-100 text-orange-800 text-xs font-black rounded-lg">Disturbio / Ruidos</span>;
+        return <span className="inline-flex items-center justify-center text-center leading-tight align-middle px-2.5 py-1 bg-orange-100 text-orange-800 text-xs font-black rounded-lg">Disturbio / Ruidos</span>;
       default:
-        return <span className="px-2.5 py-1 bg-slate-100 text-slate-800 text-xs font-black rounded-lg">Otro Incidente</span>;
+        return <span className="inline-flex items-center justify-center text-center leading-tight align-middle px-2.5 py-1 bg-slate-100 text-slate-800 text-xs font-black rounded-lg">Otro Incidente</span>;
     }
   };
 

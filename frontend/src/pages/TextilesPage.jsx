@@ -55,7 +55,7 @@ export function TextilesPage() {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="px-2.5 py-0.5 bg-amber-600 text-white text-[10px] font-black uppercase rounded-lg tracking-wider">
+              <span className="inline-flex items-center justify-center text-center leading-tight align-middle px-2.5 py-0.5 bg-amber-600 text-white text-[10px] font-black uppercase rounded-lg tracking-wider">
                 MODO DE PRUEBA
               </span>
               <h3 className="text-sm font-bold text-amber-950">Módulo en Proceso de Producción & Prototipo Visual</h3>
@@ -219,7 +219,7 @@ export function TextilesPage() {
                     <td className="py-3 px-3 text-center font-mono font-bold text-blue-700">{item.inStock} ud</td>
                     <td className="py-3 px-3 text-center font-mono font-black text-slate-900">{item.total} ud</td>
                     <td className="py-3 px-3 text-center">
-                      <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 text-[10px] font-bold rounded-lg border border-emerald-200">
+                      <span className="inline-flex items-center justify-center text-center leading-tight align-middle px-2 py-0.5 bg-emerald-50 text-emerald-700 text-[10px] font-bold rounded-lg border border-emerald-200">
                         {item.status}
                       </span>
                     </td>
@@ -269,7 +269,7 @@ export function TextilesPage() {
                     <td className="py-3 px-3 text-center font-mono font-bold text-blue-700">{item.inStock} ud</td>
                     <td className="py-3 px-3 text-center font-mono font-black text-slate-900">{item.total} ud</td>
                     <td className="py-3 px-3 text-center">
-                      <span className="px-2 py-0.5 bg-blue-50 text-blue-700 text-[10px] font-bold rounded-lg border border-blue-200">
+                      <span className="inline-flex items-center justify-center text-center leading-tight align-middle px-2 py-0.5 bg-blue-50 text-blue-700 text-[10px] font-bold rounded-lg border border-blue-200">
                         {item.status}
                       </span>
                     </td>
@@ -317,7 +317,7 @@ export function TextilesPage() {
                     <td className="py-3 px-3 text-center font-mono font-bold text-slate-800">{batch.itemsCount} piezas</td>
                     <td className="py-3 px-3 font-semibold text-slate-700">{batch.provider}</td>
                     <td className="py-3 px-3 text-center">
-                      <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold ${
+                      <span className={`inline-flex items-center justify-center text-center leading-tight align-middle px-2.5 py-1 rounded-lg text-[10px] font-bold ${
                         batch.status === 'En Proceso de Lavado'
                           ? 'bg-amber-100 text-amber-800 border border-amber-300'
                           : 'bg-emerald-100 text-emerald-800 border border-emerald-300'

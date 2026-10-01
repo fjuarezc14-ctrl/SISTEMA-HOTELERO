@@ -289,7 +289,7 @@ export function UsersPage() {
                       {/* Columna Ver Contraseña Actual (1-Clic) */}
                       <td className="py-3 px-3">
                         <div className="flex items-center gap-2">
-                          <span className={`font-mono text-xs font-bold px-2 py-1 rounded-lg border transition-all ${
+                          <span className={`inline-flex items-center justify-center text-center leading-tight align-middle font-mono text-xs font-bold px-2 py-1 rounded-lg border transition-all ${
                             isPassVisible
                               ? 'bg-amber-50 text-slate-900 border-amber-300 shadow-2xs font-mono font-black'
                               : 'bg-slate-100 text-slate-400 border-slate-200'

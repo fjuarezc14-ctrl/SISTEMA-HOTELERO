@@ -225,7 +225,7 @@ export function CheckInModal({ isOpen, onClose, room, reservationData = null, up
               <Clock className="w-4 h-4 text-violet-700 shrink-0" />
               <span>RESERVA DE: {reservationData.customer_name}</span>
             </div>
-            <span className="px-2.5 py-1 bg-violet-700 text-white rounded-xl text-[10px] uppercase tracking-wider font-mono">
+            <span className="inline-flex items-center justify-center text-center leading-tight align-middle px-2.5 py-1 bg-violet-700 text-white rounded-xl text-[10px] uppercase tracking-wider font-mono">
               Abono inicial pagado: {formatPEN(reservationData.deposit_amount_pen)}
             </span>
           </div>

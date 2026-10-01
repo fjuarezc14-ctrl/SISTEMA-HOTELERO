@@ -418,7 +418,7 @@ export function StorePage() {
                     </td>
                     <td className="py-3 px-3 text-center">
                       <span
-                        className={`px-2.5 py-1 rounded-lg text-xs font-bold ${
+                        className={`inline-flex items-center justify-center text-center leading-tight align-middle px-2.5 py-1 rounded-lg text-xs font-bold ${
                           p.stock <= 5
                             ? 'bg-rose-50 text-rose-700 border border-rose-200'
                             : 'bg-slate-100 text-slate-700'

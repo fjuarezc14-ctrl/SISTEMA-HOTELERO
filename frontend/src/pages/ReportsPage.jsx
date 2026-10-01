@@ -523,12 +523,12 @@ function KpiReports() {
                         <td className="py-3 px-3 font-mono text-slate-500">{formatDatePeru(t.created_at)}</td>
                         <td className="py-3 px-3 font-semibold text-slate-900">{t.concept}</td>
                         <td className="py-3 px-3">
-                          <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700 capitalize border border-slate-200">
+                          <span className="inline-flex items-center justify-center text-center leading-tight align-middle px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700 capitalize border border-slate-200">
                             {t.category}
                           </span>
                         </td>
                         <td className="py-3 px-3">
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                          <span className={`inline-flex items-center justify-center text-center leading-tight align-middle px-2 py-0.5 rounded text-[10px] font-bold ${
                             t.payment_method === 'YAPE_PLIN' ? 'bg-violet-100 text-violet-800' :
                             t.payment_method === 'CARD' ? 'bg-blue-100 text-blue-800' : 'bg-emerald-100 text-emerald-800'
                           }`}>

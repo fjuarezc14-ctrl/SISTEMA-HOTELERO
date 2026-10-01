@@ -463,7 +463,7 @@ export function ReceptionPage() {
                         return (
                           <div className="p-2.5 bg-violet-100/90 border border-violet-300 rounded-xl text-left space-y-1 shadow-2xs">
                             <div className="flex items-center justify-between">
-                              <span className="px-1.5 py-0.5 bg-violet-600 text-white text-[9px] font-black rounded-md uppercase">
+                              <span className="inline-flex items-center justify-center text-center leading-tight align-middle px-1.5 py-0.5 bg-violet-600 text-white text-[9px] font-black rounded-md uppercase">
                                 🔔 {labelDays}
                               </span>
                               <strong className="text-violet-900 font-mono text-[10px]">{formatPEN(upcomingRes.deposit_amount_pen)}</strong>
@@ -560,7 +560,7 @@ export function ReceptionPage() {
                           <span className="font-extrabold text-slate-900 block text-sm">{res.customer_name}</span>
                           <span className="text-slate-500 font-semibold text-[11px]">Habitación {res.room_number}</span>
                         </div>
-                        <span className="px-2 py-0.5 bg-violet-600 text-white text-[10px] font-black rounded-lg">
+                        <span className="inline-flex items-center justify-center text-center leading-tight align-middle px-2 py-0.5 bg-violet-600 text-white text-[10px] font-black rounded-lg">
                           {labelDays}
                         </span>
                       </div>
