@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api/apiClient';
+import { Pagination, usePagination } from '../components/Pagination';
 import { formatPEN, formatDatePeru, PAYMENT_METHOD_LABELS, printElectronicVoucherTicket } from '../utils/formatters';
 import { EmitVoucherModal } from '../components/EmitVoucherModal';
 import { ShiftsPage } from './ShiftsPage';
@@ -225,6 +226,8 @@ function KpiReports() {
     `);
     printWindow.document.close();
   };
+
+  const reportTxPage = usePagination(kpis?.transactions || [], { resetKey: `${startDate}|${endDate}` });
 
   return (
     <div className="space-y-6">
@@ -518,7 +521,7 @@ function KpiReports() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {kpis.transactions.map((t) => (
+                    {reportTxPage.pageItems.map((t) => (
                       <tr key={t.id} className="hover:bg-slate-50 transition-colors">
                         <td className="py-3 px-3 font-mono text-slate-500">{formatDatePeru(t.created_at)}</td>
                         <td className="py-3 px-3 font-semibold text-slate-900">{t.concept}</td>
@@ -583,6 +586,7 @@ function KpiReports() {
                     ))}
                   </tbody>
                 </table>
+                <Pagination page={reportTxPage.page} totalPages={reportTxPage.totalPages} totalItems={reportTxPage.totalItems} onChange={reportTxPage.setPage} label="movimientos" />
               </div>
             )}
           </div>

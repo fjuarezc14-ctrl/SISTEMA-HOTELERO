@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { api } from '../api/apiClient';
+import { Pagination, usePagination } from '../components/Pagination';
 import { formatPEN, printElectronicVoucherTicket } from '../utils/formatters';
 import { useShift } from '../context/ShiftContext';
 import { useGlobalStore } from '../context/GlobalStoreContext';
@@ -290,6 +291,8 @@ export function StorePage() {
     }
   };
 
+  const inventoryPage = usePagination(products, { resetKey: products.length });
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -410,7 +413,7 @@ export function StorePage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {products.map((p) => (
+                {inventoryPage.pageItems.map((p) => (
                   <tr key={p.id} className="hover:bg-slate-50 transition-colors">
                     <td className="py-3 px-3 font-semibold text-slate-900">{p.name}</td>
                     <td className="py-3 px-3 text-right font-mono font-bold text-emerald-700">
@@ -439,6 +442,7 @@ export function StorePage() {
                 ))}
               </tbody>
             </table>
+            <Pagination page={inventoryPage.page} totalPages={inventoryPage.totalPages} totalItems={inventoryPage.totalItems} onChange={inventoryPage.setPage} label="productos" />
           </div>
         )}
       </div>

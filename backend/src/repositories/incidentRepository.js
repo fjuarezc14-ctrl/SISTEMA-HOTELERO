@@ -26,7 +26,7 @@ export const incidentRepository = {
       params.push(status);
     }
 
-    params.push(limit, offset);
+    params.push(Math.min(Number(limit) || 100, 1000), Math.max(0, Number(offset) || 0));
 
     const sql = `
       SELECT

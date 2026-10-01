@@ -28,7 +28,7 @@ export const customerRepository = {
       params.push(`%${search}%`);
     }
     sql += ` GROUP BY c.id ORDER BY c.full_name ASC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
-    params.push(limit, offset);
+    params.push(Math.min(Number(limit) || 100, 1000), Math.max(0, Number(offset) || 0));
 
     const res = await query(sql, params);
     return res.rows;

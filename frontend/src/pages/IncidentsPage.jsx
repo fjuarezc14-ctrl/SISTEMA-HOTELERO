@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api/apiClient';
+import { Pagination, usePagination } from '../components/Pagination';
 import { formatPEN, formatDatePeru } from '../utils/formatters';
 import {
   AlertTriangle,
@@ -38,7 +39,7 @@ export function IncidentsPage() {
   const fetchInitialData = async () => {
     try {
       setLoading(true);
-      let query = '/incidents?limit=100';
+      let query = '/incidents?limit=500';
       if (typeFilter) query += `&incident_type=${typeFilter}`;
       if (statusFilter) query += `&status=${statusFilter}`;
 
@@ -216,6 +217,8 @@ export function IncidentsPage() {
     }
   };
 
+  const incidentsPage = usePagination(incidents, { resetKey: incidents.length });
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -284,8 +287,9 @@ export function IncidentsPage() {
           <p className="text-slate-400">Todas las habitaciones y estadías operan sin novedades.</p>
         </div>
       ) : (
+        <>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {incidents.map((inc) => (
+          {incidentsPage.pageItems.map((inc) => (
             <div
               key={inc.id}
               className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm space-y-3 flex flex-col justify-between hover:border-rose-300 transition-all"
@@ -371,6 +375,8 @@ export function IncidentsPage() {
             </div>
           ))}
         </div>
+        <Pagination page={incidentsPage.page} totalPages={incidentsPage.totalPages} totalItems={incidentsPage.totalItems} onChange={incidentsPage.setPage} label="incidentes" />
+        </>
       )}
   
       {/* PUNTO 1: Modal + Registrar Incidente Manual */}

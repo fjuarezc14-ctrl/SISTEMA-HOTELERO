@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api/apiClient';
+import { Pagination, usePagination } from '../components/Pagination';
 import { formatPEN, formatDatePeru } from '../utils/formatters';
 import { ReservationModal, buildReservationTicket } from '../components/ReservationModal';
 import { TicketPrintModal } from '../components/TicketPrintModal';
@@ -146,6 +147,8 @@ export function ReservationsPage() {
     return matchesStatus && matchesSearch;
   });
 
+  const reservationsPage = usePagination(filteredReservations, { resetKey: `${statusFilter}|${searchQuery}` });
+
   return (
     <div className="space-y-6">
       {/* Header Bar */}
@@ -279,7 +282,7 @@ export function ReservationsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {filteredReservations.map((r) => (
+                  {reservationsPage.pageItems.map((r) => (
                     <tr key={r.id} className="hover:bg-slate-50 transition-colors">
                       <td className="py-3 px-3 font-bold text-slate-900">
                         Hab. {r.room_number} <span className="text-slate-500 text-[11px]">({r.room_type_name})</span>
@@ -354,6 +357,7 @@ export function ReservationsPage() {
                   ))}
                 </tbody>
               </table>
+              <Pagination page={reservationsPage.page} totalPages={reservationsPage.totalPages} totalItems={reservationsPage.totalItems} onChange={reservationsPage.setPage} label="reservas" />
             </div>
           )}
         </div>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useShift } from '../context/ShiftContext';
 import { api } from '../api/apiClient';
+import { Pagination, usePagination } from '../components/Pagination';
 import { formatPEN, formatDatePeru } from '../utils/formatters';
 import { TicketPrintModal } from '../components/TicketPrintModal';
 import {
@@ -33,7 +34,7 @@ export function ShiftsPage() {
   const fetchHistory = async () => {
     try {
       setLoadingHistory(true);
-      const res = await api.get('/shifts/history');
+      const res = await api.get('/shifts/history?limit=500');
       setHistory(res.data || []);
     } catch (err) {
       console.error('Error cargando historial de turnos:', err.message);
@@ -82,6 +83,9 @@ export function ShiftsPage() {
     setTicketData(data);
     setIsTicketOpen(true);
   };
+
+  const activeTxPage = usePagination(activeTransactions, { resetKey: activeTransactions.length });
+  const historyPage = usePagination(history, { resetKey: history.length });
 
   return (
     <div className="space-y-6">
@@ -242,7 +246,7 @@ export function ShiftsPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {activeTransactions.map((t) => (
+                    {activeTxPage.pageItems.map((t) => (
                       <tr key={t.id} className="hover:bg-slate-50">
                         <td className="py-2 px-2 font-mono text-slate-500">{formatDatePeru(t.created_at)}</td>
                         <td className="py-2 px-2 font-semibold text-slate-800">{t.concept}</td>
@@ -261,6 +265,7 @@ export function ShiftsPage() {
                     ))}
                   </tbody>
                 </table>
+                <Pagination page={activeTxPage.page} totalPages={activeTxPage.totalPages} totalItems={activeTxPage.totalItems} onChange={activeTxPage.setPage} label="movimientos" />
               </div>
             )}
           </div>
@@ -312,7 +317,7 @@ export function ShiftsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {history.map((s) => {
+                {historyPage.pageItems.map((s) => {
                   const diff = Number(s.difference_cash_pen || s.difference_pen || 0);
                   return (
                     <tr key={s.id} className="hover:bg-slate-50 transition-colors">
@@ -354,6 +359,7 @@ export function ShiftsPage() {
                 })}
               </tbody>
             </table>
+            <Pagination page={historyPage.page} totalPages={historyPage.totalPages} totalItems={historyPage.totalItems} onChange={historyPage.setPage} label="turnos" />
           </div>
         )}
       </div>

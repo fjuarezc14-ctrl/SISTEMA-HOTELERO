@@ -5,6 +5,7 @@ import { useShift } from '../context/ShiftContext';
 import { EmitVoucherModal } from '../components/EmitVoucherModal';
 import { CashMovementModal } from '../components/CashMovementModal';
 import { CancelTransactionModal } from '../components/CancelTransactionModal';
+import { Pagination } from '../components/Pagination';
 import {
   Wallet,
   Plus,
@@ -14,7 +15,6 @@ import {
   Printer,
   Lock,
   Unlock,
-  ChevronLeft,
   ChevronRight,
   ChevronDown,
   ChevronUp,
@@ -508,31 +508,4 @@ function groupByStay(transactions) {
   }
   // Una estadía con un solo movimiento se muestra como fila normal
   return groups.map((g) => (g.type === 'stay' && g.items.length === 1 ? { type: 'single', key: g.items[0].id, tx: g.items[0] } : g));
-}
-
-function Pagination({ page, totalPages, totalItems, onChange }) {
-  if (totalPages <= 1) return null;
-  return (
-    <div className="flex items-center justify-between pt-3 mt-2 border-t border-slate-100 text-xs text-slate-500">
-      <span>
-        {totalItems} registros · Página {page} de {totalPages}
-      </span>
-      <div className="flex items-center gap-1">
-        <button
-          onClick={() => onChange(page - 1)}
-          disabled={page <= 1}
-          className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          <ChevronLeft className="w-3.5 h-3.5" />
-        </button>
-        <button
-          onClick={() => onChange(page + 1)}
-          disabled={page >= totalPages}
-          className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          <ChevronRight className="w-3.5 h-3.5" />
-        </button>
-      </div>
-    </div>
-  );
 }

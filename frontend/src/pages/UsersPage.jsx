@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ModulePermissions } from '../components/ModulePermissions';
 import { isAdminRole } from '../utils/modules';
 import { api } from '../api/apiClient';
+import { Pagination, usePagination } from '../components/Pagination';
 import { formatDatePeru } from '../utils/formatters';
 import { validateUsername, validatePassword, validateFullName } from '../utils/validators';
 import { UserCog, Plus, KeyRound, Check, AlertCircle, ShieldCheck, Search, Edit2, Crown, ConciergeBell, Sparkles, Eye, EyeOff, Wand2, Copy } from 'lucide-react';
@@ -198,6 +199,8 @@ export function UsersPage() {
       u.full_name?.toLowerCase().includes(search.toLowerCase())
   );
 
+  const usersPage = usePagination(filteredUsers, { resetKey: filteredUsers.length });
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -258,7 +261,7 @@ export function UsersPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredUsers.map((u) => {
+                {usersPage.pageItems.map((u) => {
                   const isAdmin = u.role === 'super_admin' || u.role === 'admin';
                   const isHousekeeper = u.role === 'housekeeper';
                   const isPassVisible = visibleRowPasswords[u.id];
@@ -353,6 +356,7 @@ export function UsersPage() {
                 })}
               </tbody>
             </table>
+            <Pagination page={usersPage.page} totalPages={usersPage.totalPages} totalItems={usersPage.totalItems} onChange={usersPage.setPage} label="usuarios" />
           </div>
         )}
       </div>
