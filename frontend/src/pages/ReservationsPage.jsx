@@ -276,34 +276,108 @@ export function ReservationsPage() {
                   <tr>
                     <th className="py-3 px-3">Habitación</th>
                     <th className="py-3 px-3">Huésped / Documento</th>
-                    <th className="py-3 px-3">Fecha Llegada</th>
+                    <th className="py-3 px-3">Llegada & Modalidad</th>
                     <th className="py-3 px-3">Fecha Salida</th>
-                    <th className="py-3 px-3 text-right">Total / Abono</th>
+                    <th className="py-3 px-3 text-right">Cuenta (Total / Saldo)</th>
                     <th className="py-3 px-3 text-center">Estado</th>
                     <th className="py-3 px-3 text-right">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {reservationsPage.pageItems.map((r) => (
-                    <tr key={r.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="py-3 px-3 font-bold text-slate-900">
-                        Hab. {r.room_number} <span className="text-slate-500 text-[11px]">({r.room_type_name})</span>
-                      </td>
-                      <td className="py-3 px-3">
-                        <p className="font-semibold text-slate-900">{r.customer_name}</p>
-                        <p className="text-[11px] text-slate-500">{r.customer_document} • {r.customer_phone || 'Sin telf.'}</p>
-                      </td>
-                      <td className="py-3 px-3 text-slate-700">{formatDatePeru(r.start_date)}</td>
-                      <td className="py-3 px-3 text-slate-700">{formatDatePeru(r.end_date)}</td>
-                      <td className="py-3 px-3 text-right font-mono">
-                        {r.quoted_price_pen != null && <span className="block font-black text-slate-900">{formatPEN(r.quoted_price_pen)}</span>}
-                        <span className="block text-[11px] font-bold text-emerald-700">Abono {formatPEN(r.deposit_amount_pen)}</span>
-                      </td>
-                      <td className="py-3 px-3 text-center">
-                        <Badge tone={RESERVATION_STATUS[r.status]?.tone}>
-                          {RESERVATION_STATUS[r.status]?.label || r.status}
-                        </Badge>
-                      </td>
+                  {reservationsPage.pageItems.map((r) => {
+                    const total = Number(r.quoted_price_pen || 0);
+                    const deposit = Number(r.deposit_amount_pen || 0);
+                    const pendingBalance = Math.max(0, total - deposit);
+
+                    // Indicador temporal de llegada
+                    const now = new Date();
+                    const start = new Date(r.start_date);
+                    const isToday = start.toDateString() === now.toDateString();
+                    const isOverdue = r.status === 'confirmed' && now > start;
+
+                    const stayTypeLabel =
+                      r.stay_type === 'hours'
+                        ? `${r.stay_units || 3}h (Horas)`
+                        : r.stay_type === 'overnight'
+                        ? `${r.stay_units || 1} noche(s)`
+                        : r.stay_type === 'full_day'
+                        ? `${r.stay_units || 1} día(s)`
+                        : 'Estadía';
+
+                    return (
+                      <tr key={r.id} className="hover:bg-slate-50 transition-colors">
+                        <td className="py-3 px-3 font-bold text-slate-900 whitespace-nowrap">
+                          <span className="text-sm">Hab. {r.room_number}</span>
+                          <span className="block text-slate-500 text-[11px] font-normal">{r.room_type_name}</span>
+                        </td>
+
+                        <td className="py-3 px-3">
+                          <p className="font-semibold text-slate-900">{r.customer_name}</p>
+                          <p className="text-[11px] text-slate-500">
+                            {r.customer_document} • {r.customer_phone || 'Sin telf.'}
+                          </p>
+                          {r.notes && (
+                            <span className="block text-[10px] text-slate-500 italic mt-0.5 truncate max-w-[220px]" title={r.notes}>
+                              📝 {r.notes}
+                            </span>
+                          )}
+                        </td>
+
+                        <td className="py-3 px-3 whitespace-nowrap">
+                          <span className="block font-medium text-slate-900">{formatDatePeru(r.start_date)}</span>
+                          <div className="flex flex-wrap items-center gap-1 mt-0.5">
+                            <span className="text-[10px] font-semibold text-slate-600 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded">
+                              {stayTypeLabel}
+                            </span>
+                            {isOverdue ? (
+                              <span className="text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded">
+                                ⚠️ Llegada atrasada
+                              </span>
+                            ) : isToday && r.status === 'confirmed' ? (
+                              <span className="text-[10px] font-bold text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">
+                                🟡 Llega Hoy
+                              </span>
+                            ) : null}
+                          </div>
+                        </td>
+
+                        <td className="py-3 px-3 text-slate-700 whitespace-nowrap">
+                          {formatDatePeru(r.end_date)}
+                        </td>
+
+                        <td className="py-3 px-3 text-right font-mono whitespace-nowrap">
+                          {r.quoted_price_pen != null && (
+                            <span className="block font-black text-slate-900">{formatPEN(total)}</span>
+                          )}
+                          <span className="block text-[11px] font-bold text-emerald-700">
+                            Abono {formatPEN(deposit)}
+                          </span>
+                          {pendingBalance > 0 ? (
+                            <span className="block text-[11px] font-bold text-amber-700">
+                              Saldo {formatPEN(pendingBalance)}
+                            </span>
+                          ) : (
+                            <span className="block text-[10px] font-bold text-emerald-600">
+                              ✓ 100% Pagado
+                            </span>
+                          )}
+                        </td>
+
+                        <td className="py-3 px-3 text-center whitespace-nowrap">
+                          <Badge tone={RESERVATION_STATUS[r.status]?.tone}>
+                            {RESERVATION_STATUS[r.status]?.label || r.status}
+                          </Badge>
+                          {r.status === 'checked_in' && (
+                            <span className="block text-[10px] text-blue-600 font-semibold mt-0.5">
+                              En habitación
+                            </span>
+                          )}
+                          {r.status === 'confirmed' && (
+                            <span className="block text-[10px] text-slate-400 font-medium mt-0.5">
+                              Pendiente ingreso
+                            </span>
+                          )}
+                        </td>
                       <td className="py-3 px-3 text-right space-x-1.5">
                         <button
                           onClick={() => handleSendWhatsAppConfirmation(r)}
@@ -357,7 +431,8 @@ export function ReservationsPage() {
                         )}
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
               <Pagination page={reservationsPage.page} totalPages={reservationsPage.totalPages} totalItems={reservationsPage.totalItems} onChange={reservationsPage.setPage} label="reservas" />
