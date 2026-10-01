@@ -47,8 +47,8 @@ export function oneOf(value, field, allowed) {
 const DOC_RULES = {
   DNI: { re: /^\d{8}$/, msg: 'El DNI debe tener 8 dígitos.' },
   RUC: { re: /^(10|15|17|20)\d{9}$/, msg: 'El RUC debe tener 11 dígitos y empezar con 10, 15, 17 o 20.' },
-  CE: { re: /^[A-Za-z0-9]{8,12}$/, msg: 'El carné de extranjería debe tener entre 8 y 12 caracteres alfanuméricos.' },
-  PASSPORT: { re: /^[A-Za-z0-9]{6,12}$/, msg: 'El pasaporte debe tener entre 6 y 12 caracteres alfanuméricos.' }
+  CE: { re: /^[A-Za-z0-9]{9,12}$/, msg: 'El carné de extranjería debe tener entre 9 y 12 caracteres alfanuméricos.' },
+  PASSPORT: { re: /^[A-Za-z0-9]{6,9}$/, msg: 'El pasaporte debe tener entre 6 y 9 caracteres alfanuméricos.' }
 };
 
 /** Datos de cliente: tipo y número de documento, nombre y teléfono (opcional) */
@@ -58,7 +58,7 @@ export function customerData(data = {}) {
   if (!DOC_RULES[document_type].re.test(document_number)) throw badRequest(DOC_RULES[document_type].msg);
   const full_name = text(data.full_name, 'El nombre del cliente', { min: 3, max: 150 });
   const phone = String(data.phone ?? '').replace(/\s/g, '');
-  if (phone && !/^9\d{8}$/.test(phone) && !/^\d{6,9}$/.test(phone)) throw badRequest('El teléfono debe ser un celular de 9 dígitos (o fijo de 6 a 9 dígitos).');
+  if (phone && !/^\d{7,9}$/.test(phone)) throw badRequest('El teléfono debe tener entre 7 y 9 dígitos (solo números).');
   const email = String(data.email ?? '').trim();
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw badRequest('El correo electrónico no es válido.');
   return { document_type, document_number, full_name, phone, email };
