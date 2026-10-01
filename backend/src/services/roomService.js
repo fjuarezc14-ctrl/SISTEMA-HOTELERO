@@ -98,13 +98,24 @@ export const roomService = {
     });
   },
 
-  // El estado no se cambia por aquí (tiene sus propias reglas en changeRoomStatus)
   async updateRoom(id, roomData) {
+    let newStatus = undefined;
+    if (roomData.status !== undefined) {
+      const current = await roomRepository.findRoomById(id);
+      if (current && current.status !== roomData.status) {
+        await this.changeRoomStatus(id, roomData.status, roomData.observations || roomData.notes);
+        newStatus = roomData.status;
+      }
+    }
+
+    const obs = roomData.observations !== undefined ? roomData.observations : roomData.notes;
+
     return await roomRepository.updateRoom(id, {
       room_number: roomData.room_number !== undefined ? v.text(roomData.room_number, 'El número de habitación', { max: 10 }) : undefined,
       room_type_id: roomData.room_type_id,
       floor: roomData.floor !== undefined ? v.integer(roomData.floor, 'El piso', { min: -5, max: 100 }) : undefined,
-      observations: roomData.observations !== undefined ? v.text(roomData.observations, 'La observación', { max: 255, required: false }) : undefined
+      status: newStatus,
+      observations: obs !== undefined ? v.text(obs, 'La observación', { max: 255, required: false }) : undefined
     });
   },
 

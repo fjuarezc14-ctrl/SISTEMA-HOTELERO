@@ -68,13 +68,17 @@ export function RoomFormModal({ isOpen, onClose, room = null, onSuccess }) {
     try {
       setSaving(true);
       if (room) {
+        const targetStatus = isOccupied ? room.status : status;
         await api.put(`/rooms/${room.id}`, {
           room_number: roomNumber.trim(),
           room_type_id: roomTypeId,
           floor: Number(floor),
-          status,
+          status: targetStatus,
           notes: notes.trim()
         });
+        if (!isOccupied && targetStatus !== room.status) {
+          await api.patch(`/rooms/${room.id}/status`, { status: targetStatus });
+        }
         alert(`✅ Habitación ${roomNumber} actualizada con éxito.`);
       } else {
         await api.post('/rooms', {
@@ -170,16 +174,32 @@ export function RoomFormModal({ isOpen, onClose, room = null, onSuccess }) {
         {room && (
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1">Estado de Habitación</label>
-            <select
-              value={status}
-              onChange={(e) => setStatus(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs text-slate-900 focus:outline-none focus:border-emerald-600"
-            >
-              <option value="available">Disponible (Libre)</option>
-              <option value="occupied">Ocupada</option>
-              <option value="cleaning">En Limpieza</option>
-              <option value="maintenance">Mantenimiento / Bloqueada</option>
-            </select>
+            {isOccupied ? (
+              <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl space-y-1">
+                <div className="flex items-center gap-2 text-rose-800 font-bold text-xs">
+                  <span className="w-2 h-2 rounded-full bg-rose-600 animate-pulse" />
+                  <span>Habitación Ocupada (Huésped en curso)</span>
+                </div>
+                <p className="text-[11px] text-rose-700 leading-relaxed">
+                  Para liberar la habitación o cambiar su estado, realiza el Check-out desde la tarjeta de la habitación.
+                </p>
+              </div>
+            ) : (
+              <div>
+                <select
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs text-slate-900 font-bold focus:outline-none focus:border-emerald-600"
+                >
+                  <option value="available">🟢 Disponible (Libre)</option>
+                  <option value="cleaning">🟡 En Limpieza</option>
+                  <option value="maintenance">⚪ Mantenimiento / Bloqueada</option>
+                </select>
+                <p className="text-[10px] text-slate-500 mt-1">
+                  El estado "Ocupada" se activa automáticamente al registrar un Check-in.
+                </p>
+              </div>
+            )}
           </div>
         )}
 
