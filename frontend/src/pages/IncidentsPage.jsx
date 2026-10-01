@@ -26,6 +26,7 @@ export function IncidentsPage() {
   const [loading, setLoading] = useState(true);
   const [typeFilter, setTypeFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Modal Crear Incidente
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -218,7 +219,18 @@ export function IncidentsPage() {
     }
   };
 
-  const incidentsPage = usePagination(incidents, { resetKey: incidents.length });
+  const filteredIncidents = incidents.filter((inc) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase().trim();
+    const roomMatch = String(inc.room_number || '').toLowerCase().includes(q);
+    const nameMatch = String(inc.customer_name || '').toLowerCase().includes(q);
+    const docMatch = String(inc.customer_document || '').toLowerCase().includes(q);
+    const descMatch = String(inc.description || '').toLowerCase().includes(q);
+    const userMatch = String(inc.registered_by_user || '').toLowerCase().includes(q);
+    return roomMatch || nameMatch || docMatch || descMatch || userMatch;
+  });
+
+  const incidentsPage = usePagination(filteredIncidents, { resetKey: `${filteredIncidents.length}_${searchQuery}` });
 
   return (
     <div className="space-y-6">
@@ -234,8 +246,30 @@ export function IncidentsPage() {
           </p>
         </div>
 
-        {/* Filtros y Botón Nuevo Incidente */}
+        {/* Buscador, Filtros y Botón Nuevo Incidente */}
         <div className="flex flex-wrap items-center gap-2">
+          {/* Campo de búsqueda por texto */}
+          <div className="relative flex-1 min-w-[220px] sm:min-w-[260px]">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Buscar por Hab, cliente, doc o detalle..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-8 py-1.5 text-xs font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-rose-500 shadow-2xs"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded-full"
+                title="Limpiar búsqueda"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
           <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs shadow-2xs">
             <Filter className="w-3.5 h-3.5 text-slate-400" />
             <select
@@ -286,6 +320,21 @@ export function IncidentsPage() {
           <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto" />
           <p className="font-bold text-slate-700 text-sm">No hay incidentes registrados</p>
           <p className="text-slate-400">Todas las habitaciones y estadías operan sin novedades.</p>
+        </div>
+      ) : filteredIncidents.length === 0 ? (
+        <div className="py-16 bg-white border border-slate-200 rounded-3xl text-center text-slate-400 text-xs space-y-3 shadow-sm">
+          <Search className="w-8 h-8 text-slate-300 mx-auto" />
+          <div>
+            <p className="font-bold text-slate-700 text-sm">Sin coincidencias para "{searchQuery}"</p>
+            <p className="text-slate-400 mt-0.5">Prueba buscando por otro número de habitación, nombre de cliente o descripción.</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setSearchQuery('')}
+            className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-colors"
+          >
+            Limpiar búsqueda
+          </button>
         </div>
       ) : (
         <>
