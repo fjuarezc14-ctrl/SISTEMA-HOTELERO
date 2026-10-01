@@ -36,6 +36,9 @@ CREATE TABLE IF NOT EXISTS users (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Margen para desocupar y limpiar la habitación entre una ocupación y la siguiente (reservas / check-in)
+ALTER TABLE hotel_info ADD COLUMN IF NOT EXISTS cleaning_buffer_minutes INT NOT NULL DEFAULT 60;
+
 -- Módulos permitidos por usuario (NULL = todos los módulos operativos). Los administradores siempre tienen todos.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS allowed_modules TEXT[];
 

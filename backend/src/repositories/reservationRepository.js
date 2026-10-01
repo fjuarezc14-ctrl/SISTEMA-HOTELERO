@@ -57,27 +57,6 @@ export const reservationRepository = {
     return res.rows[0];
   },
 
-  async findCollisions(roomId, startDate, endDate, excludeReservationId = null) {
-    let sql = `
-      SELECT id, start_date, end_date
-      FROM reservations
-      WHERE room_id = $1
-        AND status = 'confirmed'
-        AND (
-          (start_date <= $2 AND end_date > $2) OR
-          (start_date < $3 AND end_date >= $3) OR
-          (start_date >= $2 AND end_date <= $3)
-        )
-    `;
-    const params = [roomId, startDate, endDate];
-    if (excludeReservationId) {
-      sql += ` AND id != $4`;
-      params.push(excludeReservationId);
-    }
-
-    const res = await query(sql, params);
-    return res.rows;
-  },
 
   async update(id, { room_id, start_date, end_date, deposit_amount_pen, notes, status }) {
     const res = await query(

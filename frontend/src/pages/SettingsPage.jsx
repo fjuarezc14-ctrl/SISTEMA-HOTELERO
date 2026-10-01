@@ -44,6 +44,7 @@ export function SettingsPage() {
   const [phone, setPhone] = useState('');
   const [overnightCheckoutTime, setOvernightCheckoutTime] = useState('12:00');
   const [gracePeriodMinutes, setGracePeriodMinutes] = useState(10);
+  const [cleaningBufferMinutes, setCleaningBufferMinutes] = useState(60);
   const [ticketFooterLegend, setTicketFooterLegend] = useState('');
   const [savingHotel, setSavingHotel] = useState(false);
   const [hotelSuccess, setHotelSuccess] = useState('');
@@ -81,6 +82,7 @@ export function SettingsPage() {
         setPhone(infoData.phone || '');
         setOvernightCheckoutTime(infoData.overnight_checkout_time || '12:00');
         setGracePeriodMinutes(infoData.grace_period_minutes !== undefined ? infoData.grace_period_minutes : 10);
+        setCleaningBufferMinutes(infoData.cleaning_buffer_minutes !== undefined ? infoData.cleaning_buffer_minutes : 60);
         setTicketFooterLegend(infoData.ticket_footer_legend || '¡Gracias por su preferencia en Hotel Zafiro! Conserve sus objetos de valor.');
       }
     } catch (err) {
@@ -270,6 +272,7 @@ export function SettingsPage() {
         phone: phone.trim(),
         overnight_checkout_time: overnightCheckoutTime,
         grace_period_minutes: parseInt(gracePeriodMinutes, 10) || 0,
+        cleaning_buffer_minutes: parseInt(cleaningBufferMinutes, 10) || 0,
         ticket_footer_legend: ticketFooterLegend.trim()
       });
       invalidateCache('hotel_info');
@@ -599,9 +602,9 @@ export function SettingsPage() {
             {/* Parámetros de Operación & Tolerancia */}
             <div className="p-4 bg-emerald-50/60 border border-emerald-200 rounded-2xl space-y-3">
               <h4 className="text-xs font-bold text-emerald-900 uppercase tracking-wider">
-                Tiempos de Check-out & Tolerancia de Gracia
+                Tiempos de Check-out, Tolerancia y Limpieza
               </h4>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">Hora Salida Pernocte</label>
                   <input
@@ -623,6 +626,19 @@ export function SettingsPage() {
                     className="w-full bg-white border border-slate-300 rounded-xl p-2 text-xs font-bold font-mono text-slate-900 focus:outline-none focus:border-emerald-600"
                   />
                   <span className="text-[10px] text-slate-500">Margen libre sin cobro extra</span>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Margen de Limpieza (minutos)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="720"
+                    step="5"
+                    value={cleaningBufferMinutes}
+                    onChange={(e) => setCleaningBufferMinutes(e.target.value)}
+                    className="w-full bg-white border border-slate-300 rounded-xl p-2 text-xs font-bold font-mono text-slate-900 focus:outline-none focus:border-emerald-600"
+                  />
+                  <span className="text-[10px] text-slate-500">Tiempo para desocupar y limpiar entre una ocupación y la siguiente</span>
                 </div>
               </div>
             </div>

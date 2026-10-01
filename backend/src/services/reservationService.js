@@ -4,6 +4,31 @@ import { roomRepository } from '../repositories/roomRepository.js';
 import { cashRepository } from '../repositories/cashRepository.js';
 import { shiftRepository } from '../repositories/shiftRepository.js';
 import { stayService } from './stayService.js';
+import { occupancyService } from './occupancyService.js';
+
+function badRequest(message) {
+  const error = new Error(message);
+  error.statusCode = 400;
+  error.isOperational = true;
+  return error;
+}
+
+const MAX_RESERVATION_DAYS = 60;
+
+/** Valida el rango de fechas de una reserva y devuelve las fechas como Date */
+function parseReservationRange(start_date, end_date, { allowPastStart = false } = {}) {
+  const start = new Date(start_date);
+  const end = new Date(end_date);
+  if (isNaN(start.getTime()) || isNaN(end.getTime())) throw badRequest('Las fechas de la reserva no son válidas.');
+  if (start >= end) throw badRequest('La fecha de salida debe ser posterior a la fecha de llegada.');
+  if (!allowPastStart && start.getTime() < Date.now() - 60 * 60 * 1000) {
+    throw badRequest('La fecha de llegada no puede ser en el pasado.');
+  }
+  if (end.getTime() - start.getTime() > MAX_RESERVATION_DAYS * 86400000) {
+    throw badRequest(`Una reserva no puede durar más de ${MAX_RESERVATION_DAYS} días.`);
+  }
+  return { start, end };
+}
 
 export const reservationService = {
   async getAllReservations(status) {
@@ -22,11 +47,15 @@ export const reservationService = {
     notes = '',
     user_id
   }) {
-    if (!room_id || !customer_data?.document_number || !start_date || !end_date) {
-      const error = new Error('Habitación, cliente, fecha de inicio y fin son obligatorios.');
-      error.statusCode = 400;
-      error.isOperational = true;
-      throw error;
+    if (!room_id || !customer_data?.document_number || !customer_data?.full_name || !start_date || !end_date) {
+      throw badRequest('Habitación, cliente, fecha de inicio y fin son obligatorios.');
+    }
+
+    parseReservationRange(start_date, end_date);
+
+    const deposit = Number(deposit_amount_pen || 0);
+    if (!Number.isFinite(deposit) || deposit < 0) {
+      throw badRequest('El abono inicial debe ser un monto válido (cero o mayor).');
     }
 
     const room = await roomRepository.findRoomById(room_id);
@@ -36,6 +65,12 @@ export const reservationService = {
       error.isOperational = true;
       throw error;
     }
+    if (room.status === 'maintenance') {
+      throw badRequest('La habitación está en mantenimiento y no se puede reservar.');
+    }
+
+    // Anti-overbooking: rango ocupado + margen de limpieza (reservas y estadías activas)
+    await occupancyService.assertRoomFree({ roomId: room.id, start: start_date, end: end_date });
 
     // Registrar o actualizar cliente
     let customer = await customerRepository.findByDocument(customer_data.document_number.trim());
@@ -55,19 +90,13 @@ export const reservationService = {
       });
     }
 
-    // Validar anticolisión (Anti-Overbooking)
-    const collisions = await reservationRepository.findCollisions(room.id, start_date, end_date);
-    if (collisions.length > 0) {
-      const error = new Error('Conflicto de reserva: La habitación ya se encuentra reservada en el rango de fechas seleccionado.');
-      error.statusCode = 400;
-      error.isOperational = true;
-      throw error;
-    }
-
     // Buscar turno activo para registrar la seña en caja si aplica
     let activeShift = await shiftRepository.findActiveShiftByUserId(user_id);
     if (!activeShift) {
       activeShift = await shiftRepository.findAnyActiveShift();
+    }
+    if (deposit > 0 && !activeShift) {
+      throw badRequest('Para registrar un abono inicial debe haber un turno de caja abierto.');
     }
 
     const reservation = await reservationRepository.create({
@@ -76,9 +105,9 @@ export const reservationService = {
       work_shift_id: activeShift ? activeShift.id : null,
       start_date,
       end_date,
-      deposit_amount_pen: Number(deposit_amount_pen || 0),
+      deposit_amount_pen: deposit,
       payment_method,
-      notes: notes.trim()
+      notes: String(notes || '').trim().slice(0, 250)
     });
 
     // Si hubo abono/seña, registrarlo en caja (con soporte para Pago Mixto)
@@ -117,7 +146,9 @@ export const reservationService = {
     return reservation;
   },
 
-  async updateReservation(id, { room_id, start_date, end_date, deposit_amount_pen, notes, status }) {
+  // Reprogramar: habitación, fechas y notas. El abono y el estado no se cambian por aquí
+  // (el abono ya está registrado en caja; el estado tiene sus propias acciones).
+  async updateReservation(id, { room_id, start_date, end_date, notes }) {
     const existing = await reservationRepository.findById(id);
     if (!existing) {
       const error = new Error('Reserva no encontrada.');
@@ -125,27 +156,30 @@ export const reservationService = {
       error.isOperational = true;
       throw error;
     }
+    if (existing.status !== 'confirmed') {
+      throw badRequest('Solo se pueden reprogramar reservas confirmadas.');
+    }
 
     const targetRoomId = room_id || existing.room_id;
     const targetStartDate = start_date || existing.start_date;
     const targetEndDate = end_date || existing.end_date;
 
-    // Verificar anticolisión si cambian fechas o habitación
-    const collisions = await reservationRepository.findCollisions(targetRoomId, targetStartDate, targetEndDate, id);
-    if (collisions.length > 0) {
-      const error = new Error('Conflicto de fecha: La habitación seleccionada ya está reservada para ese horario.');
-      error.statusCode = 400;
-      error.isOperational = true;
-      throw error;
-    }
+    // Mantener la llegada original (aunque ya haya pasado) está permitido
+    const sameStart = new Date(targetStartDate).getTime() === new Date(existing.start_date).getTime();
+    parseReservationRange(targetStartDate, targetEndDate, { allowPastStart: sameStart });
+
+    await occupancyService.assertRoomFree({
+      roomId: targetRoomId,
+      start: targetStartDate,
+      end: targetEndDate,
+      excludeReservationId: id
+    });
 
     return await reservationRepository.update(id, {
       room_id: targetRoomId,
       start_date: targetStartDate,
       end_date: targetEndDate,
-      deposit_amount_pen: deposit_amount_pen !== undefined ? Number(deposit_amount_pen) : undefined,
-      notes: notes !== undefined ? notes.trim() : undefined,
-      status
+      notes: notes !== undefined ? String(notes).trim().slice(0, 250) : undefined
     });
   },
 

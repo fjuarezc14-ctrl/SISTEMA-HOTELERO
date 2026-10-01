@@ -32,7 +32,22 @@ export const settingsService = {
   },
 
   async updateHotelInfo(infoData) {
-    return await settingsRepository.updateHotelInfo(infoData);
+    const checkRange = (value, field, min, max) => {
+      if (value === undefined || value === null || value === '') return undefined;
+      const n = Number(value);
+      if (!Number.isInteger(n) || n < min || n > max) {
+        const error = new Error(`${field} debe ser un número entero entre ${min} y ${max}.`);
+        error.statusCode = 400;
+        error.isOperational = true;
+        throw error;
+      }
+      return n;
+    };
+    return await settingsRepository.updateHotelInfo({
+      ...infoData,
+      grace_period_minutes: checkRange(infoData.grace_period_minutes, 'La tolerancia de salida (minutos)', 0, 240),
+      cleaning_buffer_minutes: checkRange(infoData.cleaning_buffer_minutes, 'El margen de limpieza (minutos)', 0, 720)
+    });
   },
 
   async getAuditLogs({ limit, offset }) {
