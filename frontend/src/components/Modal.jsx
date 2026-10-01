@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
 export function Modal({ isOpen, onClose, title, children, maxWidth = 'max-w-xl' }) {
@@ -12,8 +13,9 @@ export function Modal({ isOpen, onClose, title, children, maxWidth = 'max-w-xl' 
 
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-fade-in">
+  // Se dibuja directamente en <body> para que ningún estilo de la página (márgenes, scroll) lo desplace
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
       <div
         className={`relative w-full ${maxWidth} bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden flex flex-col max-h-[90vh]`}
         onClick={(e) => e.stopPropagation()}
@@ -32,6 +34,7 @@ export function Modal({ isOpen, onClose, title, children, maxWidth = 'max-w-xl' 
         {/* Content */}
         <div className="p-4 sm:p-6 overflow-y-auto">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
