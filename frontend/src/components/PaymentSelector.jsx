@@ -12,7 +12,8 @@ export function PaymentSelector({
   setReferenceNumber,
   splitPayments,
   setSplitPayments,
-  amountLabel = 'Monto a Cobrar (S/)'
+  amountLabel = 'Monto a Cobrar (S/)',
+  amountReadOnly = false
 }) {
   const targetTotal = Number(totalAmount || 0);
 
@@ -116,8 +117,11 @@ export function PaymentSelector({
               step="0.50"
               min="0"
               value={singleAmount}
+              readOnly={amountReadOnly}
               onChange={(e) => setSingleAmount(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs font-mono font-bold text-slate-900 focus:outline-none focus:border-emerald-600"
+              className={`w-full border border-slate-300 rounded-xl p-2.5 text-xs font-mono font-bold text-slate-900 focus:outline-none focus:border-emerald-600 ${
+                amountReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-slate-50'
+              }`}
             />
           </div>
 

@@ -13,13 +13,12 @@ export function CheckOutModal({ isOpen, onClose, room, onSuccess }) {
   const graceMinutes = hotelInfo?.grace_period_minutes !== undefined ? Number(hotelInfo.grace_period_minutes) : 10;
   const [stayData, setStayData] = useState(null);
   const [loadingStay, setLoadingStay] = useState(false);
-  const [finalPaymentAmount, setFinalPaymentAmount] = useState('0.00');
   const [paymentMethod, setPaymentMethod] = useState('CASH');
   const [referenceNumber, setReferenceNumber] = useState('');
   const [splitPayments, setSplitPayments] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [overdueWarning, setOverdueWarning] = useState('');
+  const [quote, setQuote] = useState(null);
 
   const [hasIncident, setHasIncident] = useState(false);
   const [incidentType, setIncidentType] = useState('damage');
@@ -40,36 +39,39 @@ export function CheckOutModal({ isOpen, onClose, room, onSuccess }) {
           const res = await api.get(`/stays/room/${room.id}`);
           setStayData(res.data);
           
-          // Calcular saldo pendiente
-          if (res.data) {
-            const stayPrice = Number(res.data.total_stay_price_pen || 0);
-            const consumptions = Number(res.data.total_consumptions_price_pen || 0);
-            const paid = Number(res.data.total_paid_pen || 0);
-            const pending = Math.max(0, stayPrice + consumptions - paid);
-            setFinalPaymentAmount(pending.toFixed(2));
-
-            // Detectar sobrestadía aplicando Minutos de Tolerancia de Gracia
-            const now = new Date();
-            const expectedEnd = new Date(res.data.expected_end_time);
-            const isOverdue = now > expectedEnd;
-            if (isOverdue) {
-              const diffMs = now.getTime() - expectedEnd.getTime();
-              const diffMinutes = Math.floor(diffMs / 60000);
-              if (diffMinutes > graceMinutes) {
-                const extraHours = Math.ceil((diffMinutes - graceMinutes) / 60);
-                setOverdueWarning(`⏰ SOBRESTADÍA DETECTADA: Excede por ${diffMinutes} min el horario (superando la tolerancia de ${graceMinutes} min). El sistema aplicará recargo por ${extraHours} hora(s) adicional(es).`);
-              }
-            }
-          }
         } catch (err) {
           setError(err.message || 'Error cargando estadía.');
         } finally {
           setLoadingStay(false);
         }
       };
+      setQuote(null);
+      setError('');
+      setHasIncident(false);
+      setIncidentDescription('');
+      setIncidentPenalty('0.00');
+      setReferenceNumber('');
+      setSplitPayments([]);
       fetchStay();
     }
   }, [room, isOpen]);
+
+  // Saldo calculado por el backend (incluye horas extra por salir tarde y la penalidad)
+  const penaltyVal = hasIncident ? Math.max(0, parseFloat(incidentPenalty) || 0) : 0;
+  useEffect(() => {
+    if (!isOpen || !stayData?.id) return;
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      api
+        .get(`/stays/${stayData.id}/checkout-quote?penalty_amount_pen=${penaltyVal}`)
+        .then((res) => !cancelled && setQuote(res.data))
+        .catch((err) => !cancelled && setError(err.message || 'No se pudo calcular el saldo.'));
+    }, 300);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [isOpen, stayData?.id, penaltyVal]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -90,9 +92,15 @@ export function CheckOutModal({ isOpen, onClose, room, onSuccess }) {
       return;
     }
 
-    const penaltyVal = hasIncident ? (parseFloat(incidentPenalty) || 0) : 0;
-    const baseAmount = parseFloat(finalPaymentAmount) || 0;
-    const amountToPay = baseAmount + penaltyVal;
+    if (!quote) {
+      setError('Espera el cálculo del saldo.');
+      return;
+    }
+    if (hasIncident && !incidentDescription.trim()) {
+      setError('Describe la novedad o daño de la habitación.');
+      return;
+    }
+    const amountToPay = Number(quote.amount_due || 0);
 
     if (amountToPay > 0 && paymentMethod === 'MIXED') {
       const splitSum = splitPayments.reduce((acc, curr) => acc + (parseFloat(curr.amount) || 0), 0);
@@ -134,12 +142,12 @@ export function CheckOutModal({ isOpen, onClose, room, onSuccess }) {
           customerName: isFactura ? businessName.trim() : (stayData.customer_name || ''),
           customerAddress: isFactura ? businessAddress.trim() : '',
           paymentMethod: paymentMethod === 'MIXED' ? 'PAGO MIXTO' : paymentMethod,
-          totalAmount: amountToPay > 0 ? amountToPay : (Number(stayData.total_stay_price_pen || 0) + Number(stayData.total_consumptions_price_pen || 0)),
+          totalAmount: quote.total,
           items: [
             {
               qty: 1,
               description: `Hospedaje Hab. ${room.room_number} (${stayData.stay_type || 'Estadía'})`,
-              price: Number(stayData.total_stay_price_pen || 0)
+              price: quote.stay_price + quote.overstay_cost
             },
             ...(Number(stayData.total_consumptions_price_pen || 0) > 0 ? [{
               qty: 1,
@@ -166,11 +174,10 @@ export function CheckOutModal({ isOpen, onClose, room, onSuccess }) {
 
   if (!room) return null;
 
-  const stayPrice = Number(stayData?.total_stay_price_pen || 0);
-  const consumptionsPrice = Number(stayData?.total_consumptions_price_pen || 0);
-  const totalAmount = stayPrice + consumptionsPrice;
-  const totalPaid = Number(stayData?.total_paid_pen || 0);
-  const pendingBalance = Math.max(0, totalAmount - totalPaid);
+  const stayPrice = Number(quote?.stay_price ?? stayData?.total_stay_price_pen ?? 0);
+  const consumptionsPrice = Number(quote?.consumptions ?? stayData?.total_consumptions_price_pen ?? 0);
+  const totalPaid = Number(quote?.paid ?? stayData?.total_paid_pen ?? 0);
+  const amountDue = Number(quote?.amount_due || 0);
 
   return (
     <Modal
@@ -197,10 +204,13 @@ export function CheckOutModal({ isOpen, onClose, room, onSuccess }) {
             </div>
           )}
 
-          {overdueWarning && stayData && (
+          {quote?.overstay_hours > 0 && (
             <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl text-amber-800 text-xs font-semibold flex items-start gap-2">
               <AlertTriangle className="w-4 h-4 shrink-0 text-amber-600 mt-0.5" />
-              <span>{overdueWarning}</span>
+              <span>
+                ⏰ SOBRESTADÍA: superó la hora de salida y la tolerancia de {graceMinutes} min. Se cobran {quote.overstay_hours} hora(s)
+                adicional(es): {formatPEN(quote.overstay_cost)}.
+              </span>
             </div>
           )}
 
@@ -230,14 +240,20 @@ export function CheckOutModal({ isOpen, onClose, room, onSuccess }) {
               <span>Hospedaje ({stayData?.stay_type}):</span>
               <span className="font-bold font-mono text-slate-900">{formatPEN(stayPrice)}</span>
             </div>
+            {quote?.overstay_cost > 0 && (
+              <div className="flex justify-between text-amber-800 font-medium">
+                <span>Horas extra por salida tardía ({quote.overstay_hours}h):</span>
+                <span className="font-bold font-mono">{formatPEN(quote.overstay_cost)}</span>
+              </div>
+            )}
             <div className="flex justify-between text-slate-700 font-medium">
               <span>Consumos Tienda / Minibar:</span>
               <span className="font-bold font-mono text-slate-900">{formatPEN(consumptionsPrice)}</span>
             </div>
-            {hasIncident && (parseFloat(incidentPenalty) || 0) > 0 && (
+            {penaltyVal > 0 && (
               <div className="flex justify-between text-rose-700 font-bold bg-rose-50 px-2 py-1 rounded-lg border border-rose-200">
                 <span>Penalidad / Daño registrado:</span>
-                <span className="font-mono text-rose-800">+{formatPEN(parseFloat(incidentPenalty) || 0)}</span>
+                <span className="font-mono text-rose-800">+{formatPEN(penaltyVal)}</span>
               </div>
             )}
             <div className="flex justify-between text-emerald-700 font-bold pt-1.5 border-t border-slate-100">
@@ -246,10 +262,8 @@ export function CheckOutModal({ isOpen, onClose, room, onSuccess }) {
             </div>
             <div className="flex justify-between items-center pt-2 border-t border-slate-200 text-sm">
               <span className="font-black text-slate-900">Total Saldo a Cobrar:</span>
-              <span className={`font-mono text-base font-black ${
-                (Math.max(0, totalAmount + (hasIncident ? (parseFloat(incidentPenalty) || 0) : 0) - totalPaid)) > 0 ? 'text-rose-700' : 'text-emerald-700'
-              }`}>
-                {formatPEN(Math.max(0, totalAmount + (hasIncident ? (parseFloat(incidentPenalty) || 0) : 0) - totalPaid))}
+              <span className={`font-mono text-base font-black ${amountDue > 0 ? 'text-rose-700' : 'text-emerald-700'}`}>
+                {quote ? formatPEN(amountDue) : '—'}
               </span>
             </div>
           </div>
@@ -311,14 +325,15 @@ export function CheckOutModal({ isOpen, onClose, room, onSuccess }) {
           </div>
 
           {/* Cobro del Saldo Pendiente con Pago Mixto */}
-          {(pendingBalance + (hasIncident ? (parseFloat(incidentPenalty) || 0) : 0)) > 0 && (
+          {amountDue > 0 && (
             <div className="p-4 bg-amber-50/50 border border-amber-200 rounded-2xl space-y-3 shadow-sm">
               <PaymentSelector
-                totalAmount={pendingBalance + (hasIncident ? (parseFloat(incidentPenalty) || 0) : 0)}
+                totalAmount={amountDue}
                 paymentMethod={paymentMethod}
                 setPaymentMethod={setPaymentMethod}
-                singleAmount={finalPaymentAmount}
-                setSingleAmount={setFinalPaymentAmount}
+                singleAmount={amountDue.toFixed(2)}
+                setSingleAmount={() => {}}
+                amountReadOnly
                 referenceNumber={referenceNumber}
                 setReferenceNumber={setReferenceNumber}
                 splitPayments={splitPayments}
@@ -352,11 +367,11 @@ export function CheckOutModal({ isOpen, onClose, room, onSuccess }) {
             </button>
             <button
               type="submit"
-              disabled={loading}
-              className="px-5 py-2.5 text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white rounded-xl shadow-md transition-all flex items-center gap-2"
+              disabled={loading || (stayData && !quote)}
+              className="px-5 py-2.5 text-xs font-bold bg-rose-600 disabled:opacity-50 hover:bg-rose-500 text-white rounded-xl shadow-md transition-all flex items-center gap-2"
             >
               <LogOut className="w-4 h-4" />
-              <span>{loading ? 'Finalizando...' : 'Completar Salida (Enviar a Limpieza)'}</span>
+              <span>{loading ? 'Finalizando...' : amountDue > 0 ? `Cobrar ${formatPEN(amountDue)} y Completar Salida` : 'Completar Salida (Enviar a Limpieza)'}</span>
             </button>
           </div>
         </form>
