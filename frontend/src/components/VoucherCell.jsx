@@ -1,44 +1,40 @@
 import React from 'react';
-import { Printer, FileText } from 'lucide-react';
-import { Badge } from './Badge';
+import { Printer, FileText, Ban } from 'lucide-react';
 
 const LABELS = { BOLETA: 'Boleta', FACTURA: 'Factura', TICKET: 'Ticket' };
-const TONES = { BOLETA: 'indigo', FACTURA: 'violet', TICKET: 'slate' };
 
-/**
- * Celda de comprobante para listas de caja:
- * - Muestra el tipo y número (ticket, boleta o factura).
- * - "Reimprimir" disponible para todos los movimientos.
- * - "Emitir" boleta/factura para ingresos que solo tienen ticket.
- */
-export function VoucherCell({ tx, onReprint, onEmit }) {
-  const type = tx.voucher_type === 'BOLETA' || tx.voucher_type === 'FACTURA' ? tx.voucher_type : 'TICKET';
-  const canEmit = onEmit && tx.transaction_type === 'income' && !tx.is_cancelled && type === 'TICKET';
+const voucherTypeOf = (tx) => (tx.voucher_type === 'BOLETA' || tx.voucher_type === 'FACTURA' ? tx.voucher_type : 'TICKET');
 
+/** Texto del comprobante (tipo y número), sin botones */
+export function VoucherCell({ tx }) {
+  const type = voucherTypeOf(tx);
+  if (tx.transaction_type === 'expense') return <span className="text-[11px] text-slate-400">—</span>;
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      <Badge tone={TONES[type]} title={tx.voucher_number || 'Movimiento sin número (anterior a la numeración)'}>
-        {tx.transaction_type === 'expense' ? 'Egreso' : LABELS[type]}
-        {tx.voucher_number ? ` ${tx.voucher_number}` : ''}
-      </Badge>
-      <button
-        type="button"
-        onClick={() => onReprint(tx)}
-        className="px-2 py-1 rounded-lg text-[10px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 inline-flex items-center gap-1"
-        title="Reimprimir comprobante"
-      >
-        <Printer className="w-3 h-3" />
-        <span>Reimprimir</span>
+    <span className="text-[11px] leading-tight" title={tx.voucher_number ? undefined : 'Movimiento anterior a la numeración'}>
+      <span className={`font-bold ${type === 'TICKET' ? 'text-slate-500' : 'text-indigo-700'}`}>{LABELS[type]}</span>
+      {tx.voucher_number && <span className="block font-mono text-slate-500">{tx.voucher_number}</span>}
+    </span>
+  );
+}
+
+const iconBtn = 'w-7 h-7 inline-flex items-center justify-center rounded-lg border transition-colors';
+
+/** Acciones compactas de un movimiento: reimprimir, emitir boleta/factura y anular */
+export function TransactionActions({ tx, onReprint, onEmit, onCancel }) {
+  const canEmit = onEmit && tx.transaction_type === 'income' && !tx.is_cancelled && voucherTypeOf(tx) === 'TICKET';
+  return (
+    <div className="inline-flex items-center gap-1">
+      <button type="button" onClick={() => onReprint(tx)} title="Reimprimir comprobante" className={`${iconBtn} bg-white border-slate-200 text-slate-600 hover:bg-slate-100`}>
+        <Printer className="w-3.5 h-3.5" />
       </button>
       {canEmit && (
-        <button
-          type="button"
-          onClick={() => onEmit(tx)}
-          className="px-2 py-1 rounded-lg text-[10px] font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 inline-flex items-center gap-1"
-          title="Emitir boleta o factura para este cobro"
-        >
-          <FileText className="w-3 h-3 text-emerald-600" />
-          <span>Boleta / Factura</span>
+        <button type="button" onClick={() => onEmit(tx)} title="Emitir boleta o factura" className={`${iconBtn} bg-white border-emerald-200 text-emerald-700 hover:bg-emerald-50`}>
+          <FileText className="w-3.5 h-3.5" />
+        </button>
+      )}
+      {onCancel && !tx.is_cancelled && (
+        <button type="button" onClick={() => onCancel(tx)} title="Anular movimiento" className={`${iconBtn} bg-white border-rose-200 text-rose-600 hover:bg-rose-50`}>
+          <Ban className="w-3.5 h-3.5" />
         </button>
       )}
     </div>

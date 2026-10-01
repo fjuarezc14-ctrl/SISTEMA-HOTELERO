@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api/apiClient';
-import { formatPEN, formatDatePeru, PAYMENT_METHOD_LABELS } from '../utils/formatters';
+import { formatPEN, formatTimePeru, PAYMENT_METHOD_LABELS } from '../utils/formatters';
 import { useShift } from '../context/ShiftContext';
 import { EmitVoucherModal } from '../components/EmitVoucherModal';
 import { CashMovementModal } from '../components/CashMovementModal';
 import { CancelTransactionModal } from '../components/CancelTransactionModal';
-import { VoucherCell } from '../components/VoucherCell';
+import { VoucherCell, TransactionActions } from '../components/VoucherCell';
 import { useReceipt } from '../context/ReceiptContext';
 import { cashReceipt } from '../utils/receipts';
 import { Pagination } from '../components/Pagination';
@@ -13,7 +13,6 @@ import {
   Wallet,
   Plus,
   AlertCircle,
-  Ban,
   Lock,
   Unlock,
   ChevronRight,
@@ -26,6 +25,9 @@ import {
 } from 'lucide-react';
 
 const PAGE_SIZE = 15;
+
+const formatDateOnly = (iso) =>
+  new Intl.DateTimeFormat('es-PE', { timeZone: 'America/Lima', day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(iso));
 
 // Fecha de hoy en Lima como YYYY-MM-DD
 const todayLima = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date());
@@ -112,7 +114,10 @@ export function CashPage({ onOpenShiftModal = () => {}, onCloseShiftModal = () =
 
   const renderTxRow = (t, nested = false) => (
     <tr key={t.id} className={`hover:bg-slate-50 transition-colors ${t.is_cancelled ? 'bg-rose-50/30' : nested ? 'bg-slate-50/60' : ''}`}>
-      <td className={`py-3 px-3 text-slate-600 font-mono ${nested ? 'pl-8' : ''}`}>{formatDatePeru(t.created_at)}</td>
+      <td className={`py-3 px-3 whitespace-nowrap ${nested ? 'pl-8' : ''}`}>
+        <span className="block font-mono font-bold text-slate-700">{formatTimePeru(t.created_at)}</span>
+        <span className="block text-[10px] text-slate-400">{formatDateOnly(t.created_at)}</span>
+      </td>
       <td className="py-3 px-3">
         {t.is_cancelled ? (
           <span className="inline-flex items-center justify-center text-center leading-tight align-middle px-2 py-0.5 rounded text-[10px] font-bold bg-slate-200 text-slate-700 line-through border border-slate-300">
@@ -146,7 +151,7 @@ export function CashPage({ onOpenShiftModal = () => {}, onCloseShiftModal = () =
 
       {/* Columna Comprobante SUNAT */}
       <td className="py-3 px-3">
-        <VoucherCell tx={t} onReprint={handleReprint} onEmit={handleEmitVoucher} />
+        <VoucherCell tx={t} />
       </td>
 
       <td className={`py-3 px-3 text-right font-mono font-bold ${t.is_cancelled ? 'line-through text-slate-400' : 'text-slate-900'}`}>
@@ -154,18 +159,7 @@ export function CashPage({ onOpenShiftModal = () => {}, onCloseShiftModal = () =
       </td>
 
       <td className="py-3 px-3 text-center">
-        {!t.is_cancelled ? (
-          <button
-            onClick={() => handleCancelTransaction(t)}
-            className="px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-lg text-[10px] border border-rose-200 transition-colors inline-flex items-center gap-1"
-            title="Anular movimiento y revertir de caja/hospedaje"
-          >
-            <Ban className="w-3 h-3 text-rose-600" />
-            <span>Anular</span>
-          </button>
-        ) : (
-          <span className="text-[10px] text-slate-400 font-medium">Anulado</span>
-        )}
+        <TransactionActions tx={t} onReprint={handleReprint} onEmit={handleEmitVoucher} onCancel={handleCancelTransaction} />
       </td>
     </tr>
   );
@@ -305,7 +299,7 @@ export function CashPage({ onOpenShiftModal = () => {}, onCloseShiftModal = () =
                     <th className="py-3 px-3">Tipo</th>
                     <th className="py-3 px-3">Concepto</th>
                     <th className="py-3 px-3">Medio Pago</th>
-                    <th className="py-3 px-3">Comprobante SUNAT</th>
+                    <th className="py-3 px-3">Comprobante</th>
                     <th className="py-3 px-3 text-right">Monto</th>
                     <th className="py-3 px-3 text-center">Acciones</th>
                   </tr>
@@ -320,14 +314,17 @@ export function CashPage({ onOpenShiftModal = () => {}, onCloseShiftModal = () =
                           onClick={() => toggleGroup(g.key)}
                           className="cursor-pointer bg-white hover:bg-emerald-50/40 transition-colors"
                         >
-                          <td className="py-3 px-3 text-slate-600 font-mono">
+                          <td className="py-3 px-3 whitespace-nowrap">
                             <span className="inline-flex items-center gap-1">
                               {expandedGroups[g.key] ? (
                                 <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
                               ) : (
                                 <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
                               )}
-                              {formatDatePeru(g.lastAt)}
+                              <span>
+                                <span className="block font-mono font-bold text-slate-700">{formatTimePeru(g.lastAt)}</span>
+                                <span className="block text-[10px] text-slate-400">{formatDateOnly(g.lastAt)}</span>
+                              </span>
                             </span>
                           </td>
                           <td className="py-3 px-3">

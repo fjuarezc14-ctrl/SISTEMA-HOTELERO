@@ -3,7 +3,7 @@ import { api } from '../api/apiClient';
 import { escapeHtml } from '../utils/escapeHtml';
 import { Pagination, usePagination } from '../components/Pagination';
 import { formatPEN, formatDatePeru, PAYMENT_METHOD_LABELS } from '../utils/formatters';
-import { VoucherCell } from '../components/VoucherCell';
+import { VoucherCell, TransactionActions } from '../components/VoucherCell';
 import { useReceipt } from '../context/ReceiptContext';
 import { cashReceipt } from '../utils/receipts';
 import { EmitVoucherModal } from '../components/EmitVoucherModal';
@@ -518,7 +518,7 @@ function KpiReports() {
                       <th className="py-3 px-3">Concepto</th>
                       <th className="py-3 px-3">Categoría</th>
                       <th className="py-3 px-3">Medio Pago</th>
-                      <th className="py-3 px-3">Comprobante SUNAT</th>
+                      <th className="py-3 px-3">Comprobante</th>
                       <th className="py-3 px-3">Registrado Por</th>
                       <th className="py-3 px-3 text-right">Monto (S/)</th>
                     </tr>
@@ -542,7 +542,17 @@ function KpiReports() {
                           </span>
                         </td>
                         <td className="py-3 px-3">
-                          <VoucherCell tx={t} onReprint={(tx) => printReceipt(cashReceipt(tx, kpis.transactions))} onEmit={(tx) => { setSelectedVoucherTx(tx); setIsVoucherModalOpen(true); }} />
+                          <div className="flex items-center gap-2">
+                            <VoucherCell tx={t} />
+                            <TransactionActions
+                              tx={t}
+                              onReprint={(tx) => printReceipt(cashReceipt(tx, kpis.transactions))}
+                              onEmit={(tx) => {
+                                setSelectedVoucherTx(tx);
+                                setIsVoucherModalOpen(true);
+                              }}
+                            />
+                          </div>
                         </td>
                         <td className="py-3 px-3 text-slate-600">{t.user_full_name || 'Sistema'}</td>
                         <td className={`py-3 px-3 text-right font-mono font-bold ${t.transaction_type === 'expense' ? 'text-rose-600' : 'text-emerald-700'}`}>
