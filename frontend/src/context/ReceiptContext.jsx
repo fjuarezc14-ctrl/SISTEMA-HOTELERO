@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useRef, useState, useCallback } from 'react';
-import { Modal } from '../components/Modal';
-import { ReceiptDocument, RECEIPT_CSS } from '../components/ReceiptDocument';
+import { Modal } from '../components/common/Modal';
+import { ReceiptDocument, RECEIPT_CSS } from '../components/payments/ReceiptDocument';
 import { useGlobalStore } from './GlobalStoreContext';
 import { formatPEN } from '../utils/formatters';
 import { Printer, Share2, Send } from 'lucide-react';
