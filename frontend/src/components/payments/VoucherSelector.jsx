@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FileText, Building2, UserCheck, Search, CheckCircle2, ShieldCheck } from 'lucide-react';
+import { FileText, Building2, UserCheck, Search, CheckCircle2, ShieldCheck, Ticket } from 'lucide-react';
 
 export function VoucherSelector({
   voucherType = 'NONE',
@@ -54,39 +54,40 @@ export function VoucherSelector({
         <button
           type="button"
           onClick={() => setVoucherType('NONE')}
-          className={`py-2 px-2.5 rounded-xl text-xs font-extrabold border transition-all text-center ${
+          className={`py-2 px-2.5 rounded-xl text-xs font-extrabold border transition-all text-center flex items-center justify-center gap-1.5 ${
             voucherType === 'NONE'
               ? 'bg-slate-900 border-slate-900 text-white shadow-xs'
               : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100'
           }`}
         >
-          🎟️ Ticket Interno
+          <Ticket className="w-4 h-4" />
+          <span>Ticket Interno</span>
         </button>
 
         <button
           type="button"
           onClick={() => setVoucherType('BOLETA')}
-          className={`py-2 px-2.5 rounded-xl text-xs font-extrabold border transition-all text-center flex items-center justify-center gap-1 ${
+          className={`py-2 px-2.5 rounded-xl text-xs font-extrabold border transition-all text-center flex items-center justify-center gap-1.5 ${
             voucherType === 'BOLETA'
               ? 'bg-emerald-600 border-emerald-600 text-white shadow-xs'
               : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100'
           }`}
         >
-          <UserCheck className="w-3.5 h-3.5" />
-          📄 Boleta (DNI)
+          <UserCheck className="w-4 h-4" />
+          <span>Boleta (DNI)</span>
         </button>
 
         <button
           type="button"
           onClick={() => setVoucherType('FACTURA')}
-          className={`py-2 px-2.5 rounded-xl text-xs font-extrabold border transition-all text-center flex items-center justify-center gap-1 ${
+          className={`py-2 px-2.5 rounded-xl text-xs font-extrabold border transition-all text-center flex items-center justify-center gap-1.5 ${
             voucherType === 'FACTURA'
               ? 'bg-indigo-600 border-indigo-600 text-white shadow-xs'
               : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100'
           }`}
         >
-          <Building2 className="w-3.5 h-3.5" />
-          🏢 Factura (RUC)
+          <Building2 className="w-4 h-4" />
+          <span>Factura (RUC)</span>
         </button>
       </div>
 
