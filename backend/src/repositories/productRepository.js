@@ -16,27 +16,29 @@ export const productRepository = {
     return res.rows[0] || null;
   },
 
-  async create({ name, sale_price_pen, stock = 0, is_active = true }) {
+  async create({ name, sale_price_pen, stock = 0, is_active = true, icon = null }) {
     const res = await query(
-      `INSERT INTO products (name, sale_price_pen, stock, is_active)
-       VALUES ($1, $2, $3, $4)
+      `INSERT INTO products (name, sale_price_pen, stock, is_active, icon)
+       VALUES ($1, $2, $3, $4, NULLIF($5, ''))
        RETURNING *`,
-      [name, sale_price_pen, stock, is_active]
+      [name, sale_price_pen, stock, is_active, icon]
     );
     return res.rows[0];
   },
 
-  async update(id, { name, sale_price_pen, stock, is_active }, runQuery = query) {
+  // icon: undefined = no cambia, '' = vuelve al icono automático
+  async update(id, { name, sale_price_pen, stock, is_active, icon }, runQuery = query) {
     const res = await runQuery(
       `UPDATE products
        SET name = COALESCE($2, name),
            sale_price_pen = COALESCE($3, sale_price_pen),
            stock = COALESCE($4, stock),
            is_active = COALESCE($5, is_active),
+           icon = CASE WHEN $6::text IS NULL THEN icon ELSE NULLIF($6, '') END,
            updated_at = NOW()
        WHERE id = $1
        RETURNING *`,
-      [id, name, sale_price_pen, stock, is_active]
+      [id, name, sale_price_pen, stock, is_active, icon ?? null]
     );
     return res.rows[0] || null;
   },
