@@ -6,7 +6,7 @@ import { api } from '../../api/apiClient';
 import { Pagination, usePagination } from '../../components/common/Pagination';
 import { formatDatePeru } from '../../utils/formatters';
 import { validateUsername, validatePassword, validateFullName } from '../../utils/validators';
-import { UserCog, Plus, KeyRound, Check, AlertCircle, ShieldCheck, Search, Edit2, Crown, ConciergeBell, Sparkles, Eye, EyeOff, Wand2, Copy, Users, Layers } from 'lucide-react';
+import { UserCog, Plus, KeyRound, Check, AlertCircle, ShieldCheck, Search, Edit2, Crown, ConciergeBell, Sparkles, Eye, EyeOff, Users, Layers } from 'lucide-react';
 import { Modal } from '../../components/common/Modal';
 
 export function UsersPage() {
@@ -32,31 +32,8 @@ export function UsersPage() {
   const [editFullName, setEditFullName] = useState('');
   const [editRole, setEditRole] = useState('receptionist');
   const [editModules, setEditModules] = useState(null);
-  const [editPassword, setEditPassword] = useState('');
-  const [showEditPassword, setShowEditPassword] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [editError, setEditError] = useState('');
-
-  // Visibilidad de contraseñas por fila en la tabla
-  const [visibleRowPasswords, setVisibleRowPasswords] = useState({});
-  const [userPasswords, setUserPasswords] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem('hotel_user_known_passwords') || '{}');
-    } catch {
-      return {};
-    }
-  });
-
-  const saveKnownPassword = (key, pass) => {
-    if (!key || !pass) return;
-    setUserPasswords((prev) => {
-      const next = { ...prev, [String(key)]: pass };
-      try {
-        localStorage.setItem('hotel_user_known_passwords', JSON.stringify(next));
-      } catch {}
-      return next;
-    });
-  };
 
   // Modal Cambiar Clave
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
@@ -67,17 +44,6 @@ export function UsersPage() {
   const [resetting, setResetting] = useState(false);
   const [resetError, setResetError] = useState('');
   const [resetSuccessMsg, setResetSuccessMsg] = useState('');
-  const [copied, setCopied] = useState(false);
-
-  // Función para generar contraseña aleatoria visible de 1-clic
-  const generateRandomPassword = () => {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!';
-    let pass = 'Zafiro';
-    for (let i = 0; i < 4; i++) {
-      pass += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return pass;
-  };
 
   const fetchUsers = async () => {
     try {
@@ -110,17 +76,13 @@ export function UsersPage() {
 
     try {
       setCreating(true);
-      const res = await api.post('/users', {
+      await api.post('/users', {
         username: username.trim(),
         password,
         full_name: fullName.trim(),
         role,
         allowed_modules: isAdminRole(role) ? null : modules
       });
-      if (res.data?.id) {
-        saveKnownPassword(res.data.id, password);
-      }
-      saveKnownPassword(username.trim().toLowerCase(), password);
       setIsCreateModalOpen(false);
       setUsername('');
       setPassword('');
@@ -140,8 +102,6 @@ export function UsersPage() {
     setEditFullName(u.full_name || '');
     setEditRole(u.role || 'receptionist');
     setEditModules(u.allowed_modules ?? null);
-    setEditPassword('');
-    setShowEditPassword(false);
     setEditError('');
     setIsEditModalOpen(true);
   };
@@ -167,18 +127,6 @@ export function UsersPage() {
         allowed_modules: isAdminRole(editRole) ? null : editModules
       });
 
-      if (editPassword.trim()) {
-        const pwdErr = validatePassword(editPassword.trim(), 'Nueva Contraseña');
-        if (pwdErr) {
-          setEditError(pwdErr);
-          setUpdating(false);
-          return;
-        }
-        await api.post(`/users/${editingUser.id}/reset-password`, { password: editPassword.trim() });
-        saveKnownPassword(editingUser.id, editPassword.trim());
-        saveKnownPassword(editUsername.trim().toLowerCase(), editPassword.trim());
-      }
-
       setIsEditModalOpen(false);
       await fetchUsers();
     } catch (err) {
@@ -202,12 +150,10 @@ export function UsersPage() {
 
   const handleOpenPasswordModal = (u) => {
     setSelectedUser(u);
-    const autoPass = generateRandomPassword();
-    setNewPassword(autoPass);
-    setShowPassword(true); // Mostrar visible por defecto
+    setNewPassword('');
+    setShowPassword(false);
     setResetError('');
     setResetSuccessMsg('');
-    setCopied(false);
     setIsPasswordModalOpen(true);
   };
 
@@ -224,9 +170,7 @@ export function UsersPage() {
     try {
       setResetting(true);
       await api.post(`/users/${selectedUser.id}/reset-password`, { password: newPassword });
-      saveKnownPassword(selectedUser.id, newPassword);
-      saveKnownPassword(selectedUser.username?.toLowerCase(), newPassword);
-      setResetSuccessMsg(`Contraseña de @${selectedUser.username} actualizada a: "${newPassword}"`);
+      setResetSuccessMsg(`Contraseña de @${selectedUser.username} actualizada correctamente.`);
       await fetchUsers();
     } catch (err) {
       setResetError(err.message || 'Error actualizando contraseña.');
@@ -331,7 +275,6 @@ export function UsersPage() {
                       <th className="py-3 px-3">Nombre Completo</th>
                       <th className="py-3 px-3">Rol / Nivel Acceso</th>
                       <th className="py-3 px-3">Módulos Asignados</th>
-                      <th className="py-3 px-3">Contraseña</th>
                       <th className="py-3 px-3 text-center">Estado</th>
                       <th className="py-3 px-3 text-right">Acciones</th>
                     </tr>
@@ -340,8 +283,6 @@ export function UsersPage() {
                     {usersPage.pageItems.map((u) => {
                       const isAdmin = u.role === 'super_admin' || u.role === 'admin';
                       const isHousekeeper = u.role === 'housekeeper';
-                      const isPassVisible = Boolean(visibleRowPasswords[u.id]);
-                      const known = userPasswords[u.id] || userPasswords[u.username?.toLowerCase()];
 
                       return (
                         <tr key={u.id} className="hover:bg-slate-50 transition-colors">
@@ -382,38 +323,6 @@ export function UsersPage() {
                             )}
                           </td>
 
-                          {/* Columna Ver Contraseña con el icono del ojo */}
-                          <td className="py-3 px-3">
-                            <div className="flex items-center gap-1.5">
-                              <span
-                                className={`inline-flex items-center justify-center font-mono text-[11px] font-bold px-2 py-0.5 rounded-lg border transition-all ${
-                                  isPassVisible
-                                    ? 'bg-amber-50 text-slate-900 border-amber-300 shadow-2xs font-mono font-black'
-                                    : 'bg-slate-100 text-slate-400 border-slate-200'
-                                }`}
-                              >
-                                {isPassVisible ? (known || (isAdmin ? 'admin123' : '••••••••')) : '••••••••'}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setVisibleRowPasswords((prev) => ({
-                                    ...prev,
-                                    [u.id]: !prev[u.id]
-                                  }));
-                                }}
-                                className="p-1 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-emerald-700 transition-colors"
-                                title={isPassVisible ? 'Ocultar contraseña' : 'Ver contraseña'}
-                              >
-                                {isPassVisible ? (
-                                  <EyeOff className="w-3.5 h-3.5 text-emerald-600" />
-                                ) : (
-                                  <Eye className="w-3.5 h-3.5 text-slate-400 hover:text-emerald-600" />
-                                )}
-                              </button>
-                            </div>
-                          </td>
-
                           <td className="py-3 px-3 text-center">
                             <button
                               onClick={() => handleToggleActive(u)}
@@ -439,11 +348,11 @@ export function UsersPage() {
 
                             <button
                               onClick={() => handleOpenPasswordModal(u)}
-                              className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-900 font-extrabold rounded-lg text-[11px] border border-amber-300 transition-colors inline-flex items-center gap-1 shadow-2xs"
-                              title="Restablecer o Asignar Clave Rápida en 1-Clic"
+                              className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-900 font-semibold rounded-lg text-[11px] border border-amber-200 transition-colors inline-flex items-center gap-1"
+                              title="Restablecer Contraseña"
                             >
                               <KeyRound className="w-3.5 h-3.5 text-amber-600" />
-                              <span>🔑 Clave Rápida</span>
+                              <span>Clave</span>
                             </button>
                           </td>
                         </tr>
@@ -636,44 +545,6 @@ export function UsersPage() {
             </select>
           </div>
 
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="block text-xs font-semibold text-slate-700">
-                Cambiar Contraseña <span className="text-[10px] text-slate-400 font-normal">(Opcional)</span>
-              </label>
-              <button
-                type="button"
-                onClick={() => {
-                  const pass = generateRandomPassword();
-                  setEditPassword(pass);
-                  setShowEditPassword(true);
-                }}
-                className="text-[10px] font-extrabold text-amber-700 hover:text-amber-800 flex items-center gap-0.5 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200"
-                title="Generar contraseña visible"
-              >
-                <Wand2 className="w-3 h-3 text-amber-600" />
-                <span>🎲 Generar</span>
-              </button>
-            </div>
-            <div className="relative">
-              <input
-                type={showEditPassword ? 'text' : 'password'}
-                placeholder="Dejar vacío para mantener la actual"
-                value={editPassword}
-                onChange={(e) => setEditPassword(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 pr-9 text-xs font-mono font-bold text-slate-900 focus:outline-none focus:border-emerald-600"
-              />
-              <button
-                type="button"
-                onClick={() => setShowEditPassword(!showEditPassword)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 p-1"
-                title={showEditPassword ? 'Ocultar' : 'Ver'}
-              >
-                {showEditPassword ? <EyeOff className="w-4 h-4 text-emerald-600" /> : <Eye className="w-4 h-4 text-slate-500" />}
-              </button>
-            </div>
-          </div>
-
           <ModulePermissions role={editRole} value={editModules} onChange={setEditModules} />
 
           <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
@@ -714,68 +585,33 @@ export function UsersPage() {
           )}
 
           {resetSuccessMsg && (
-            <div className="p-3.5 bg-emerald-50 border border-emerald-300 rounded-2xl text-emerald-950 text-xs space-y-2">
-              <div className="flex items-center gap-2 font-bold text-emerald-800">
-                <Check className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>¡Clave actualizada correctamente!</span>
-              </div>
-              <div className="flex items-center justify-between bg-white border border-emerald-200 p-2 rounded-xl">
-                <span className="font-mono text-sm font-black text-slate-900">{newPassword}</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    navigator.clipboard.writeText(newPassword);
-                    setCopied(true);
-                    setTimeout(() => setCopied(false), 2000);
-                  }}
-                  className="px-2.5 py-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-bold rounded-lg text-[11px] flex items-center gap-1 transition-colors"
-                >
-                  <Copy className="w-3.5 h-3.5" />
-                  <span>{copied ? '¡Copiada!' : 'Copiar'}</span>
-                </button>
-              </div>
+            <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs flex items-center gap-2">
+              <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>{resetSuccessMsg}</span>
             </div>
           )}
 
           <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="block text-xs font-bold text-slate-800">Nueva Contraseña Visible</label>
-              <button
-                type="button"
-                onClick={() => {
-                  const pass = generateRandomPassword();
-                  setNewPassword(pass);
-                  setShowPassword(true);
-                }}
-                className="text-[11px] font-extrabold text-amber-700 hover:text-amber-800 flex items-center gap-1 bg-amber-50 hover:bg-amber-100 px-2 py-0.5 rounded-lg border border-amber-200 transition-colors"
-              >
-                <Wand2 className="w-3 h-3 text-amber-600" />
-                <span>🎲 Generar Clave Temporal</span>
-              </button>
-            </div>
-
+            <label className="block text-xs font-semibold text-slate-700 mb-1">Nueva Contraseña</label>
             <div className="relative">
               <input
                 type={showPassword ? 'text' : 'password'}
                 required
                 minLength={6}
-                placeholder="Nueva clave secreta"
+                placeholder="Mínimo 6 caracteres"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 pr-10 text-xs font-mono font-bold text-slate-900 focus:outline-none focus:border-emerald-600"
+                className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 pr-10 text-xs text-slate-900 focus:outline-none focus:border-emerald-600"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 p-1"
-                title={showPassword ? 'Ocultar contraseña' : 'Ver contraseña'}
+                title={showPassword ? 'Ocultar' : 'Ver'}
               >
                 {showPassword ? <EyeOff className="w-4 h-4 text-emerald-600" /> : <Eye className="w-4 h-4 text-slate-500" />}
               </button>
             </div>
-            <p className="text-[10px] text-slate-500 mt-1">
-              Puedes alternar la visibilidad de la nueva clave con el icono del ojo.
-            </p>
           </div>
 
           <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
@@ -792,9 +628,9 @@ export function UsersPage() {
             <button
               type="submit"
               disabled={resetting}
-              className="px-5 py-2.5 text-xs font-extrabold bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl shadow-md transition-all"
+              className="px-4 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl shadow-md transition-all"
             >
-              {resetting ? 'Guardando...' : 'Asignar Clave Rápida'}
+              {resetting ? 'Guardando...' : 'Cambiar Contraseña'}
             </button>
           </div>
         </form>
