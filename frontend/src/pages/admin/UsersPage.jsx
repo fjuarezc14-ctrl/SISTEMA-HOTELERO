@@ -1,17 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { ModulePermissions } from '../../components/users/ModulePermissions';
-import { isAdminRole } from '../../utils/modules';
+import { RoleMatrixView } from '../../components/users/RoleMatrixView';
+import { isAdminRole, ROLE_DEFAULT_MODULES } from '../../utils/modules';
 import { api } from '../../api/apiClient';
 import { Pagination, usePagination } from '../../components/common/Pagination';
 import { formatDatePeru } from '../../utils/formatters';
 import { validateUsername, validatePassword, validateFullName } from '../../utils/validators';
-import { UserCog, Plus, KeyRound, Check, AlertCircle, ShieldCheck, Search, Edit2, Crown, ConciergeBell, Sparkles, Eye, EyeOff, Wand2, Copy } from 'lucide-react';
+import { UserCog, Plus, KeyRound, Check, AlertCircle, ShieldCheck, Search, Edit2, Crown, ConciergeBell, Sparkles, Eye, EyeOff, Wand2, Copy, Users, Layers } from 'lucide-react';
 import { Modal } from '../../components/common/Modal';
 
 export function UsersPage() {
   const [users, setUsers] = useState([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
+  const [viewMode, setViewMode] = useState('list'); // 'list' | 'matrix'
 
   // Modal Crear Usuario
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -224,107 +226,158 @@ export function UsersPage() {
         </button>
       </div>
 
-      {/* Bar de Búsqueda */}
-      <div className="p-4 bg-white border border-slate-200 rounded-2xl shadow-sm flex items-center gap-3">
-        <Search className="w-4 h-4 text-slate-400" />
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Buscar trabajador por usuario o nombre completo..."
-          className="w-full bg-transparent text-xs text-slate-900 placeholder-slate-400 focus:outline-none"
-        />
+      {/* Selector de Vista: Lista de Personal vs Matriz de Roles */}
+      <div className="flex items-center gap-1.5 p-1 bg-white border border-slate-200 rounded-2xl w-fit shadow-xs">
+        <button
+          type="button"
+          onClick={() => setViewMode('list')}
+          className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ${
+            viewMode === 'list'
+              ? 'bg-emerald-600 text-white shadow-xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+          }`}
+        >
+          <Users className="w-3.5 h-3.5" />
+          <span>Personal Autorizado ({users.length})</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setViewMode('matrix')}
+          className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ${
+            viewMode === 'matrix'
+              ? 'bg-emerald-600 text-white shadow-xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+          }`}
+        >
+          <Layers className="w-3.5 h-3.5" />
+          <span>Matriz de Roles & Permisos (10 Módulos)</span>
+        </button>
       </div>
 
-      {/* Users Table */}
-      <div className="p-6 bg-white border border-slate-200 rounded-3xl shadow-sm space-y-4">
-        <h3 className="text-sm font-bold text-slate-900">Personal Autorizado</h3>
-
-        {loading ? (
-          <div className="py-8 text-center text-xs text-slate-400">Cargando usuarios...</div>
-        ) : filteredUsers.length === 0 ? (
-          <div className="py-8 text-center text-xs text-slate-400">No se encontraron usuarios coincidentes.</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="border-b border-slate-200 text-slate-500 uppercase text-[10px] tracking-wider">
-                <tr>
-                  <th className="py-3 px-3">Usuario</th>
-                  <th className="py-3 px-3">Nombre Completo</th>
-                  <th className="py-3 px-3">Rol / Nivel Acceso</th>
-                  <th className="py-3 px-3 text-center">Estado</th>
-                  <th className="py-3 px-3 text-right">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {usersPage.pageItems.map((u) => {
-                  const isAdmin = u.role === 'super_admin' || u.role === 'admin';
-                  const isHousekeeper = u.role === 'housekeeper';
-
-                  return (
-                    <tr key={u.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="py-3 px-3 font-mono font-bold text-slate-900">@{u.username}</td>
-                      <td className="py-3 px-3 font-semibold text-slate-800">{u.full_name}</td>
-                      <td className="py-3 px-3">
-                        {isAdmin ? (
-                          <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-violet-100 text-violet-800 border border-violet-200 inline-flex items-center gap-1">
-                            <Crown className="w-3 h-3 text-violet-600" />
-                            <span>Administrador</span>
-                          </span>
-                        ) : isHousekeeper ? (
-                          <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200 inline-flex items-center gap-1">
-                            <Sparkles className="w-3 h-3 text-blue-600" />
-                            <span>Personal Limpieza</span>
-                          </span>
-                        ) : (
-                          <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 inline-flex items-center gap-1">
-                            <ConciergeBell className="w-3 h-3 text-emerald-600" />
-                            <span>Recepcionista / Cajero</span>
-                          </span>
-                        )}
-                      </td>
-
-                      <td className="py-3 px-3 text-center">
-                        <button
-                          onClick={() => handleToggleActive(u)}
-                          className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all ${
-                            u.is_active
-                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
-                              : 'bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100'
-                          }`}
-                          title="Hacer clic para activar/desactivar acceso"
-                        >
-                          {u.is_active ? '🟢 Activo' : '🔴 Inactivo'}
-                        </button>
-                      </td>
-
-                      <td className="py-3 px-3 text-right space-x-2">
-                        <button
-                          onClick={() => handleOpenEdit(u)}
-                          className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg text-[11px] transition-colors inline-flex items-center gap-1"
-                        >
-                          <Edit2 className="w-3 h-3 text-slate-500" />
-                          <span>Editar</span>
-                        </button>
-
-                        <button
-                          onClick={() => handleOpenPasswordModal(u)}
-                          className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-900 font-extrabold rounded-lg text-[11px] border border-amber-300 transition-colors inline-flex items-center gap-1 shadow-2xs"
-                          title="Restablecer o Asignar Clave Rápida en 1-Clic"
-                        >
-                          <KeyRound className="w-3.5 h-3.5 text-amber-600" />
-                          <span>🔑 Clave Rápida</span>
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-            <Pagination page={usersPage.page} totalPages={usersPage.totalPages} totalItems={usersPage.totalItems} onChange={usersPage.setPage} label="usuarios" />
+      {viewMode === 'matrix' ? (
+        <RoleMatrixView />
+      ) : (
+        <>
+          {/* Bar de Búsqueda */}
+          <div className="p-4 bg-white border border-slate-200 rounded-2xl shadow-sm flex items-center gap-3">
+            <Search className="w-4 h-4 text-slate-400" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar trabajador por usuario o nombre completo..."
+              className="w-full bg-transparent text-xs text-slate-900 placeholder-slate-400 focus:outline-none"
+            />
           </div>
-        )}
-      </div>
+
+          {/* Users Table */}
+          <div className="p-6 bg-white border border-slate-200 rounded-3xl shadow-sm space-y-4">
+            <h3 className="text-sm font-bold text-slate-900">Personal Autorizado</h3>
+
+            {loading ? (
+              <div className="py-8 text-center text-xs text-slate-400">Cargando usuarios...</div>
+            ) : filteredUsers.length === 0 ? (
+              <div className="py-8 text-center text-xs text-slate-400">No se encontraron usuarios coincidentes.</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="border-b border-slate-200 text-slate-500 uppercase text-[10px] tracking-wider">
+                    <tr>
+                      <th className="py-3 px-3">Usuario</th>
+                      <th className="py-3 px-3">Nombre Completo</th>
+                      <th className="py-3 px-3">Rol / Nivel Acceso</th>
+                      <th className="py-3 px-3">Módulos Asignados</th>
+                      <th className="py-3 px-3 text-center">Estado</th>
+                      <th className="py-3 px-3 text-right">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {usersPage.pageItems.map((u) => {
+                      const isAdmin = u.role === 'super_admin' || u.role === 'admin';
+                      const isHousekeeper = u.role === 'housekeeper';
+
+                      return (
+                        <tr key={u.id} className="hover:bg-slate-50 transition-colors">
+                          <td className="py-3 px-3 font-mono font-bold text-slate-900">@{u.username}</td>
+                          <td className="py-3 px-3 font-semibold text-slate-800">{u.full_name}</td>
+                          <td className="py-3 px-3">
+                            {isAdmin ? (
+                              <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-violet-100 text-violet-800 border border-violet-200 inline-flex items-center gap-1">
+                                <Crown className="w-3 h-3 text-violet-600" />
+                                <span>Administrador</span>
+                              </span>
+                            ) : isHousekeeper ? (
+                              <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200 inline-flex items-center gap-1">
+                                <Sparkles className="w-3 h-3 text-blue-600" />
+                                <span>Personal Limpieza</span>
+                              </span>
+                            ) : (
+                              <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 inline-flex items-center gap-1">
+                                <ConciergeBell className="w-3 h-3 text-emerald-600" />
+                                <span>Recepcionista / Cajero</span>
+                              </span>
+                            )}
+                          </td>
+
+                          <td className="py-3 px-3">
+                            {isAdmin ? (
+                              <span className="text-[10px] font-semibold text-violet-700 bg-violet-50 px-2 py-0.5 rounded-lg border border-violet-200">
+                                10/10 Módulos (Acceso Total)
+                              </span>
+                            ) : Array.isArray(u.allowed_modules) ? (
+                              <span className="text-[10px] font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-lg border border-slate-200">
+                                {u.allowed_modules.length} módulos personalizados
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200">
+                                Predeterminado ({isHousekeeper ? '3 módulos' : '7 módulos'})
+                              </span>
+                            )}
+                          </td>
+
+                          <td className="py-3 px-3 text-center">
+                            <button
+                              onClick={() => handleToggleActive(u)}
+                              className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all ${
+                                u.is_active
+                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
+                                  : 'bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100'
+                              }`}
+                              title="Hacer clic para activar/desactivar acceso"
+                            >
+                              {u.is_active ? '🟢 Activo' : '🔴 Inactivo'}
+                            </button>
+                          </td>
+
+                          <td className="py-3 px-3 text-right space-x-2">
+                            <button
+                              onClick={() => handleOpenEdit(u)}
+                              className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg text-[11px] transition-colors inline-flex items-center gap-1"
+                            >
+                              <Edit2 className="w-3 h-3 text-slate-500" />
+                              <span>Editar</span>
+                            </button>
+
+                            <button
+                              onClick={() => handleOpenPasswordModal(u)}
+                              className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-900 font-extrabold rounded-lg text-[11px] border border-amber-300 transition-colors inline-flex items-center gap-1 shadow-2xs"
+                              title="Restablecer o Asignar Clave Rápida en 1-Clic"
+                            >
+                              <KeyRound className="w-3.5 h-3.5 text-amber-600" />
+                              <span>🔑 Clave Rápida</span>
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                <Pagination page={usersPage.page} totalPages={usersPage.totalPages} totalItems={usersPage.totalItems} onChange={usersPage.setPage} label="usuarios" />
+              </div>
+            )}
+          </div>
+        </>
+      )}
 
       {/* Modal Crear Usuario */}
       <Modal
@@ -406,7 +459,17 @@ export function UsersPage() {
               <label className="block text-xs font-semibold text-slate-700 mb-1">Rol / Cargo</label>
               <select
                 value={role}
-                onChange={(e) => setRole(e.target.value)}
+                onChange={(e) => {
+                  const newRole = e.target.value;
+                  setRole(newRole);
+                  if (newRole === 'housekeeper') {
+                    setModules(['reception', 'incidents', 'textiles']);
+                  } else if (newRole === 'receptionist') {
+                    setModules(['reception', 'reservations', 'store', 'cash', 'customers', 'incidents', 'textiles']);
+                  } else {
+                    setModules(null);
+                  }
+                }}
                 className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs text-slate-900 focus:outline-none focus:border-emerald-600"
               >
                 <option value="receptionist">Recepcionista / Cajero</option>
@@ -477,7 +540,15 @@ export function UsersPage() {
             <label className="block text-xs font-semibold text-slate-700 mb-1">Rol / Permisos de Acceso</label>
             <select
               value={editRole}
-              onChange={(e) => setEditRole(e.target.value)}
+              onChange={(e) => {
+                const newRole = e.target.value;
+                setEditRole(newRole);
+                if (newRole === 'housekeeper' && (!editModules || editModules.length > 3)) {
+                  setEditModules(['reception', 'incidents', 'textiles']);
+                } else if (newRole === 'admin') {
+                  setEditModules(null);
+                }
+              }}
               className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs text-slate-900 focus:outline-none focus:border-emerald-600"
             >
               <option value="receptionist">Recepcionista / Cajero</option>
