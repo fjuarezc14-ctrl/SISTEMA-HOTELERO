@@ -161,82 +161,36 @@ export function ReceptionPage() {
 
   return (
     <div className="space-y-6 pb-8">
-      {/* Top Header Bar: Title & Action Buttons */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-            <span>Dashboard de Recepción</span>
-          </h1>
-          <p className="text-xs text-slate-500">Gestión visual en tiempo real de ocupación y tarifas en Soles.</p>
+
+      {/* Fila superior: KPIs compactos + botón Nueva Reserva */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="flex-1 grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-3">
+          {[
+            { label: 'Llegadas pend.', value: upcomingReservations.length, Icon: Plane, tone: 'bg-blue-50 text-blue-600' },
+            { label: 'Hab. libres', value: availableCount, Icon: Key, tone: 'bg-emerald-50 text-emerald-600' },
+            { label: 'Hab. ocupadas', value: occupiedCount, Icon: BedDouble, tone: 'bg-rose-50 text-rose-600' },
+            { label: 'En limpieza', value: cleaningCount, Icon: Sparkles, tone: 'bg-amber-50 text-amber-600' },
+            { label: 'Total hab.', value: totalCount, Icon: Ticket, tone: 'bg-violet-50 text-violet-600' }
+          ].map(({ label, value, Icon, tone }) => (
+            <div key={label} className="px-3 py-2.5 bg-white border border-slate-200 rounded-2xl shadow-sm flex items-center gap-2.5">
+              <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${tone}`}>
+                <Icon className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block truncate">{label}</span>
+                <span className="text-lg font-black text-slate-900 leading-none">{value}</span>
+              </div>
+            </div>
+          ))}
         </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setIsReservationModalOpen(true)}
-            className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-xs rounded-2xl shadow-sm transition-all flex items-center justify-center gap-2 shrink-0"
-          >
-            <PhoneCall className="w-4 h-4" />
-            <span>Nueva Reserva</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Top Summary KPI Cards Row (5 Tarjetas Superiores Estilo Dashboard UI) */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-        {/* KPI 1: Llegadas Pendientes */}
-        <div className="p-4 bg-white border border-slate-200 rounded-3xl shadow-sm flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-            <Plane className="w-6 h-6" />
-          </div>
-          <div>
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">LLEGADAS PEND.</span>
-            <span className="text-xl font-black text-slate-900">{upcomingReservations.length}</span>
-          </div>
-        </div>
-
-        {/* KPI 2: Hab. Libres */}
-        <div className="p-4 bg-white border border-slate-200 rounded-3xl shadow-sm flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-            <Key className="w-6 h-6" />
-          </div>
-          <div>
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">HAB. LIBRES</span>
-            <span className="text-xl font-black text-slate-900">{availableCount}</span>
-          </div>
-        </div>
-
-        {/* KPI 3: Hab. Ocupadas */}
-        <div className="p-4 bg-white border border-slate-200 rounded-3xl shadow-sm flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
-            <BedDouble className="w-6 h-6" />
-          </div>
-          <div>
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">HAB. OCUPADAS</span>
-            <span className="text-xl font-black text-slate-900">{occupiedCount}</span>
-          </div>
-        </div>
-
-        {/* KPI 4: En Limpieza */}
-        <div className="p-4 bg-white border border-slate-200 rounded-3xl shadow-sm flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
-            <Sparkles className="w-6 h-6" />
-          </div>
-          <div>
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">EN LIMPIEZA</span>
-            <span className="text-xl font-black text-slate-900">{cleaningCount}</span>
-          </div>
-        </div>
-
-        {/* KPI 5: Mantenimiento / Total */}
-        <div className="p-4 bg-white border border-slate-200 rounded-3xl shadow-sm flex items-center gap-3 col-span-2 sm:col-span-1">
-          <div className="w-12 h-12 rounded-2xl bg-violet-50 text-violet-600 flex items-center justify-center shrink-0">
-            <Ticket className="w-6 h-6" />
-          </div>
-          <div>
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">TOTAL HAB.</span>
-            <span className="text-xl font-black text-slate-900">{totalCount}</span>
-          </div>
-        </div>
+        <button
+          onClick={() => setIsReservationModalOpen(true)}
+          className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-xs rounded-2xl shadow-sm transition-all flex items-center justify-center gap-2 shrink-0 sm:self-start xl:self-stretch"
+        >
+          <PhoneCall className="w-4 h-4" />
+          <span>Nueva Reserva</span>
+        </button>
       </div>
 
       {/* Main Split Layout: Mapa de Habitaciones + Sidebar Llegadas Pendientes */}
