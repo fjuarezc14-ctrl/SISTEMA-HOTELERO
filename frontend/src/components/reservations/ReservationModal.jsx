@@ -388,7 +388,10 @@ export function ReservationModal({ isOpen, onClose, reservation = null, preselec
             <>
               <div className="flex flex-wrap items-center gap-1.5">
                 {[
-                  { label: `Mínimo ${Number(quote.rule.value)}%`, amount: minDeposit },
+                  {
+                    label: quote?.rule?.type === 'percent' ? `Mínimo ${Number(quote.rule.value)}%` : `Mínimo ${formatPEN(minDeposit)}`,
+                    amount: minDeposit
+                  },
                   { label: '50%', amount: total / 2 },
                   { label: `Completo ${formatPEN(total)}`, amount: total }
                 ].map((opt) => (
