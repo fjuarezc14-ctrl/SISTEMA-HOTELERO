@@ -500,7 +500,7 @@ export function TextilesPage() {
 
       {/* Modal: Movimiento de una prenda */}
       <Modal isOpen={modal === 'move' && !!selected} onClose={closeModal} title={`Movimiento: ${selected?.name || ''}`} maxWidth="max-w-md">
-        {selected && (
+        {modal === 'move' && selected && (
           <form onSubmit={handleMove} className="space-y-4">
             <ErrorBox message={error} />
             <div className="grid grid-cols-4 gap-2 text-center text-[11px]">
@@ -591,8 +591,9 @@ export function TextilesPage() {
       </Modal>
 
       {/* Modal: Recibir lote */}
+      {/* Prenda (move) y lote (return) comparten "selected": cada modal solo lee sus datos cuando es el abierto */}
       <Modal isOpen={modal === 'return' && !!selected} onClose={closeModal} title={`Recibir Lote ${selected?.code || ''}`} maxWidth="max-w-lg">
-        {selected && (
+        {modal === 'return' && selected?.items && (
           <form onSubmit={handleReturn} className="space-y-4">
             <ErrorBox message={error} />
             <p className="text-xs text-slate-600">
