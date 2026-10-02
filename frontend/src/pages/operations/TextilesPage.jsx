@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { api } from '../../api/apiClient';
 import { formatDatePeru } from '../../utils/formatters';
 import { Modal } from '../../components/common/Modal';
+import { DateTimeInput } from '../../components/common/DateInput';
 import { Badge } from '../../components/common/Badge';
 import { Pagination, usePagination } from '../../components/common/Pagination';
 import { Bed, Bath, Shirt, WashingMachine, Search, Plus, Package, ArrowRightLeft, AlertCircle, PackageCheck } from 'lucide-react';
@@ -564,7 +565,7 @@ export function TextilesPage() {
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Retorno estimado</label>
-              <input type="datetime-local" value={laundryReturn} onChange={(e) => setLaundryReturn(e.target.value)} className={inputClass} />
+              <DateTimeInput value={laundryReturn} onChange={setLaundryReturn} className={inputClass} />
             </div>
           </div>
           <div className="border border-slate-200 rounded-xl divide-y divide-slate-100 max-h-64 overflow-y-auto">

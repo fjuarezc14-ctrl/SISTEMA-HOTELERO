@@ -10,6 +10,7 @@ import { useReceipt } from '../../context/ReceiptContext';
 import { cashReceipt } from '../../utils/receipts';
 import { Pagination } from '../../components/common/Pagination';
 import { CategoryBadge } from '../../components/common/Badge';
+import { DateInput } from '../../components/common/DateInput';
 import {
   Wallet,
   Plus,
@@ -18,7 +19,6 @@ import {
   Unlock,
   ChevronRight,
   ChevronDown,
-  ChevronUp,
   BedDouble,
   QrCode,
   CreditCard,
@@ -54,7 +54,6 @@ export function CashPage({ onOpenShiftModal = () => {}, onCloseShiftModal = () =
   const [dateTo, setDateTo] = useState(todayLima());
   const [page, setPage] = useState(1);
   const [expandedGroups, setExpandedGroups] = useState({});
-  const [showBreakdown, setShowBreakdown] = useState(false);
 
   // Buscador y filtros avanzados
   const [searchQuery, setSearchQuery] = useState('');
@@ -290,22 +289,18 @@ export function CashPage({ onOpenShiftModal = () => {}, onCloseShiftModal = () =
 
       {/* Historial y Tabla */}
       <div className="space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
           <TotalCard
             label="Total Ingresos"
             tone="emerald"
             total={totalIncome}
             byMethod={sumByMethod(transactions, 'income')}
-            expanded={showBreakdown}
-            onToggle={() => setShowBreakdown(!showBreakdown)}
           />
           <TotalCard
             label="Total Egresos"
             tone="rose"
             total={totalExpense}
             byMethod={sumByMethod(transactions, 'expense')}
-            expanded={showBreakdown}
-            onToggle={() => setShowBreakdown(!showBreakdown)}
           />
         </div>
 
@@ -341,19 +336,17 @@ export function CashPage({ onOpenShiftModal = () => {}, onCloseShiftModal = () =
               </div>
               {scope === 'range' && (
                 <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
-                  <input
-                    type="date"
+                  <DateInput
                     value={dateFrom}
                     max={dateTo}
-                    onChange={(e) => setDateFrom(e.target.value)}
+                    onChange={setDateFrom}
                     className="bg-slate-50 border border-slate-300 rounded-lg px-2 py-1 text-xs text-slate-900"
                   />
                   <span>al</span>
-                  <input
-                    type="date"
+                  <DateInput
                     value={dateTo}
                     min={dateFrom}
-                    onChange={(e) => setDateTo(e.target.value)}
+                    onChange={setDateTo}
                     className="bg-slate-50 border border-slate-300 rounded-lg px-2 py-1 text-xs text-slate-900"
                   />
                 </div>
@@ -570,41 +563,31 @@ function sumByMethod(transactions, type) {
 }
 
 const TONES = {
-  emerald: { text: 'text-emerald-700', hover: 'hover:bg-emerald-50' },
-  rose: { text: 'text-rose-700', hover: 'hover:bg-rose-50' }
+  emerald: { text: 'text-emerald-700' },
+  rose: { text: 'text-rose-700' }
 };
 
-function TotalCard({ label, tone, total, byMethod, expanded, onToggle }) {
+function TotalCard({ label, tone, total, byMethod }) {
   const c = TONES[tone];
   return (
-    <div className="p-4 bg-white border border-slate-200 rounded-2xl shadow-sm">
-      <div className="flex items-start justify-between gap-2">
-        <div className="space-y-1">
-          <span className={`text-xs font-semibold uppercase ${c.text}`}>{label}</span>
-          <p className={`text-2xl font-black font-mono ${c.text}`}>{formatPEN(total)}</p>
-        </div>
-        <button
-          onClick={onToggle}
-          title={expanded ? 'Ocultar desglose' : 'Ver por medio de pago'}
-          className={`p-1.5 rounded-lg text-slate-500 border border-slate-200 transition-colors ${c.hover}`}
-        >
-          {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-        </button>
+    <div className="p-4 bg-white border border-slate-200 rounded-2xl shadow-sm flex flex-col md:flex-row md:items-center gap-3 md:gap-5">
+      <div className="shrink-0 md:w-40">
+        <span className={`text-xs font-semibold uppercase ${c.text}`}>{label}</span>
+        <p className={`text-2xl font-black font-mono ${c.text}`}>{formatPEN(total)}</p>
       </div>
 
-      {expanded && (
-        <div className="mt-3 pt-3 border-t border-slate-100 space-y-1.5">
-          {PAYMENT_METHODS.map(({ id, icon: Icon, color }) => (
-            <div key={id} className="flex items-center justify-between text-xs">
-              <span className="flex items-center gap-1.5 text-slate-600 font-medium">
-                <Icon className={`w-3.5 h-3.5 ${color}`} />
-                {PAYMENT_METHOD_LABELS[id]}
-              </span>
-              <span className="font-mono font-bold text-slate-900">{formatPEN(byMethod[id] || 0)}</span>
-            </div>
-          ))}
-        </div>
-      )}
+      {/* Desglose por medio de pago */}
+      <div className="flex-1 grid grid-cols-3 gap-2 md:pl-5 md:border-l border-slate-100">
+        {PAYMENT_METHODS.map(({ id, icon: Icon, color }) => (
+          <div key={id} className="min-w-0">
+            <span className="flex items-center gap-1 text-[11px] text-slate-500 font-medium">
+              <Icon className={`w-3.5 h-3.5 shrink-0 ${color}`} />
+              <span className="truncate">{PAYMENT_METHOD_LABELS[id]}</span>
+            </span>
+            <p className="font-mono font-bold text-sm text-slate-900">{formatPEN(byMethod[id] || 0)}</p>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

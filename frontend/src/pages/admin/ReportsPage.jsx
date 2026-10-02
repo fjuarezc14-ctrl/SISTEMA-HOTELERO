@@ -10,6 +10,7 @@ import { EmitVoucherModal } from '../../components/payments/EmitVoucherModal';
 import { ShiftsPage } from './ShiftsPage';
 import { exportToExcel } from '../../utils/exportExcel';
 import { CategoryBadge } from '../../components/common/Badge';
+import { DateInput } from '../../components/common/DateInput';
 import {
   BarChart3,
   Wallet,
@@ -324,19 +325,17 @@ function KpiReports() {
           <div className="flex items-center gap-3 pt-2 border-t border-slate-100">
             <div className="flex items-center gap-2">
               <label className="text-xs font-semibold text-slate-600">Desde:</label>
-              <input
-                type="date"
+              <DateInput
                 value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
+                onChange={setStartDate}
                 className="bg-slate-50 border border-slate-300 rounded-xl p-1.5 text-xs text-slate-900 focus:outline-none focus:border-emerald-600"
               />
             </div>
             <div className="flex items-center gap-2">
               <label className="text-xs font-semibold text-slate-600">Hasta:</label>
-              <input
-                type="date"
+              <DateInput
                 value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
+                onChange={setEndDate}
                 className="bg-slate-50 border border-slate-300 rounded-xl p-1.5 text-xs text-slate-900 focus:outline-none focus:border-emerald-600"
               />
             </div>

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Modal } from '../common/Modal';
+import { DateTimeInput } from '../common/DateInput';
 import { api } from '../../api/apiClient';
 import { formatPEN, formatDatePeru } from '../../utils/formatters';
 import { PaymentSelector } from '../payments/PaymentSelector';
@@ -314,11 +315,10 @@ export function ReservationModal({ isOpen, onClose, reservation = null, preselec
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Fecha / Hora de Llegada</label>
-              <input
-                type="datetime-local"
+              <DateTimeInput
                 required
                 value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
+                onChange={setStartDate}
                 className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 text-xs text-slate-900 focus:outline-none focus:border-emerald-600"
               />
             </div>
