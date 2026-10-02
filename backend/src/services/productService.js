@@ -17,6 +17,13 @@ function operationalError(message, statusCode) {
 
 const truncate = (text, max) => (text.length > max ? `${text.slice(0, max - 3)}...` : text);
 
+// Clave del icono elegido en la tienda ('' = icono automático según el nombre)
+const productIcon = (icon) => {
+  const key = String(icon ?? '').trim();
+  if (key && !/^[a-z_]{1,30}$/.test(key)) throw v.badRequest('El icono del producto no es válido.');
+  return key;
+};
+
 // Valida productos, cantidades y stock; agrupa productos repetidos
 async function resolveSaleItems(items) {
   const merged = new Map();
@@ -64,7 +71,8 @@ export const productService = {
       ...productData,
       name: v.text(productData.name, 'El nombre del producto', { min: 2, max: 100 }),
       sale_price_pen: v.money(productData.sale_price_pen, 'El precio de venta', { allowZero: false, max: 10000 }),
-      stock: v.integer(productData.stock ?? 0, 'El stock', { min: 0, max: 99999 })
+      stock: v.integer(productData.stock ?? 0, 'El stock', { min: 0, max: 99999 }),
+      icon: productIcon(productData.icon)
     });
   },
 
@@ -73,6 +81,7 @@ export const productService = {
     if (data.name !== undefined) data.name = v.text(data.name, 'El nombre del producto', { min: 2, max: 100 });
     if (data.sale_price_pen !== undefined) data.sale_price_pen = v.money(data.sale_price_pen, 'El precio de venta', { allowZero: false, max: 10000 });
     if (data.stock !== undefined) data.stock = v.integer(data.stock, 'El stock', { min: 0, max: 99999 });
+    if (data.icon !== undefined) data.icon = productIcon(data.icon);
     return await productRepository.update(id, data);
   },
 

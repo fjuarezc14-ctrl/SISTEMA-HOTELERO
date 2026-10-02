@@ -1,25 +1,11 @@
 import React, { useState } from 'react';
 import { formatPEN } from '../../utils/formatters';
-import { Search, ShoppingBag, Coffee, Wine, Sparkles, Check, PackageX, PackageCheck, AlertTriangle } from 'lucide-react';
+import { Search, Check, AlertTriangle } from 'lucide-react';
+import { ProductIcon } from './ProductIcon';
 
 export function ProductCardGrid({ products = [], selectedProductId, onSelectProduct, disabled = false, cartQuantities = null }) {
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('ALL');
-
-  // Determinar icono visual según el nombre del producto
-  const getProductIcon = (name = '') => {
-    const lower = name.toLowerCase();
-    if (lower.includes('agua') || lower.includes('gaseosa') || lower.includes('inCA') || lower.includes('coca') || lower.includes('jugo') || lower.includes('red bull') || lower.includes('energizante')) {
-      return <Coffee className="w-5 h-5 text-blue-600" />;
-    }
-    if (lower.includes('cerveza') || lower.includes('vino') || lower.includes('whisky') || lower.includes('ron') || lower.includes('pisco')) {
-      return <Wine className="w-5 h-5 text-amber-600" />;
-    }
-    if (lower.includes('preservativo') || lower.includes('shampoo') || lower.includes('jabon') || lower.includes('toalla') || lower.includes('cepillo')) {
-      return <Sparkles className="w-5 h-5 text-rose-600" />;
-    }
-    return <ShoppingBag className="w-5 h-5 text-emerald-600" />;
-  };
 
   // Filtrado de productos por texto y stock
   const filteredProducts = products.filter((p) => {
@@ -37,7 +23,7 @@ export function ProductCardGrid({ products = [], selectedProductId, onSelectProd
           <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
           <input
             type="text"
-            placeholder="🔍 Buscar producto..."
+            placeholder="Buscar producto..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-3 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-emerald-600"
@@ -103,7 +89,7 @@ export function ProductCardGrid({ products = [], selectedProductId, onSelectProd
                 {/* Header de la Tarjeta */}
                 <div className="flex items-start justify-between gap-1 mb-2">
                   <div className="p-1.5 rounded-xl bg-slate-100/80 shrink-0">
-                    {getProductIcon(p.name)}
+                    <ProductIcon product={p} />
                   </div>
                   {isSelected && cartQuantities ? (
                     <span className="inline-flex items-center justify-center text-center leading-tight align-middle px-1.5 py-0.5 bg-emerald-600 text-white font-black text-[10px] rounded-md">

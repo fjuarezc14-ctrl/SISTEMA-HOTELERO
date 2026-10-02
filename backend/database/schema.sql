@@ -303,6 +303,8 @@ CREATE TABLE IF NOT EXISTS store_sale_items (
 ALTER TABLE cash_transactions ADD COLUMN IF NOT EXISTS store_sale_id UUID REFERENCES store_sales(id) ON DELETE SET NULL;
 -- Nombre del producto congelado en los consumos (si luego se renombra, el histórico no cambia)
 ALTER TABLE room_consumptions ADD COLUMN IF NOT EXISTS product_name VARCHAR(100);
+-- Icono del producto en la tienda (NULL = se deduce del nombre)
+ALTER TABLE products ADD COLUMN IF NOT EXISTS icon VARCHAR(30);
 
 CREATE INDEX IF NOT EXISTS idx_store_sales_shift ON store_sales(work_shift_id);
 CREATE INDEX IF NOT EXISTS idx_store_sale_items_sale ON store_sale_items(sale_id);
