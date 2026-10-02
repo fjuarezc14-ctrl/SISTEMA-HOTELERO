@@ -11,6 +11,21 @@ export const customerRepository = {
     return res.rows[0] || null;
   },
 
+  /** Incidentes del cliente: registrados a su nombre o durante alguna de sus estadías */
+  async findIncidents(customerId) {
+    const res = await query(
+      `SELECT i.*, r.room_number, u.full_name AS registered_by_user
+       FROM stay_incidents i
+       JOIN rooms r ON i.room_id = r.id
+       LEFT JOIN users u ON i.user_id = u.id
+       WHERE i.customer_id = $1
+          OR i.stay_id IN (SELECT id FROM stays WHERE customer_id = $1)
+       ORDER BY i.created_at DESC`,
+      [customerId]
+    );
+    return res.rows;
+  },
+
   async findAll({ search = '', limit = 100, offset = 0 } = {}) {
     let sql = `
       SELECT 
@@ -76,8 +91,8 @@ export const customerRepository = {
     return res.rows[0] || null;
   },
 
-  async incrementVisits(id) {
-    const res = await query(
+  async incrementVisits(id, runQuery = query) {
+    const res = await runQuery(
       `UPDATE customers 
        SET total_visits = total_visits + 1, updated_at = NOW() 
        WHERE id = $1 RETURNING *`,

@@ -1,5 +1,19 @@
 import * as v from '../utils/validate.js';
 import { customerRepository } from '../repositories/customerRepository.js';
+import { requireAdminAuthorization } from './adminAuthorizationService.js';
+
+// Quitar un veto requiere autorización de un administrador (auth: requester, admin_username, admin_password, ipAddress)
+async function authorizeVetoRemoval(customer, nextBlacklisted, auth = {}) {
+  if (!customer.is_blacklisted || nextBlacklisted) return;
+  await requireAdminAuthorization({
+    requester: auth.requester,
+    adminUsername: auth.admin_username,
+    adminPassword: auth.admin_password,
+    action: 'CUSTOMER_VETO_REMOVED',
+    details: `Veto retirado a ${customer.full_name} (${customer.document_type} ${customer.document_number}). Motivo del veto: ${customer.blacklist_reason || 'sin motivo'}.`,
+    ipAddress: auth.ipAddress
+  });
+}
 
 export const customerService = {
   async getCustomers({ search, limit, offset }) {
@@ -15,6 +29,10 @@ export const customerService = {
       throw error;
     }
     return customer;
+  },
+
+  async getCustomerIncidents(id) {
+    return await customerRepository.findIncidents(id);
   },
 
   async getCustomerByDocument(docNumber) {
@@ -101,7 +119,7 @@ export const customerService = {
     });
   },
 
-  async updateCustomer(id, { document_type, document_number, full_name, phone = '', email = '', is_blacklisted, blacklist_reason = '' }) {
+  async updateCustomer(id, { document_type, document_number, full_name, phone = '', email = '', is_blacklisted, blacklist_reason = '' }, auth) {
     const customer = await this.getCustomerById(id);
 
     const data = v.customerData({ document_type: document_type || customer.document_type, document_number, full_name, phone, email });
@@ -117,6 +135,7 @@ export const customerService = {
     }
 
     const blacklisted = is_blacklisted === undefined ? customer.is_blacklisted : Boolean(is_blacklisted);
+    await authorizeVetoRemoval(customer, blacklisted, auth);
 
     return await customerRepository.update(customer.id, {
       document_type: data.document_type,
@@ -129,19 +148,24 @@ export const customerService = {
     });
   },
 
-  async updateBlacklist(id, { is_blacklisted, blacklist_reason }) {
+  async updateBlacklist(id, { is_blacklisted, blacklist_reason }, auth) {
     const customer = await this.getCustomerById(id);
+    const blacklisted = Boolean(is_blacklisted);
+    await authorizeVetoRemoval(customer, blacklisted, auth);
     return await customerRepository.update(customer.id, {
-      is_blacklisted,
-      blacklist_reason: is_blacklisted ? blacklist_reason : ''
+      is_blacklisted: blacklisted,
+      blacklist_reason: blacklisted ? blacklist_reason : ''
     });
   },
 
-  async toggleBlacklist(id, { is_blacklisted, blacklist_reason = '' }) {
+  // Sin is_blacklisted se invierte el estado actual
+  async toggleBlacklist(id, { is_blacklisted, blacklist_reason = '' }, auth) {
     const customer = await this.getCustomerById(id);
+    const blacklisted = is_blacklisted === undefined ? !customer.is_blacklisted : Boolean(is_blacklisted);
+    await authorizeVetoRemoval(customer, blacklisted, auth);
     return await customerRepository.toggleBlacklist(customer.id, {
-      is_blacklisted,
-      blacklist_reason
+      is_blacklisted: blacklisted,
+      blacklist_reason: blacklisted ? v.text(blacklist_reason || 'Incidencia o falta grave', 'El motivo del veto', { max: 500 }) : ''
     });
   }
 };

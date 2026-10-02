@@ -17,6 +17,11 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import { Modal } from '../../components/common/Modal';
+import { CustomerRecordModal } from '../../components/customers/CustomerRecordModal';
+import { LiftVetoModal } from '../../components/customers/LiftVetoModal';
+import { AdminAuthFields } from '../../components/common/AdminAuthFields';
+import { useAuth } from '../../context/AuthContext';
+import { isAdminRole } from '../../utils/modules';
 import { validateDocument, validateFullName, validatePhone, validateEmail, getDocumentConstraints } from '../../utils/validators';
 
 export function CustomersPage() {
@@ -24,6 +29,14 @@ export function CustomersPage() {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [filterTab, setFilterTab] = useState('all'); // 'all' | 'frequent' | 'blacklisted'
+
+  const { user } = useAuth();
+  const needsAdminAuth = !isAdminRole(user?.role);
+
+  // Modal con el detalle del veto / incidentes
+  const [recordCustomer, setRecordCustomer] = useState(null);
+  // Modal para quitar el veto (con autorización de administrador)
+  const [liftVetoCustomer, setLiftVetoCustomer] = useState(null);
 
   // Modal para agregar o editar cliente
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -35,6 +48,7 @@ export function CustomersPage() {
   const [email, setEmail] = useState('');
   const [isBlacklisted, setIsBlacklisted] = useState(false);
   const [blacklistReason, setBlacklistReason] = useState('');
+  const [adminAuth, setAdminAuth] = useState({ username: '', password: '' });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -58,20 +72,18 @@ export function CustomersPage() {
   }, [search]);
 
   const handleToggleBlacklist = async (customer) => {
-    const willBlacklist = !customer.is_blacklisted;
-    let reason = customer.blacklist_reason || '';
-
-    if (willBlacklist) {
-      const inputReason = window.prompt(`Motivo del veto para ${customer.full_name}:`, 'Incidencia o faltas durante la estadía');
-      if (inputReason === null) return; // Cancelado
-      reason = inputReason.trim() || 'Incidencia o falta grave';
-    } else {
-      if (!window.confirm(`¿Seguro de retirar el veto a ${customer.full_name}?`)) return;
+    if (customer.is_blacklisted) {
+      setLiftVetoCustomer(customer);
+      return;
     }
+
+    const inputReason = window.prompt(`Motivo del veto para ${customer.full_name}:`, 'Incidencia o faltas durante la estadía');
+    if (inputReason === null) return; // Cancelado
+    const reason = inputReason.trim() || 'Incidencia o falta grave';
 
     try {
       await api.patch(`/customers/${customer.id}/toggle-blacklist`, {
-        is_blacklisted: willBlacklist,
+        is_blacklisted: true,
         blacklist_reason: reason
       });
       fetchCustomers();
@@ -109,9 +121,13 @@ export function CustomersPage() {
     setEmail(c.email || '');
     setIsBlacklisted(c.is_blacklisted || false);
     setBlacklistReason(c.blacklist_reason || '');
+    setAdminAuth({ username: '', password: '' });
     setError('');
     setIsModalOpen(true);
   };
+
+  // Al editar un cliente vetado y desmarcar la lista negra se quita el veto
+  const liftingVetoOnEdit = Boolean(editingCustomer?.is_blacklisted && !isBlacklisted);
 
   const handleSaveCustomer = async (e) => {
     e.preventDefault();
@@ -137,7 +153,9 @@ export function CustomersPage() {
           phone: phone.trim(),
           email: email.trim(),
           is_blacklisted: isBlacklisted,
-          blacklist_reason: isBlacklisted ? blacklistReason.trim() : null
+          blacklist_reason: isBlacklisted ? blacklistReason.trim() : null,
+          admin_username: liftingVetoOnEdit && needsAdminAuth ? adminAuth.username : undefined,
+          admin_password: liftingVetoOnEdit && needsAdminAuth ? adminAuth.password : undefined
         });
       } else {
         await api.post('/customers', {
@@ -300,22 +318,27 @@ export function CustomersPage() {
 
                       <td className="py-3 px-3 text-center">
                         {c.is_blacklisted ? (
-                          <div className="inline-flex flex-col items-center">
-                            <span className="px-2.5 py-1 rounded-lg text-[10px] font-black bg-rose-100 text-rose-800 border border-rose-300 flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => setRecordCustomer(c)}
+                            title="Ver detalle del veto"
+                            className="inline-flex group"
+                          >
+                            <span className="px-2.5 py-1 rounded-lg text-[10px] font-black bg-rose-100 text-rose-800 border border-rose-300 inline-flex items-center gap-1 group-hover:bg-rose-200 transition-colors">
                               <ShieldAlert className="w-3 h-3 text-rose-600" />
-                              <span>🛑 VETADO</span>
+                              <span>VETADO</span>
                             </span>
-                            {c.blacklist_reason && (
-                              <span className="text-[9px] text-rose-600 font-medium truncate max-w-[140px]" title={c.blacklist_reason}>
-                                {c.blacklist_reason}
-                              </span>
-                            )}
-                          </div>
+                          </button>
                         ) : hasIncidents ? (
-                          <span className="px-2.5 py-1 rounded-lg text-[10px] font-black bg-amber-100 text-amber-800 border border-amber-300 flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => setRecordCustomer(c)}
+                            title="Ver detalle de incidencias"
+                            className="px-2.5 py-1 rounded-lg text-[10px] font-black bg-amber-100 text-amber-800 border border-amber-300 hover:bg-amber-200 transition-colors inline-flex items-center gap-1"
+                          >
                             <AlertTriangle className="w-3 h-3 text-amber-600" />
                             <span>{c.incident_count} Incidencia(s)</span>
-                          </span>
+                          </button>
                         ) : (
                           <span className="inline-flex items-center justify-center text-center leading-tight align-middle px-2.5 py-1 rounded-lg text-[10px] font-black bg-emerald-50 text-emerald-700 border border-emerald-200">
                             Cliente Limpio
@@ -371,6 +394,19 @@ export function CustomersPage() {
           </div>
         )}
       </div>
+
+      <LiftVetoModal
+        isOpen={Boolean(liftVetoCustomer)}
+        onClose={() => setLiftVetoCustomer(null)}
+        customer={liftVetoCustomer}
+        onSuccess={fetchCustomers}
+      />
+
+      <CustomerRecordModal
+        isOpen={Boolean(recordCustomer)}
+        onClose={() => setRecordCustomer(null)}
+        customer={recordCustomer}
+      />
 
       {/* Modal Agregar / Editar Cliente */}
       <Modal
@@ -461,12 +497,20 @@ export function CustomersPage() {
               <input
                 type="text"
                 value={blacklistReason}
-                onChange={(e) => setBlacklistReason(e.target.checked)}
+                onChange={(e) => setBlacklistReason(e.target.value)}
                 placeholder="Motivo de la advertencia / incidencia..."
                 className="w-full bg-white border border-rose-300 rounded-lg p-2 text-xs text-slate-900 focus:outline-none focus:border-rose-600"
               />
             )}
           </div>
+
+          {liftingVetoOnEdit && needsAdminAuth && (
+            <AdminAuthFields
+              value={adminAuth}
+              onChange={setAdminAuth}
+              message="Quitar el veto a este cliente requiere la autorización de un administrador."
+            />
+          )}
 
           <div className="flex justify-end gap-3 pt-3 border-t border-slate-200">
             <button

@@ -127,7 +127,7 @@ export function IncidentsPage() {
     if (!window.confirm(`¿Seguro que deseas VETAR a ${customerName || 'este huésped'} y agregarle a la Lista Negra?`)) return;
 
     try {
-      await api.patch(`/customers/${customerId}/toggle-blacklist`, { reason: 'Registrado desde Módulo de Incidentes' });
+      await api.patch(`/customers/${customerId}/toggle-blacklist`, { is_blacklisted: true, blacklist_reason: 'Registrado desde Módulo de Incidentes' });
       alert(`🛑 El huésped ${customerName} ha sido enviado a la Lista Negra.`);
       await fetchInitialData();
     } catch (err) {
