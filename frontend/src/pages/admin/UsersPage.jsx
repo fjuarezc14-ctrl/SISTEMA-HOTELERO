@@ -32,8 +32,31 @@ export function UsersPage() {
   const [editFullName, setEditFullName] = useState('');
   const [editRole, setEditRole] = useState('receptionist');
   const [editModules, setEditModules] = useState(null);
+  const [editPassword, setEditPassword] = useState('');
+  const [showEditPassword, setShowEditPassword] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [editError, setEditError] = useState('');
+
+  // Visibilidad de contraseñas por fila en la tabla
+  const [visibleRowPasswords, setVisibleRowPasswords] = useState({});
+  const [userPasswords, setUserPasswords] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('hotel_user_known_passwords') || '{}');
+    } catch {
+      return {};
+    }
+  });
+
+  const saveKnownPassword = (key, pass) => {
+    if (!key || !pass) return;
+    setUserPasswords((prev) => {
+      const next = { ...prev, [String(key)]: pass };
+      try {
+        localStorage.setItem('hotel_user_known_passwords', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
 
   // Modal Cambiar Clave
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
@@ -87,13 +110,17 @@ export function UsersPage() {
 
     try {
       setCreating(true);
-      await api.post('/users', {
+      const res = await api.post('/users', {
         username: username.trim(),
         password,
         full_name: fullName.trim(),
         role,
         allowed_modules: isAdminRole(role) ? null : modules
       });
+      if (res.data?.id) {
+        saveKnownPassword(res.data.id, password);
+      }
+      saveKnownPassword(username.trim().toLowerCase(), password);
       setIsCreateModalOpen(false);
       setUsername('');
       setPassword('');
@@ -113,6 +140,8 @@ export function UsersPage() {
     setEditFullName(u.full_name || '');
     setEditRole(u.role || 'receptionist');
     setEditModules(u.allowed_modules ?? null);
+    setEditPassword('');
+    setShowEditPassword(false);
     setEditError('');
     setIsEditModalOpen(true);
   };
@@ -137,6 +166,19 @@ export function UsersPage() {
         role: editRole,
         allowed_modules: isAdminRole(editRole) ? null : editModules
       });
+
+      if (editPassword.trim()) {
+        const pwdErr = validatePassword(editPassword.trim(), 'Nueva Contraseña');
+        if (pwdErr) {
+          setEditError(pwdErr);
+          setUpdating(false);
+          return;
+        }
+        await api.post(`/users/${editingUser.id}/reset-password`, { password: editPassword.trim() });
+        saveKnownPassword(editingUser.id, editPassword.trim());
+        saveKnownPassword(editUsername.trim().toLowerCase(), editPassword.trim());
+      }
+
       setIsEditModalOpen(false);
       await fetchUsers();
     } catch (err) {
@@ -182,6 +224,8 @@ export function UsersPage() {
     try {
       setResetting(true);
       await api.post(`/users/${selectedUser.id}/reset-password`, { password: newPassword });
+      saveKnownPassword(selectedUser.id, newPassword);
+      saveKnownPassword(selectedUser.username?.toLowerCase(), newPassword);
       setResetSuccessMsg(`Contraseña de @${selectedUser.username} actualizada a: "${newPassword}"`);
       await fetchUsers();
     } catch (err) {
@@ -287,6 +331,7 @@ export function UsersPage() {
                       <th className="py-3 px-3">Nombre Completo</th>
                       <th className="py-3 px-3">Rol / Nivel Acceso</th>
                       <th className="py-3 px-3">Módulos Asignados</th>
+                      <th className="py-3 px-3">Contraseña</th>
                       <th className="py-3 px-3 text-center">Estado</th>
                       <th className="py-3 px-3 text-right">Acciones</th>
                     </tr>
@@ -295,6 +340,8 @@ export function UsersPage() {
                     {usersPage.pageItems.map((u) => {
                       const isAdmin = u.role === 'super_admin' || u.role === 'admin';
                       const isHousekeeper = u.role === 'housekeeper';
+                      const isPassVisible = Boolean(visibleRowPasswords[u.id]);
+                      const known = userPasswords[u.id] || userPasswords[u.username?.toLowerCase()];
 
                       return (
                         <tr key={u.id} className="hover:bg-slate-50 transition-colors">
@@ -333,6 +380,38 @@ export function UsersPage() {
                                 Predeterminado ({isHousekeeper ? '3 módulos' : '7 módulos'})
                               </span>
                             )}
+                          </td>
+
+                          {/* Columna Ver Contraseña con el icono del ojo */}
+                          <td className="py-3 px-3">
+                            <div className="flex items-center gap-1.5">
+                              <span
+                                className={`inline-flex items-center justify-center font-mono text-[11px] font-bold px-2 py-0.5 rounded-lg border transition-all ${
+                                  isPassVisible
+                                    ? 'bg-amber-50 text-slate-900 border-amber-300 shadow-2xs font-mono font-black'
+                                    : 'bg-slate-100 text-slate-400 border-slate-200'
+                                }`}
+                              >
+                                {isPassVisible ? (known || (isAdmin ? 'admin123' : '••••••••')) : '••••••••'}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setVisibleRowPasswords((prev) => ({
+                                    ...prev,
+                                    [u.id]: !prev[u.id]
+                                  }));
+                                }}
+                                className="p-1 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-emerald-700 transition-colors"
+                                title={isPassVisible ? 'Ocultar contraseña' : 'Ver contraseña'}
+                              >
+                                {isPassVisible ? (
+                                  <EyeOff className="w-3.5 h-3.5 text-emerald-600" />
+                                ) : (
+                                  <Eye className="w-3.5 h-3.5 text-slate-400 hover:text-emerald-600" />
+                                )}
+                              </button>
+                            </div>
                           </td>
 
                           <td className="py-3 px-3 text-center">
@@ -555,6 +634,44 @@ export function UsersPage() {
               <option value="admin">Administrador General</option>
               <option value="housekeeper">Personal Limpieza</option>
             </select>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-semibold text-slate-700">
+                Cambiar Contraseña <span className="text-[10px] text-slate-400 font-normal">(Opcional)</span>
+              </label>
+              <button
+                type="button"
+                onClick={() => {
+                  const pass = generateRandomPassword();
+                  setEditPassword(pass);
+                  setShowEditPassword(true);
+                }}
+                className="text-[10px] font-extrabold text-amber-700 hover:text-amber-800 flex items-center gap-0.5 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200"
+                title="Generar contraseña visible"
+              >
+                <Wand2 className="w-3 h-3 text-amber-600" />
+                <span>🎲 Generar</span>
+              </button>
+            </div>
+            <div className="relative">
+              <input
+                type={showEditPassword ? 'text' : 'password'}
+                placeholder="Dejar vacío para mantener la actual"
+                value={editPassword}
+                onChange={(e) => setEditPassword(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 pr-9 text-xs font-mono font-bold text-slate-900 focus:outline-none focus:border-emerald-600"
+              />
+              <button
+                type="button"
+                onClick={() => setShowEditPassword(!showEditPassword)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 p-1"
+                title={showEditPassword ? 'Ocultar' : 'Ver'}
+              >
+                {showEditPassword ? <EyeOff className="w-4 h-4 text-emerald-600" /> : <Eye className="w-4 h-4 text-slate-500" />}
+              </button>
+            </div>
           </div>
 
           <ModulePermissions role={editRole} value={editModules} onChange={setEditModules} />
