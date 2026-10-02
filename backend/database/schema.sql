@@ -303,6 +303,8 @@ CREATE TABLE IF NOT EXISTS store_sale_items (
 );
 
 ALTER TABLE cash_transactions ADD COLUMN IF NOT EXISTS store_sale_id UUID REFERENCES store_sales(id) ON DELETE SET NULL;
+-- Abono de reserva: permite vincularlo a la estadía en el check-in
+ALTER TABLE cash_transactions ADD COLUMN IF NOT EXISTS reservation_id UUID REFERENCES reservations(id) ON DELETE SET NULL;
 -- Nombre del producto congelado en los consumos (si luego se renombra, el histórico no cambia)
 ALTER TABLE room_consumptions ADD COLUMN IF NOT EXISTS product_name VARCHAR(100);
 -- Icono del producto en la tienda (NULL = se deduce del nombre)

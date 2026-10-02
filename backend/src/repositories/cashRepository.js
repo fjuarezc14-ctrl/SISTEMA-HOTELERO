@@ -15,11 +15,12 @@ export const cashRepository = {
     voucher_number = '',
     customer_ruc = '',
     customer_business_name = '',
-    store_sale_id = null
+    store_sale_id = null,
+    reservation_id = null
   }, runQuery = query) {
     const res = await runQuery(
-      `INSERT INTO cash_transactions (work_shift_id, stay_id, user_id, transaction_type, concept, category, amount_pen, payment_method, reference_number, voucher_type, voucher_number, customer_ruc, customer_business_name, store_sale_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+      `INSERT INTO cash_transactions (work_shift_id, stay_id, user_id, transaction_type, concept, category, amount_pen, payment_method, reference_number, voucher_type, voucher_number, customer_ruc, customer_business_name, store_sale_id, reservation_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
        RETURNING *`,
       [
         work_shift_id,
@@ -35,7 +36,8 @@ export const cashRepository = {
         voucher_number,
         customer_ruc,
         customer_business_name,
-        store_sale_id
+        store_sale_id,
+        reservation_id
       ]
     );
     return res.rows[0];

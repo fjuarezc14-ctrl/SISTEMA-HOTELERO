@@ -180,17 +180,18 @@ export const stayService = {
     const amountDue = round2(Math.max(0, quote.price - deposit));
     const payments = normalizePayment(initial_payment, amountDue);
 
-    // 7. Voucher (si hay cobro)
     const paidNow = payments.reduce((sum, p) => sum + p.amount, 0);
-    const voucher = payments.length > 0 ? await issueVoucher(initial_payment) : null;
 
-    // 8. Ejecutar todas las escrituras dentro de una transacción atómica
+    // 7. Ejecutar todas las escrituras dentro de una transacción atómica
     return await withTransaction(async (txQuery) => {
       // Bloquear habitación para verificar que sigue disponible antes de asignar
       const lockRes = await txQuery('SELECT id, status FROM rooms WHERE id = $1 FOR UPDATE', [room.id]);
       if (lockRes.rows[0]?.status !== 'available') {
         throw badRequest(`La habitación ya no está disponible (Estado actual: ${lockRes.rows[0]?.status}).`);
       }
+
+      // Comprobante (si hay cobro): dentro de la transacción para no dejar saltos en la numeración
+      const voucher = payments.length > 0 ? await issueVoucher(initial_payment, txQuery) : null;
 
       // Crear la estadía
       const stay = await stayRepository.create({
@@ -203,7 +204,7 @@ export const stayService = {
         companion_name: companion_name ? String(companion_name).trim().slice(0, 150) : '',
         total_stay_price_pen: quote.price
       }, txQuery);
-      await customerRepository.incrementVisits(customer.id);
+      await customerRepository.incrementVisits(customer.id, txQuery);
 
       // Habitación ocupada
       await roomRepository.updateRoomStatus(room.id, 'occupied', `Huésped: ${customer.full_name}`, txQuery);
@@ -227,16 +228,18 @@ export const stayService = {
 
       const updated = await stayRepository.updateStayPrices(stay.id, { total_paid_pen: round2(deposit + paidNow) }, txQuery);
 
-      // Si viene de una reserva con abono, vincular el movimiento de caja de la seña a esta estadía
-      if (reservation && deposit > 0 && reservation.work_shift_id) {
+      // Si viene de una reserva con abono, vincular los movimientos de caja de la seña a esta estadía.
+      // Abonos anteriores a la columna reservation_id: se buscan por turno y concepto.
+      if (reservation && deposit > 0) {
         await txQuery(
-          `UPDATE cash_transactions 
-           SET stay_id = $1 
-           WHERE work_shift_id = $2 
-             AND stay_id IS NULL 
-             AND category = 'stay' 
-             AND concept LIKE $3`,
-          [stay.id, reservation.work_shift_id, `%Abono de Reserva Hab. ${room.room_number}%`]
+          `UPDATE cash_transactions
+           SET stay_id = $1
+           WHERE stay_id IS NULL
+             AND (
+               reservation_id = $2
+               OR (reservation_id IS NULL AND work_shift_id = $3 AND category = 'stay' AND concept LIKE $4)
+             )`,
+          [stay.id, reservation.id, reservation.work_shift_id, `Abono de Reserva Hab. ${room.room_number} - %`]
         );
       }
 
@@ -344,7 +347,7 @@ export const stayService = {
       }
 
       // Registrar en caja: primero penalidad (incidente), luego consumos (tienda) y finalmente saldo de estadía (hospedaje)
-      const voucher = payments.length > 0 ? await issueVoucher(final_payment) : null;
+      const voucher = payments.length > 0 ? await issueVoucher(final_payment, txQuery) : null;
       let penaltyLeft = quote.penalty;
       let storeLeft = round2(Math.min(quote.consumptions, Math.max(0, quote.amount_due - penaltyLeft)));
       let stayLeft = round2(Math.max(0, quote.amount_due - penaltyLeft - storeLeft));

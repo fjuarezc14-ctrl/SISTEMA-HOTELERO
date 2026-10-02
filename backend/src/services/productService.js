@@ -144,7 +144,6 @@ export const productService = {
 
     // El pago (simple o mixto) debe cubrir exactamente el total de la venta
     normalizePayment({ amount: totalAmount, payment_method, reference_number, split_payments }, totalAmount);
-    const voucher = await issueVoucher({ voucher_type, customer_ruc, customer_business_name });
 
     // Verificar si viene una habitación vinculada
     let stayInfo = null;
@@ -154,11 +153,14 @@ export const productService = {
 
     const paymentLabel = payment_method === 'MIXED' && Array.isArray(split_payments) && split_payments.length > 0 ? 'MIXED' : payment_method || 'CASH';
 
-    // Descontar stock y guardar el detalle de la venta con el precio de este momento (todo o nada)
+    // Descontar stock y guardar el detalle de la venta con el precio de este momento (todo o nada).
+    // El comprobante se numera aquí: si la venta falla, el número no se pierde.
+    let voucher = null;
     const sale = await withTransaction(async (txQuery) => {
       for (const l of lines) {
         await decrementStockTx(txQuery, l);
       }
+      voucher = await issueVoucher({ voucher_type, customer_ruc, customer_business_name }, txQuery);
       const saleRes = await txQuery(
         `INSERT INTO store_sales (work_shift_id, stay_id, user_id, total_pen, payment_method)
          VALUES ($1, $2, $3, $4, $5) RETURNING *`,
@@ -246,9 +248,8 @@ export const productService = {
 
     // Operación atómica: Stock + Kardex + Egreso de caja
     return await withTransaction(async (txQuery) => {
-      // 1. Incrementar stock en productos
-      const currentStock = Number(product.stock || 0);
-      await productRepository.update(product.id, { stock: currentStock + qty }, txQuery);
+      // 1. Incrementar stock en productos (atómico)
+      await productRepository.incrementStock(product.id, qty, txQuery);
 
       // 2. Registrar egreso en caja
       const concept = `Compra mercadería: ${product.name} (x${qty})`;

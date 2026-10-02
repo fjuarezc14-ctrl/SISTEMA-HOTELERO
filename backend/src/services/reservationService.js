@@ -186,6 +186,7 @@ export const reservationService = {
         amount_pen: p.amount,
         payment_method: p.payment_method,
         reference_number: p.reference_number,
+        reservation_id: reservation.id,
         ...voucher
       });
     }

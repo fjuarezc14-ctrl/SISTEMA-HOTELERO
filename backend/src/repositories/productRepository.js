@@ -43,6 +43,15 @@ export const productRepository = {
     return res.rows[0] || null;
   },
 
+  /** Suma stock de forma atómica (no se pierden compras simultáneas) */
+  async incrementStock(id, quantity, runQuery = query) {
+    const res = await runQuery(
+      `UPDATE products SET stock = stock + $2, updated_at = NOW() WHERE id = $1 RETURNING *`,
+      [id, quantity]
+    );
+    return res.rows[0] || null;
+  },
+
   async decrementStock(id, quantity = 1) {
     const res = await query(
       `UPDATE products

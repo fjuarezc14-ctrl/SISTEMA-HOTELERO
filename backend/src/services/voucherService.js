@@ -35,9 +35,10 @@ export async function nextVoucherNumber(voucherType, runQuery = query) {
 
 /**
  * Prepara los datos del comprobante de una operación.
+ * Con runQuery de una transacción, el número solo se consume si la operación se confirma (sin saltos).
  * Devuelve { voucher_type, voucher_number, customer_ruc, customer_business_name } listos para cash_transactions.
  */
-export async function issueVoucher({ voucher_type, customer_ruc = '', customer_business_name = '' } = {}) {
+export async function issueVoucher({ voucher_type, customer_ruc = '', customer_business_name = '' } = {}, runQuery = query) {
   const type = normalizeVoucherType(voucher_type);
   const ruc = String(customer_ruc || '').trim();
   const businessName = String(customer_business_name || '').trim();
@@ -49,7 +50,7 @@ export async function issueVoucher({ voucher_type, customer_ruc = '', customer_b
 
   return {
     voucher_type: type,
-    voucher_number: await nextVoucherNumber(type),
+    voucher_number: await nextVoucherNumber(type, runQuery),
     customer_ruc: type === 'FACTURA' ? ruc : '',
     customer_business_name: type === 'FACTURA' ? businessName.slice(0, 255) : ''
   };

@@ -200,9 +200,14 @@ test('check-in desde reserva: respeta la salida reservada y cobra total − abon
   assert.equal(money(stay.total_stay_price_pen), money(quote.price));
   assert.equal(money(stay.total_paid_pen), money(quote.price), 'Pagado = abono + diferencia');
 
+  // El abono (cobrado al reservar) queda vinculado a la estadía; en el check-in solo se cobra la diferencia
   const txs = await cashForStay(stay.id);
-  assert.equal(txs.length, 1, 'Solo se registra la diferencia (el abono ya estaba en caja)');
-  assert.equal(money(txs[0].amount_pen), money(quote.amount_due));
+  assert.equal(txs.length, 2, 'Abono de la reserva + diferencia cobrada en el check-in');
+  const depositTx = txs.find((t) => t.reservation_id === reservation.id);
+  assert.ok(depositTx, 'El abono se vincula por reservation_id');
+  assert.equal(money(depositTx.amount_pen), money(reservation.deposit_amount_pen));
+  const checkinTx = txs.find((t) => t !== depositTx);
+  assert.equal(money(checkinTx.amount_pen), money(quote.amount_due));
 
   const final = await expectOk('GET', `/stays/${stay.id}/checkout-quote`, { token });
   assert.equal(money(final.amount_due), 0, 'Sin consumos, no debe quedar saldo');
