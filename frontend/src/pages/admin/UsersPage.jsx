@@ -407,22 +407,7 @@ export function UsersPage() {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="block text-xs font-bold text-slate-800">Contraseña</label>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const pass = generateRandomPassword();
-                    setPassword(pass);
-                    setShowCreatePassword(true);
-                  }}
-                  className="text-[10px] font-extrabold text-amber-700 hover:text-amber-800 flex items-center gap-0.5 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200"
-                  title="Generar contraseña de prueba"
-                >
-                  <Wand2 className="w-3 h-3 text-amber-600" />
-                  <span>🎲 Generar</span>
-                </button>
-              </div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Contraseña</label>
               <div className="relative">
                 <input
                   type={showCreatePassword ? 'text' : 'password'}
