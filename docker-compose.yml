@@ -34,6 +34,9 @@ services:
       - DB_PASSWORD=${DB_PASSWORD:-hotel_secret_2026}
       - DB_NAME=${DB_NAME:-hotel_peru_db}
       - JWT_SECRET=${JWT_SECRET:-valetec_hotel_peru_jwt_secret_2026}
+      - CORS_ORIGIN=${CORS_ORIGIN:-https://hotelprueba.valetec.pe}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-https://hotelprueba.valetec.pe}
+      - FRONTEND_URL=${FRONTEND_URL:-https://hotelprueba.valetec.pe}
     depends_on:
       - postgres
     volumes:

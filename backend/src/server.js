@@ -12,15 +12,33 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 4000;
 
-const allowedOrigins = process.env.CORS_ORIGIN
-  ? process.env.CORS_ORIGIN.split(',').map((o) => o.trim())
-  : ['http://localhost:5185', 'http://127.0.0.1:5185'];
+const rawOrigins = [
+  process.env.CORS_ORIGIN,
+  process.env.ALLOWED_ORIGINS,
+  process.env.FRONTEND_URL
+].filter(Boolean).join(',');
+
+const defaultOrigins = [
+  'http://localhost:5185',
+  'http://127.0.0.1:5185',
+  'https://hotelprueba.valetec.pe'
+];
+
+const parsedCustomOrigins = rawOrigins
+  ? rawOrigins.split(',').map((o) => o.trim()).filter(Boolean)
+  : [];
+
+const allowedOrigins = Array.from(new Set([...defaultOrigins, ...parsedCustomOrigins]));
 
 // Middlewares de seguridad y parsing
 app.use(helmet({ crossOriginResourcePolicy: false }));
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin || allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
+      return callback(null, true);
+    }
+    // Permitir acceso desde IPs locales (ej. compañeros en la misma red en puerto 5185)
+    if (/^http:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)(:5185)?$/.test(origin)) {
       return callback(null, true);
     }
     return callback(new Error(`Origen ${origin} no permitido por política CORS.`));
