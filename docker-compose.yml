@@ -8,7 +8,7 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD:-hotel_secret_2026}
       POSTGRES_DB: ${DB_NAME:-hotel_peru_db}
     ports:
-      - "5438:5432"
+      - "127.0.0.1:5440:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./backend/database/schema.sql:/docker-entrypoint-initdb.d/1_schema.sql
@@ -25,7 +25,7 @@ services:
     ports:
       - "4020:4020"
     environment:
-      - NODE_ENV=${NODE_ENV:-development}
+      - NODE_ENV=${NODE_ENV:-production}
       - PORT=4020
       - TZ=America/Lima
       - DB_HOST=postgres
@@ -39,9 +39,6 @@ services:
       - FRONTEND_URL=${FRONTEND_URL:-https://hotelprueba.valetec.pe}
     depends_on:
       - postgres
-    volumes:
-      - ./backend:/app
-      - /app/node_modules
     networks:
       - hotel_network
 
@@ -52,12 +49,7 @@ services:
     container_name: hotel_peru_frontend
     restart: always
     ports:
-      - "5185:5185"
-    environment:
-      - VITE_PROXY_TARGET=http://backend:4020
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
+      - "5185:80"
     depends_on:
       - backend
     networks:
