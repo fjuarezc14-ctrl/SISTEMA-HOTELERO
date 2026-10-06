@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { api } from '../../api/apiClient';
 import { useGlobalStore } from '../../context/GlobalStoreContext';
+import { useSmartPolling } from '../../hooks/useSmartPolling';
 import {
   BedDouble,
   Wallet,
@@ -32,21 +33,23 @@ export function Sidebar({ currentTab, setCurrentTab, isMobileOpen = false, setIs
     setImgError(false);
   }, [hotelInfo?.logo_url]);
 
-  useEffect(() => {
+  const checkIncidents = useCallback(async () => {
     if (!canSeeIncidents) return;
-    const checkIncidents = async () => {
-      try {
-        const res = await api.get('/incidents?status=reported&limit=100');
-        const list = res.data?.data || res.data || [];
-        setReportedIncidentsCount(list.length);
-      } catch (err) {
-        // Silencioso
-      }
-    };
-    checkIncidents();
-    const interval = setInterval(checkIncidents, 60000); // Actualiza cada 60 segundos
-    return () => clearInterval(interval);
+    try {
+      const res = await api.get('/incidents?status=reported&limit=100');
+      const list = res.data?.data || res.data || [];
+      setReportedIncidentsCount(list.length);
+    } catch (err) {
+      // Silencioso
+    }
   }, [canSeeIncidents]);
+
+  useEffect(() => {
+    checkIncidents();
+  }, [checkIncidents]);
+
+  // Polling inteligente cada 90s (se pausa en segundo plano, refresca al volver)
+  useSmartPolling(checkIncidents, 90000, canSeeIncidents);
 
   const navItems = [
     { id: 'reception', label: 'Recepción', icon: BedDouble },

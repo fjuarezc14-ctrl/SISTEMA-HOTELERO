@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { api } from '../../api/apiClient';
 import { useGlobalStore } from '../../context/GlobalStoreContext';
+import { useSmartPolling } from '../../hooks/useSmartPolling';
 import { formatPEN, formatDatePeru, getRemainingTime, ROOM_STATUS_CONFIG } from '../../utils/formatters';
 import { CheckInModal } from '../../components/reception/CheckInModal';
 import { CheckOutModal } from '../../components/reception/CheckOutModal';
@@ -74,9 +75,10 @@ export function ReceptionPage() {
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 15000); // Refresco automático cada 15s
-    return () => clearInterval(interval);
   }, [fetchData]);
+
+  // Polling inteligente cada 30s (pausado en segundo plano, refresco instantáneo al volver a la pestaña)
+  useSmartPolling(fetchData, 30000);
 
   const handleQuickStatusChange = async (roomId, newStatus) => {
     try {

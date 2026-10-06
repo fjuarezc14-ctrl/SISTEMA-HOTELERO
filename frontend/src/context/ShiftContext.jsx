@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { api } from '../api/apiClient';
 import { useAuth } from './AuthContext';
+import { useSmartPolling } from '../hooks/useSmartPolling';
 
 const ShiftContext = createContext(null);
 
@@ -25,10 +26,10 @@ export function ShiftProvider({ children }) {
 
   useEffect(() => {
     fetchActiveShift();
-    // Sondeo periódico cada 30 segundos
-    const interval = setInterval(fetchActiveShift, 30000);
-    return () => clearInterval(interval);
   }, [fetchActiveShift]);
+
+  // Sondeo inteligente cada 90s solo si está autenticado y pestaña visible
+  useSmartPolling(fetchActiveShift, 90000, isAuthenticated);
 
   const openShift = async (initialCash, shiftNotes = '', adminAuth = null) => {
     const res = await api.post('/shifts/open', {
