@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { api } from '../../api/apiClient';
+import { useGlobalStore } from '../../context/GlobalStoreContext';
 import { escapeHtml } from '../../utils/escapeHtml';
 import { Pagination, usePagination } from '../../components/common/Pagination';
 import { formatPEN, formatDatePeru, PAYMENT_METHOD_LABELS } from '../../utils/formatters';
@@ -66,9 +67,11 @@ export function ReportsPage() {
 
 function KpiReports() {
   const { printReceipt } = useReceipt();
+  const { hotelInfo } = useGlobalStore();
   const [period, setPeriod] = useState('today'); // 'today' | 'yesterday' | 'week' | 'month' | 'custom'
   const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10));
   const [endDate, setEndDate] = useState(new Date().toISOString().slice(0, 10));
+  const [categoryFilter, setCategoryFilter] = useState('all'); // 'all' | 'store' | 'stay' | 'expense' | 'incident'
 
   const [kpis, setKpis] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -128,25 +131,59 @@ function KpiReports() {
     fetchReportsData();
   }, [startDate, endDate]);
 
+  // Transacciones filtradas según categoría seleccionada
+  const filteredTransactions = useMemo(() => {
+    if (!kpis?.transactions) return [];
+    if (categoryFilter === 'all') return kpis.transactions;
+    if (categoryFilter === 'store') {
+      return kpis.transactions.filter((t) => t.category === 'store' || t.category === 'consumption');
+    }
+    if (categoryFilter === 'stay') {
+      return kpis.transactions.filter((t) => t.category === 'stay');
+    }
+    if (categoryFilter === 'expense') {
+      return kpis.transactions.filter((t) => t.transaction_type === 'expense');
+    }
+    if (categoryFilter === 'incident') {
+      return kpis.transactions.filter((t) => t.category === 'incident');
+    }
+    return kpis.transactions;
+  }, [kpis?.transactions, categoryFilter]);
+
+  // Subtotal consolidado del filtro activo
+  const filteredTotal = useMemo(() => {
+    return filteredTransactions.reduce((sum, t) => {
+      const val = Number(t.amount_pen || 0);
+      return t.transaction_type === 'expense' ? sum - val : sum + val;
+    }, 0);
+  }, [filteredTransactions]);
+
   const exportToXlsx = async () => {
-    if (!kpis || !kpis.transactions || kpis.transactions.length === 0) {
-      alert('No hay transacciones en el periodo seleccionado para exportar.');
+    if (!filteredTransactions || filteredTransactions.length === 0) {
+      alert('No hay transacciones en el periodo o categoría seleccionada para exportar.');
       return;
     }
     try {
+      const hotelNameClean = (hotelInfo?.trade_name || hotelInfo?.business_name || 'Hotel')
+        .replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ_-]/g, '_');
+      const catLabel = categoryFilter === 'store' ? 'Ventas_Tienda' :
+                       categoryFilter === 'stay' ? 'Hospedajes' :
+                       categoryFilter === 'expense' ? 'Gastos_Egresos' :
+                       categoryFilter === 'incident' ? 'Incidentes' : 'General';
+
       await exportToExcel(
-        kpis.transactions,
+        filteredTransactions,
         [
-          { header: 'Fecha', value: (t) => formatDatePeru(t.created_at), width: 20 },
-          { header: 'Tipo', value: (t) => (t.transaction_type === 'expense' ? 'Egreso' : 'Ingreso'), width: 10 },
+          { header: 'Fecha / Hora', value: (t) => formatDatePeru(t.created_at), width: 20 },
+          { header: 'Tipo', value: (t) => (t.transaction_type === 'expense' ? 'Egreso' : 'Ingreso'), width: 12 },
           { header: 'Concepto', value: (t) => t.concept, width: 40 },
-          { header: 'Categoría', value: (t) => t.category, width: 16 },
+          { header: 'Categoría', value: (t) => (t.category === 'store' || t.category === 'consumption' ? 'Tienda / Minibar' : t.category === 'stay' ? 'Hospedaje' : t.category === 'incident' ? 'Incidente' : t.category), width: 18 },
           { header: 'Medio de Pago', value: (t) => PAYMENT_METHOD_LABELS[t.payment_method] || t.payment_method, width: 18 },
           { header: 'Registrado Por', value: (t) => t.user_full_name || 'Sistema', width: 22 },
-          { header: 'Monto', value: (t) => t.amount_pen, width: 14, money: true }
+          { header: 'Monto (S/)', value: (t) => t.amount_pen, width: 14, money: true }
         ],
-        `reporte_hotel_${startDate}_al_${endDate}`,
-        'Movimientos'
+        `reporte_${catLabel}_${hotelNameClean}_${startDate}_al_${endDate}`,
+        `Reporte ${catLabel}`
       );
     } catch (err) {
       alert('Error al generar el archivo Excel.');
@@ -156,8 +193,20 @@ function KpiReports() {
 
   const exportMinceturPoliceReport = () => {
     const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert('Por favor permite las ventanas emergentes (pop-ups) para generar el Libro Oficial PNP / MINCETUR.');
+      return;
+    }
+
     const nowStr = new Date().toLocaleDateString('es-PE', { year: 'numeric', month: 'long', day: 'numeric' });
     const periodStr = `${startDate} al ${endDate}`;
+
+    // Membrete legal dinámico: se adapta automáticamente si el hotel cambia de nombre o RUC en Configuración
+    const businessName = escapeHtml(hotelInfo?.business_name || 'ESTABLECIMIENTO DE HOSPEDAJE');
+    const tradeName = escapeHtml(hotelInfo?.trade_name || hotelInfo?.business_name || 'Hotel');
+    const ruc = escapeHtml(hotelInfo?.ruc || '-');
+    const address = escapeHtml(hotelInfo?.address || '-');
+    const phone = escapeHtml(hotelInfo?.phone || '-');
 
     const rowsHtml = minceturStays.map((s, idx) => `
       <tr>
@@ -176,7 +225,7 @@ function KpiReports() {
       <!DOCTYPE html>
       <html>
         <head>
-          <title>Libro Registral Oficial PNP / MINCETUR - Hotel Zafiro</title>
+          <title>Libro Registral Oficial PNP / MINCETUR - ${tradeName}</title>
           <style>
             body { font-family: Arial, sans-serif; padding: 25px; color: #0f172a; line-height: 1.4; }
             .header-title { text-align: center; border-bottom: 2px solid #059669; padding-bottom: 10px; margin-bottom: 15px; }
@@ -192,13 +241,13 @@ function KpiReports() {
         </head>
         <body>
           <div class="header-title">
-            <h1>HOTEL ZAFIRO S.A.C.</h1>
+            <h1>${businessName}</h1>
             <h2>LIBRO REGISTRAL OFICIAL DE HUÉSPEDES (POLICÍA NACIONAL DEL PERÚ & MINCETUR)</h2>
           </div>
           <div class="box-info">
             <div>
-              <strong>RUC:</strong> 20123456789 | <strong>Establecimiento:</strong> Hotel Zafiro Lima<br/>
-              <strong>Dirección:</strong> Av. Principal 123, Lima, Perú
+              <strong>RUC:</strong> ${ruc} | <strong>Establecimiento:</strong> ${tradeName}<br/>
+              <strong>Dirección:</strong> ${address} | <strong>Teléfono:</strong> ${phone}
             </div>
             <div style="text-align: right;">
               <strong>Rango Consultado:</strong> ${periodStr}<br/>
@@ -232,7 +281,18 @@ function KpiReports() {
     printWindow.document.close();
   };
 
-  const reportTxPage = usePagination(kpis?.transactions || [], { resetKey: `${startDate}|${endDate}` });
+  const counts = useMemo(() => {
+    if (!kpis?.transactions) return { all: 0, store: 0, stay: 0, expense: 0, incident: 0 };
+    return {
+      all: kpis.transactions.length,
+      store: kpis.transactions.filter((t) => t.category === 'store' || t.category === 'consumption').length,
+      stay: kpis.transactions.filter((t) => t.category === 'stay').length,
+      expense: kpis.transactions.filter((t) => t.transaction_type === 'expense').length,
+      incident: kpis.transactions.filter((t) => t.category === 'incident').length
+    };
+  }, [kpis?.transactions]);
+
+  const reportTxPage = usePagination(filteredTransactions, { resetKey: `${startDate}|${endDate}|${categoryFilter}` });
 
   return (
     <div className="space-y-6">
@@ -262,9 +322,12 @@ function KpiReports() {
           <button
             onClick={exportToXlsx}
             className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-md shadow-emerald-600/20 transition-all flex items-center gap-1.5"
+            title="Exportar a Excel según el periodo y categoría filtrada"
           >
             <Download className="w-4 h-4" />
-            <span>Exportar Excel</span>
+            <span>
+              Exportar Excel {categoryFilter === 'store' ? '(Solo Tienda)' : categoryFilter === 'stay' ? '(Solo Hospedaje)' : categoryFilter === 'expense' ? '(Solo Gastos)' : categoryFilter === 'incident' ? '(Solo Incidentes)' : ''}
+            </span>
           </button>
         </div>
       </div>
@@ -412,7 +475,17 @@ function KpiReports() {
               </h3>
 
               <div className="space-y-3">
-                <div className="p-3.5 bg-slate-50 rounded-2xl flex items-center justify-between border border-slate-200">
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setCategoryFilter(categoryFilter === 'stay' ? 'all' : 'stay')}
+                  className={`p-3.5 rounded-2xl flex items-center justify-between border transition-all cursor-pointer ${
+                    categoryFilter === 'stay'
+                      ? 'bg-emerald-50 border-emerald-300 ring-2 ring-emerald-500 shadow-xs'
+                      : 'bg-slate-50 border-slate-200 hover:bg-slate-100 hover:border-slate-300'
+                  }`}
+                  title="Hacer clic para filtrar solo hospedajes en la tabla"
+                >
                   <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
                       <Bed className="w-5 h-5" />
@@ -422,10 +495,23 @@ function KpiReports() {
                       <span className="text-[11px] text-slate-500">Alquiler por horas, pernocte y día completo</span>
                     </div>
                   </div>
-                  <span className="text-sm font-mono font-black text-emerald-700">{formatPEN(kpis.stayRevenue)}</span>
+                  <div className="text-right">
+                    <span className="text-sm font-mono font-black text-emerald-700 block">{formatPEN(kpis.stayRevenue)}</span>
+                    <span className="text-[10px] font-semibold text-emerald-600">{categoryFilter === 'stay' ? '● Filtrado activo' : 'Clic para filtrar'}</span>
+                  </div>
                 </div>
 
-                <div className="p-3.5 bg-slate-50 rounded-2xl flex items-center justify-between border border-slate-200">
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setCategoryFilter(categoryFilter === 'store' ? 'all' : 'store')}
+                  className={`p-3.5 rounded-2xl flex items-center justify-between border transition-all cursor-pointer ${
+                    categoryFilter === 'store'
+                      ? 'bg-blue-50 border-blue-300 ring-2 ring-blue-500 shadow-xs'
+                      : 'bg-slate-50 border-slate-200 hover:bg-slate-100 hover:border-slate-300'
+                  }`}
+                  title="Hacer clic para filtrar solo ventas de tienda y frigobar"
+                >
                   <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center">
                       <ShoppingBag className="w-5 h-5" />
@@ -435,10 +521,23 @@ function KpiReports() {
                       <span className="text-[11px] text-slate-500">Ventas de mostrador y consumos a habitación</span>
                     </div>
                   </div>
-                  <span className="text-sm font-mono font-black text-blue-700">{formatPEN(kpis.storeRevenue)}</span>
+                  <div className="text-right">
+                    <span className="text-sm font-mono font-black text-blue-700 block">{formatPEN(kpis.storeRevenue)}</span>
+                    <span className="text-[10px] font-semibold text-blue-600">{categoryFilter === 'store' ? '● Filtrado activo' : 'Clic para filtrar'}</span>
+                  </div>
                 </div>
 
-                <div className="p-3.5 bg-slate-50 rounded-2xl flex items-center justify-between border border-slate-200">
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setCategoryFilter(categoryFilter === 'incident' ? 'all' : 'incident')}
+                  className={`p-3.5 rounded-2xl flex items-center justify-between border transition-all cursor-pointer ${
+                    categoryFilter === 'incident'
+                      ? 'bg-violet-50 border-violet-300 ring-2 ring-violet-500 shadow-xs'
+                      : 'bg-slate-50 border-slate-200 hover:bg-slate-100 hover:border-slate-300'
+                  }`}
+                  title="Hacer clic para filtrar solo incidentes y penalidades"
+                >
                   <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-xl bg-violet-100 text-violet-700 flex items-center justify-center">
                       <ShieldAlert className="w-5 h-5" />
@@ -448,7 +547,10 @@ function KpiReports() {
                       <span className="text-[11px] text-slate-500">Cobro de daños y sobrestadía</span>
                     </div>
                   </div>
-                  <span className="text-sm font-mono font-black text-violet-700">{formatPEN(kpis.incidentRevenue)}</span>
+                  <div className="text-right">
+                    <span className="text-sm font-mono font-black text-violet-700 block">{formatPEN(kpis.incidentRevenue)}</span>
+                    <span className="text-[10px] font-semibold text-violet-600">{categoryFilter === 'incident' ? '● Filtrado activo' : 'Clic para filtrar'}</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -503,12 +605,81 @@ function KpiReports() {
             </div>
           </div>
 
-          {/* Tabla de Movimientos Financieros */}
+          {/* Tabla de Movimientos Financieros con Filtros por Categoría */}
           <div className="p-6 bg-white border border-slate-200 rounded-3xl shadow-sm space-y-4">
-            <h3 className="text-sm font-bold text-slate-900">Transacciones de Caja en el Periodo</h3>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">
+                  {categoryFilter === 'store' ? 'Ventas de Tienda & Minibar' :
+                   categoryFilter === 'stay' ? 'Ingresos por Hospedaje / Check-ins' :
+                   categoryFilter === 'expense' ? 'Gastos & Egresos de Caja' :
+                   categoryFilter === 'incident' ? 'Cobros por Incidentes / Daños' :
+                   'Transacciones de Caja en el Periodo'}
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Mostrando {filteredTransactions.length} movimiento(s) • Total filtrado: <span className="font-mono font-bold text-emerald-700">{formatPEN(filteredTotal)}</span>
+                </p>
+              </div>
 
-            {kpis.transactions.length === 0 ? (
-              <div className="py-8 text-center text-xs text-slate-400">No hay movimientos registrados en el periodo.</div>
+              {/* Botones de Filtro por Categoría */}
+              <div className="flex items-center gap-1.5 overflow-x-auto text-xs font-semibold p-1 bg-slate-100 rounded-2xl w-fit">
+                <button
+                  type="button"
+                  onClick={() => setCategoryFilter('all')}
+                  className={`px-3 py-1.5 rounded-xl transition-all ${
+                    categoryFilter === 'all'
+                      ? 'bg-white text-slate-900 font-bold shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Todos ({counts.all})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCategoryFilter('store')}
+                  className={`px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all ${
+                    categoryFilter === 'store'
+                      ? 'bg-blue-600 text-white font-bold shadow-xs'
+                      : 'text-blue-700 hover:bg-blue-50'
+                  }`}
+                  title="Ver solo ventas de productos y frigobar"
+                >
+                  <ShoppingBag className="w-3.5 h-3.5" />
+                  <span>Solo Tienda ({counts.store})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCategoryFilter('stay')}
+                  className={`px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all ${
+                    categoryFilter === 'stay'
+                      ? 'bg-emerald-600 text-white font-bold shadow-xs'
+                      : 'text-emerald-700 hover:bg-emerald-50'
+                  }`}
+                  title="Ver solo alquiler de habitaciones"
+                >
+                  <Bed className="w-3.5 h-3.5" />
+                  <span>Solo Hospedaje ({counts.stay})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCategoryFilter('expense')}
+                  className={`px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all ${
+                    categoryFilter === 'expense'
+                      ? 'bg-rose-600 text-white font-bold shadow-xs'
+                      : 'text-rose-700 hover:bg-rose-50'
+                  }`}
+                  title="Ver solo gastos y salidas de caja"
+                >
+                  <ArrowDownCircle className="w-3.5 h-3.5" />
+                  <span>Gastos ({counts.expense})</span>
+                </button>
+              </div>
+            </div>
+
+            {filteredTransactions.length === 0 ? (
+              <div className="py-8 text-center text-xs text-slate-400">
+                No hay movimientos registrados en la categoría seleccionada para este periodo.
+              </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
